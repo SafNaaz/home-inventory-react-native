@@ -32,9 +32,6 @@
       "eas": {
         "projectId": "e71839cd-4cd6-49e4-bd68-ffab2ccadcff"
       }
-    },
-    "plugins": [
-      "expo-dev-client"
-    ]
+    }
   }
 }
