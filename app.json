@@ -16,17 +16,25 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.fridgeapp"
+      "bundleIdentifier": "com.safnas.fridgeapp"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.anonymous.fridgeapp"
+      "package": "com.safnas.fridgeapp"
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "e71839cd-4cd6-49e4-bd68-ffab2ccadcff"
+      }
+    },
+    "plugins": [
+      "expo-dev-client"
+    ]
   }
 }

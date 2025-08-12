@@ -56,3 +56,7 @@ web-build/
 
 # Local Netlify folder
 .netlify
+
+# Generated native folders (CNG/Prebuild)
+/android/
+/ios/

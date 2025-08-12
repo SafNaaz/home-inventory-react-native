@@ -1,9 +1,8 @@
-const { getDefaultConfig } = require('expo/metro-config');
+const { getDefaultConfig } = require('@expo/metro-config');
 
 const config = getDefaultConfig(__dirname);
 
 // Reduce file watching to prevent EMFILE errors
-config.watchFolders = [];
 config.resolver.platforms = ['ios', 'android', 'native', 'web'];
 
 // Exclude unnecessary directories from watching
