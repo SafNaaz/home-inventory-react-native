@@ -106,7 +106,123 @@ npx expo start --web
 
 ## 🏗 Building for Production
 
-This project uses **EAS Build** for creating production builds. Make sure you have an Expo account and are logged in.
+This project supports **multiple build workflows** depending on your needs. Choose the one that best fits your development style and requirements.
+
+## 📱 **Development Workflows**
+
+### **Managed Workflow (Expo Go)**
+Best for: Quick prototyping, Expo SDK only apps
+
+**Configuration:**
+```json
+// app.json - Include all native configurations
+{
+  "expo": {
+    "plugins": [], // No expo-dev-client
+    "android": { "package": "com.safnas.fridgeapp" },
+    "ios": { "bundleIdentifier": "com.safnas.fridgeapp" }
+  }
+}
+
+// package.json
+{
+  "scripts": {
+    "android": "expo start --android",
+    "ios": "expo start --ios"
+  },
+  "dependencies": {
+    // No expo-dev-client
+  }
+}
+```
+
+**Usage:**
+```bash
+npm start          # Start Expo server
+# Press 'a' for Android, 'i' for iOS
+# Or scan QR code with Expo Go app
+```
+
+### **Development Build Workflow (Custom Native)**
+Best for: Custom native modules, full React Native features
+
+**Configuration:**
+```json
+// app.json - Include expo-dev-client plugin
+{
+  "expo": {
+    "plugins": ["expo-dev-client"],
+    "android": { "package": "com.safnas.fridgeapp" },
+    "ios": { "bundleIdentifier": "com.safnas.fridgeapp" }
+  }
+}
+
+// package.json
+{
+  "scripts": {
+    "android": "expo run:android",
+    "ios": "expo run:ios"
+  },
+  "dependencies": {
+    "expo-dev-client": "~4.0.29"
+  }
+}
+```
+
+**Setup:**
+```bash
+# Generate native folders
+npx expo prebuild
+
+# Build and run locally
+npm run android  # or npm run ios
+```
+
+## 🚀 **Local APK Building (Fast & Free)**
+
+### **Quick Debug APK (Recommended for Testing)**
+```bash
+# Navigate to android folder
+cd android
+
+# Build debug APK (2-5 minutes)
+.\gradlew assembleDebug
+
+# APK location: android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+### **Release APK (Production-ready)**
+```bash
+cd android
+
+# Build release APK
+.\gradlew assembleRelease
+
+# APK location: android/app/build/outputs/apk/release/app-release.apk
+```
+
+### **Using Expo CLI**
+```bash
+# Debug build
+npx expo run:android --variant debug
+
+# Release build  
+npx expo run:android --variant release
+```
+
+### **Bundle Size Optimization**
+```bash
+# Build with bundle analysis
+cd android
+.\gradlew assembleRelease --scan
+
+# Build specific architecture (smaller APK)
+.\gradlew assembleRelease -Preact.native.archFlags=arm64-v8a
+```
+
+## ☁️ **EAS Build (Cloud Building)**
+
+This is useful for CI/CD, when you don't have the development environment setup, or for iOS builds on non-Mac machines.
 
 ### Setup EAS Build
 
@@ -129,12 +245,12 @@ npx eas build --profile development --platform android
 npx eas build --profile development --platform all
 ```
 
-### Preview Builds
+### Preview Builds (APK Download)
 
 ```bash
-# Build preview version (production-like but for testing)
-npx eas build --profile preview --platform ios
+# Build preview version - generates downloadable APK
 npx eas build --profile preview --platform android
+npx eas build --profile preview --platform ios
 ```
 
 ### Production Builds
@@ -156,6 +272,113 @@ npx eas submit --platform ios
 
 # Submit to Google Play Store
 npx eas submit --platform android
+```
+
+## 🔄 **Switching Between Workflows**
+
+### **From Managed to Development Build**
+
+1. **Add expo-dev-client**:
+   ```bash
+   npx expo install expo-dev-client
+   ```
+
+2. **Update app.json**:
+   ```json
+   {
+     "expo": {
+       "plugins": ["expo-dev-client"]
+     }
+   }
+   ```
+
+3. **Update package.json scripts**:
+   ```json
+   {
+     "scripts": {
+       "android": "expo run:android",
+       "ios": "expo run:ios"
+     }
+   }
+   ```
+
+4. **Generate native folders**:
+   ```bash
+   npx expo prebuild
+   ```
+
+### **From Development Build to Managed**
+
+1. **Remove expo-dev-client**:
+   ```bash
+   npm uninstall expo-dev-client
+   ```
+
+2. **Update app.json** (remove expo-dev-client from plugins):
+   ```json
+   {
+     "expo": {
+       "plugins": []
+     }
+   }
+   ```
+
+3. **Update package.json scripts**:
+   ```json
+   {
+     "scripts": {
+       "android": "expo start --android",
+       "ios": "expo start --ios"
+     }
+   }
+   ```
+
+4. **Remove native folders** (optional):
+   ```bash
+   # Windows
+   rmdir /s /q android ios
+   
+   # macOS/Linux
+   rm -rf android ios
+   ```
+
+5. **Update .gitignore**:
+   ```gitignore
+   # For managed workflow
+   # /android/
+   # /ios/
+   
+   # For development build workflow
+   /android/
+   /ios/
+   ```
+
+## ⚡ **Build Comparison**
+
+| Method | Speed | Cost | Use Case | APK Location |
+|--------|-------|------|----------|--------------|
+| **Local Debug** | 2-5 min | Free | Development/Testing | `android/app/build/outputs/apk/debug/` |
+| **Local Release** | 3-7 min | Free | Production APK | `android/app/build/outputs/apk/release/` |
+| **EAS Preview** | 10-20 min | Uses build minutes | Shareable APK | Download from expo.dev |
+| **EAS Production** | 10-25 min | Uses build minutes | App Store submission | Download from expo.dev |
+
+## 💡 **Quick Tips**
+
+### **For Fast Development:**
+- Use **Managed Workflow** with Expo Go for rapid prototyping
+- Use **Local Debug Builds** for testing with custom native modules
+
+### **For Production:**
+- Use **Local Release Builds** for immediate APK generation
+- Use **EAS Production Builds** for app store submissions
+
+### **APK Sharing:**
+```bash
+# After local build, find your APK at:
+android/app/build/outputs/apk/debug/app-debug.apk
+
+# Install directly on device via ADB:
+adb install android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
 ## 🔧 Local Development Setup
@@ -331,9 +554,73 @@ npx react-native start --reset-cache
 
 ### Build Troubleshooting
 
+#### **EAS Build Issues**
 - Check [EAS Build logs](https://expo.dev/builds) for detailed error information
 - Ensure all dependencies are compatible with Expo SDK 51
 - Verify that your app targets Android API level 34+ for Google Play Store
+
+#### **Local Build Issues**
+
+**Gradle Build Failures:**
+```bash
+# Clean gradle cache
+cd android
+.\gradlew clean
+
+# Reset gradle wrapper
+.\gradlew wrapper --gradle-version=8.8
+```
+
+**Android SDK Issues:**
+```bash
+# Check SDK path
+echo $ANDROID_HOME  # macOS/Linux
+echo %ANDROID_HOME% # Windows
+
+# Install required SDK
+# Open Android Studio > SDK Manager > Install API 34+
+```
+
+**Prebuild Issues:**
+```bash
+# Clear prebuild cache
+npx expo prebuild --clear
+
+# Reset to clean state
+git clean -fd
+npx expo prebuild
+```
+
+**Development Client Not Found:**
+```bash
+# Make sure you're running the right command for your workflow
+# Managed: npm start (then press 'a')
+# Dev Build: npm run android (builds and installs)
+```
+
+**Permission Denied (Windows):**
+```cmd
+# Run as administrator or use:
+PowerShell -ExecutionPolicy Bypass
+```
+
+**Metro Bundler Issues:**
+```bash
+# Reset Metro cache
+npx expo start --clear
+npx react-native start --reset-cache
+```
+
+**APK Not Found After Build:**
+```bash
+# Check these locations:
+# Debug: android/app/build/outputs/apk/debug/app-debug.apk
+# Release: android/app/build/outputs/apk/release/app-release.apk
+
+# If not found, check gradle output for actual path
+cd android
+.\gradlew assembleDebug --info
+```
 
 ## 📄 Scripts
 
