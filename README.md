@@ -201,6 +201,16 @@ cd android
 # APK location: android/app/build/outputs/apk/release/app-release.apk
 ```
 
+### **Release AAB (Android App Bundle - Recommended for Play Store)**
+```bash
+cd android
+
+# Build release AAB (recommended for Google Play Store)
+.\gradlew bundleRelease
+
+# AAB location: android/app/build/outputs/bundle/release/app-release.aab
+```
+
 ### **Using Expo CLI**
 ```bash
 # Debug build
@@ -680,20 +690,28 @@ Before generating a new production build, update the version information:
 ```bash
 # Clean previous builds
 cd android
-./gradlew clean
+.\gradlew clean
 
 # Generate signed AAB for Play Store (recommended)
-./gradlew bundleRelease
+.\gradlew bundleRelease
 
-# Generate signed APK
-./gradlew assembleRelease
+# Generate signed APK (for direct installation)
+.\gradlew assembleRelease
 ```
 
 ### Build Artifacts
 
 Generated files will be located in:
-- **AAB**: `android/app/build/outputs/bundle/release/`
-- **APK**: `android/app/build/outputs/apk/release/`
+- **AAB**: `android/app/build/outputs/bundle/release/` *(Upload to Google Play Console)*
+- **APK**: `android/app/build/outputs/apk/release/` *(For direct installation/testing)*
+
+### Update Benefits for Users
+
+**When you upload a new AAB version to Play Store:**
+- **Delta Updates**: Users only download changed code (5-15MB instead of full app)
+- **Smaller Downloads**: App bundles are 15-20% smaller than APKs
+- **Device Optimization**: Users get code optimized for their specific device
+- **Automatic Updates**: Play Store handles the update process seamlessly
 
 ### Data Persistence
 
