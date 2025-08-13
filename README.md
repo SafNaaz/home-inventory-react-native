@@ -660,3 +660,53 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - **Android**: Targets API level 34+ (Google Play Store compliant)
 - **iOS**: Compatible with latest iOS versions
 - **EAS Build**: Configured for development, preview, and production builds
+
+## Version Management & Release
+
+### Updating App Version
+
+Before generating a new production build, update the version information:
+
+1. **Android Version (Required for Play Store uploads)**:
+   - Edit `android/app/build.gradle`
+   - Increment `versionCode` (integer) for each release
+   - Update `versionName` (string) for user-facing version
+
+2. **Package Version (Optional)**:
+   - Update `version` in `package.json`
+
+### Build Commands
+
+```bash
+# Clean previous builds
+cd android
+./gradlew clean
+
+# Generate signed AAB for Play Store (recommended)
+./gradlew bundleRelease
+
+# Generate signed APK
+./gradlew assembleRelease
+```
+
+### Build Artifacts
+
+Generated files will be located in:
+- **AAB**: `android/app/build/outputs/bundle/release/`
+- **APK**: `android/app/build/outputs/apk/release/`
+
+### Data Persistence
+
+User data will persist across app updates when:
+- Package name (applicationId) remains unchanged
+- App is signed with the same keystore
+- Internal storage structure is maintained
+
+### Git Ignore
+
+The following build artifacts are excluded from version control:
+- Build directories (`build/`)
+- Gradle cache (`.gradle/`)
+- IDE files (`.idea/`, `*.iml`)
+- Bundle files (`*.jsbundle`)
+- Native build cache
