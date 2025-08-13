@@ -217,7 +217,9 @@ cd android
 .\gradlew assembleRelease --scan
 
 # Build specific architecture (smaller APK)
-.\gradlew assembleRelease -Preact.native.archFlags=arm64-v8a
+.\gradlew assembleRelease -Preact.native.archFlags=arm64-v8a  (windows)
+
+./gradlew assembleRelease -Preact.native.archFlags=arm64-v8a (linux)
 ```
 
 ## ☁️ **EAS Build (Cloud Building)**
@@ -378,7 +380,9 @@ npx eas submit --platform android
 android/app/build/outputs/apk/debug/app-debug.apk
 
 # Install directly on device via ADB:
-adb install android/app/build/outputs/apk/debug/app-debug.apk
+debug adb install android/app/build/outputs/apk/debug/app-debug.apk
+
+release - adb install android/app/build/outputs/apk/release/app-release.apk
 ```
 
 ## 🔧 Local Development Setup
