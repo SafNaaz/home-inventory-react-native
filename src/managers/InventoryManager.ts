@@ -131,7 +131,6 @@ export class InventoryManager {
 
     await StorageService.saveInventoryItems(this.inventoryItems);
     console.log(`🔄 Updated ${item.name} quantity to ${Math.round(clampedQuantity * 100)}%`);
-    
     this.notifyListeners();
   }
 
