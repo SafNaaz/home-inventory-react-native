@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
-import { Provider as PaperProvider, IconButton } from 'react-native-paper';
+import { Provider as PaperProvider, IconButton, Title, Paragraph, Button } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { StatusBar, Alert, View } from 'react-native';
 
@@ -69,14 +69,7 @@ const App: React.FC = () => {
               {
                 text: 'Retry',
                 onPress: () => initializeApp(),
-              },
-              {
-                text: 'Exit',
-                onPress: () => {
-                  // In a real app, you might want to close the app or show a locked screen
-                },
-                style: 'cancel',
-              },
+              }
             ]
           );
           return;
@@ -88,6 +81,11 @@ const App: React.FC = () => {
       console.error('❌ Error initializing app:', error);
       setIsLoading(false);
     }
+  };
+
+  const handleAuthenticate = async () => {
+    const success = await settingsManager.authenticateUser();
+    setIsAuthenticated(success);
   };
 
   // Show loading screen while initializing
@@ -105,13 +103,34 @@ const App: React.FC = () => {
 
   // Show authentication screen if security is enabled but not authenticated
   if (isSecurityEnabled && !isAuthenticated) {
+    const theme = isDarkMode ? darkTheme : lightTheme;
     return (
-      <PaperProvider theme={isDarkMode ? darkTheme : lightTheme}>
+      <PaperProvider theme={theme}>
         <StatusBar
           barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-          backgroundColor={isDarkMode ? '#121212' : '#ffffff'}
+          backgroundColor={theme.colors.surface}
         />
-        {/* You can create a proper authentication screen component here */}
+        <View style={{ 
+          flex: 1, 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          backgroundColor: theme.colors.background,
+          padding: 32,
+        }}>
+          <Icon name="lock" size={80} color={theme.colors.primary} style={{ marginBottom: 24 }} />
+          <Title style={{ fontSize: 24, marginBottom: 8, color: theme.colors.onBackground }}>App Locked</Title>
+          <Paragraph style={{ textAlign: 'center', marginBottom: 32, color: theme.colors.onSurfaceVariant }}>
+            Please authenticate using your device security to access your home inventory.
+          </Paragraph>
+          <Button 
+            mode="contained" 
+            onPress={handleAuthenticate}
+            icon="fingerprint"
+            contentStyle={{ paddingHorizontal: 24, paddingVertical: 8 }}
+          >
+            Unlock Now
+          </Button>
+        </View>
       </PaperProvider>
     );
   }

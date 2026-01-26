@@ -11,7 +11,10 @@ import {
   Divider,
   useTheme,
   Button,
+  Portal,
+  Dialog,
 } from 'react-native-paper';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 
 import { settingsManager } from '../managers/SettingsManager';
@@ -22,6 +25,8 @@ const NotificationSettingsScreen: React.FC = () => {
   const [isSecondReminderEnabled, setIsSecondReminderEnabled] = useState(false);
   const [reminderTime1, setReminderTime1] = useState(new Date());
   const [reminderTime2, setReminderTime2] = useState(new Date());
+  const [timePickerVisible, setTimePickerVisible] = useState(false);
+  const [timePickerType, setTimePickerType] = useState<'time1' | 'time2'>('time1');
 
   useEffect(() => {
     loadSettings();
@@ -51,6 +56,24 @@ const NotificationSettingsScreen: React.FC = () => {
 
   const formatTime = (date: Date): string => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const handleTimePickerOpen = (type: 'time1' | 'time2') => {
+    setTimePickerType(type);
+    setTimePickerVisible(true);
+  };
+
+  const handleTimePickerConfirm = async (date: Date) => {
+    if (timePickerType === 'time1') {
+      await settingsManager.updateReminderTime1(date);
+    } else {
+      await settingsManager.updateReminderTime2(date);
+    }
+    setTimePickerVisible(false);
+  };
+
+  const handleTestNotification = async () => {
+    await settingsManager.sendTestNotification();
   };
 
   return (
@@ -89,10 +112,7 @@ const NotificationSettingsScreen: React.FC = () => {
                 description={`Daily at ${formatTime(reminderTime1)}`}
                 left={(props) => <List.Icon {...props} icon="clock-outline" />}
                 right={(props) => <List.Icon {...props} icon="chevron-right" />}
-                onPress={() => {
-                  // TODO: Open time picker for first reminder
-                  console.log('Open time picker for first reminder');
-                }}
+                onPress={() => handleTimePickerOpen('time1')}
               />
 
               <Divider />
@@ -118,10 +138,7 @@ const NotificationSettingsScreen: React.FC = () => {
                     description={`Daily at ${formatTime(reminderTime2)}`}
                     left={(props) => <List.Icon {...props} icon="clock-outline" />}
                     right={(props) => <List.Icon {...props} icon="chevron-right" />}
-                    onPress={() => {
-                      // TODO: Open time picker for second reminder
-                      console.log('Open time picker for second reminder');
-                    }}
+                    onPress={() => handleTimePickerOpen('time2')}
                   />
                 </>
               )}
@@ -150,16 +167,27 @@ const NotificationSettingsScreen: React.FC = () => {
           <View style={styles.section}>
             <Button
               mode="outlined"
-              onPress={() => {
-                console.log('Test notification sent (demo mode)');
-                // TODO: Send test notification
-              }}
+              onPress={handleTestNotification}
               icon="bell-ring"
               style={styles.testButton}
             >
               Send Test Notification
             </Button>
           </View>
+        )}
+
+        {timePickerVisible && (
+          <DateTimePicker
+            value={timePickerType === 'time1' ? reminderTime1 : reminderTime2}
+            mode="time"
+            is24Hour={false}
+            onChange={(event, selectedDate) => {
+              setTimePickerVisible(false);
+              if (selectedDate) {
+                handleTimePickerConfirm(selectedDate);
+              }
+            }}
+          />
         )}
       </ScrollView>
     </View>

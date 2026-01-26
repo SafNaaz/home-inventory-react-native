@@ -1,5 +1,8 @@
 import { AppSettings } from '../models/Types';
 import { StorageService } from '../services/StorageService';
+import * as LocalAuthentication from 'expo-local-authentication';
+import * as Notifications from 'expo-notifications';
+import { Platform } from 'react-native';
 
 // MARK: - Settings Manager Class
 export class SettingsManager {
@@ -128,10 +131,26 @@ export class SettingsManager {
 
   // MARK: - Biometric Authentication
   async authenticateUser(): Promise<boolean> {
-    // For now, return true as biometric authentication is not implemented
-    // This can be enhanced later with proper authentication
-    console.log('🔐 Authentication requested (simplified for demo)');
-    return true;
+    try {
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+
+      if (!hasHardware || !isEnrolled) {
+        console.warn('🔒 Biometric hardware not available or not enrolled');
+        return true; // Fallback or handle differently in production
+      }
+
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: 'Authenticate to access Home Inventory',
+        fallbackLabel: 'Use Passcode',
+        disableDeviceFallback: false,
+      });
+
+      return result.success;
+    } catch (error) {
+      console.error('❌ Authentication error:', error);
+      return false;
+    }
   }
 
   async checkAuthenticationIfNeeded(): Promise<boolean> {
@@ -139,16 +158,23 @@ export class SettingsManager {
       const success = await this.authenticateUser();
       if (success) {
         this.settings.isAuthenticated = true;
-        await this.saveSettings();
+        this.notifyListeners();
+        // Note: Not saving to storage as authentication status is runtime only
       }
       return success;
     }
     return true;
   }
 
-  // MARK: - Push Notifications (Simplified for demo)
+  // MARK: - Push Notifications
   private initializePushNotifications(): void {
-    console.log('📱 Push notifications initialized (demo mode)');
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+      }),
+    });
   }
 
   async toggleInventoryReminder(): Promise<void> {
@@ -157,7 +183,7 @@ export class SettingsManager {
     if (this.settings.isInventoryReminderEnabled) {
       const hasPermission = await this.requestNotificationPermission();
       if (hasPermission) {
-        this.scheduleInventoryReminders();
+        await this.scheduleInventoryReminders();
         await this.saveSettings();
         console.log('🔔 Inventory reminders enabled');
       } else {
@@ -165,7 +191,7 @@ export class SettingsManager {
         console.log('❌ Notification permission denied');
       }
     } else {
-      this.cancelInventoryReminders();
+      await this.cancelInventoryReminders();
       await this.saveSettings();
       console.log('🔕 Inventory reminders disabled');
     }
@@ -175,7 +201,7 @@ export class SettingsManager {
     this.settings.isSecondReminderEnabled = !this.settings.isSecondReminderEnabled;
     
     if (this.settings.isInventoryReminderEnabled) {
-      this.scheduleInventoryReminders();
+      await this.scheduleInventoryReminders();
     }
     
     await this.saveSettings();
@@ -186,7 +212,7 @@ export class SettingsManager {
     this.settings.reminderTime1 = time;
     
     if (this.settings.isInventoryReminderEnabled) {
-      this.scheduleInventoryReminders();
+      await this.scheduleInventoryReminders();
     }
     
     await this.saveSettings();
@@ -197,7 +223,7 @@ export class SettingsManager {
     this.settings.reminderTime2 = time;
     
     if (this.settings.isInventoryReminderEnabled) {
-      this.scheduleInventoryReminders();
+      await this.scheduleInventoryReminders();
     }
     
     await this.saveSettings();
@@ -205,47 +231,82 @@ export class SettingsManager {
   }
 
   private async requestNotificationPermission(): Promise<boolean> {
-    // Simplified for demo - always return true
-    console.log('📱 Notification permission requested (demo mode)');
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+    
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+    
+    if (finalStatus !== 'granted') {
+      return false;
+    }
+
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'default',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#FF231F7C',
+      });
+    }
+
     return true;
   }
 
-  private scheduleInventoryReminders(): void {
+  private async scheduleInventoryReminders(): Promise<void> {
     // Cancel existing notifications
-    this.cancelInventoryReminders();
+    await this.cancelInventoryReminders();
     
     // Schedule first reminder
-    this.scheduleReminder(this.settings.reminderTime1, 'inventoryReminder1');
+    await this.scheduleDailyReminder(
+      this.settings.reminderTime1, 
+      'Time to check your inventory!',
+      'Stay on top of your supplies and restock low items.'
+    );
     
     // Schedule second reminder only if enabled
     if (this.settings.isSecondReminderEnabled) {
-      this.scheduleReminder(this.settings.reminderTime2, 'inventoryReminder2');
-      console.log(`✅ Inventory reminders scheduled for ${this.formatTime(this.settings.reminderTime1)} and ${this.formatTime(this.settings.reminderTime2)}`);
-    } else {
-      console.log(`✅ Inventory reminder scheduled for ${this.formatTime(this.settings.reminderTime1)}`);
-    }
-  }
-
-  private scheduleReminder(time: Date, id: string): void {
-    const now = new Date();
-    let scheduleDate = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate(),
-      time.getHours(),
-      time.getMinutes()
-    );
-    
-    // If the time has already passed today, schedule for tomorrow
-    if (scheduleDate <= now) {
-      scheduleDate.setDate(scheduleDate.getDate() + 1);
+      await this.scheduleDailyReminder(
+        this.settings.reminderTime2,
+        'Evening inventory check!',
+        'Any items running low today? Update your list now.'
+      );
     }
     
-    console.log(`📅 Reminder scheduled for ${this.formatTime(time)} (demo mode)`);
+    console.log(`✅ Reminders scheduled`);
   }
 
-  private cancelInventoryReminders(): void {
-    console.log('🗑️ Inventory reminders cancelled (demo mode)');
+  private async scheduleDailyReminder(time: Date, title: string, body: string): Promise<void> {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title,
+        body,
+        sound: true,
+      },
+      trigger: {
+        hour: time.getHours(),
+        minute: time.getMinutes(),
+        repeats: true,
+      },
+    });
+  }
+
+  async sendTestNotification(): Promise<void> {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "Test Notification 🔔",
+        body: "Inventory reminders are working correctly!",
+        data: { data: 'test' },
+      },
+      trigger: null, // Send immediately
+    });
+  }
+
+  private async cancelInventoryReminders(): Promise<void> {
+    await Notifications.cancelAllScheduledNotificationsAsync();
+    console.log('🗑️ All notifications cancelled');
   }
 
   private formatTime(date: Date): string {
