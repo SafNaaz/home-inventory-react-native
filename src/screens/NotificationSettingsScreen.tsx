@@ -272,7 +272,6 @@ const NotificationSettingsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingBottom: 85, // Space for floating tab bar
   },
   scrollView: {
     flex: 1,

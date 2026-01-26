@@ -721,6 +721,7 @@ const InventoryScreen: React.FC = () => {
   const renderHomeScreen = () => (
     <ScrollView
       style={styles.scrollView}
+      contentContainerStyle={{ paddingBottom: 110 }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
       {renderStatsHeader()}
@@ -760,6 +761,7 @@ const InventoryScreen: React.FC = () => {
         </View>
         <ScrollView
           style={styles.scrollView}
+          contentContainerStyle={{ paddingBottom: 110 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
           <View style={styles.subcategoriesList}>
@@ -795,6 +797,7 @@ const InventoryScreen: React.FC = () => {
         </View>
         <ScrollView
           style={styles.scrollView}
+          contentContainerStyle={{ paddingBottom: 110 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
           <View style={styles.itemsList}>
