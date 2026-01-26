@@ -72,6 +72,264 @@ const CATEGORY_ICONS: Record<InventoryCategory, string[]> = {
   ],
 };
 
+// Slider control that allows dragging and only updates the DB on release
+const SliderControl: React.FC<{
+  initialValue: number;
+  onComplete: (value: number) => void;
+  trackColor: string;
+  progressColor: string;
+  thumbColor: string;
+}> = ({ initialValue, onComplete, trackColor, progressColor, thumbColor }) => {
+  const [value, setValue] = useState<number>(initialValue);
+  const [dragging, setDragging] = useState(false);
+  const trackWidth = useRef<number>(200);
+  const trackRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (!dragging) setValue(initialValue);
+  }, [initialValue, dragging]);
+
+  const clamp = (v: number) => Math.max(0, Math.min(1, v));
+
+  const handleMove = (nativeEvent: any, gestureState?: any) => {
+    const w = trackWidth.current || 200;
+
+    // Prefer pageX + measure for reliable global coords
+    const pageX = nativeEvent.pageX ?? gestureState?.moveX;
+
+    if (pageX != null && trackRef.current && trackRef.current.measure) {
+      trackRef.current.measure((fx: number, fy: number, width: number, height: number, px: number, py: number) => {
+        const pct = clamp((pageX - px) / (width || w));
+        setValue(pct);
+      });
+      return;
+    }
+
+    // Fallback to locationX
+    const locationX = nativeEvent.locationX ?? gestureState?.x0 ?? 0;
+    const pct = clamp(locationX / w);
+    setValue(pct);
+  };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (e, gs) => {
+        setDragging(true);
+        handleMove(e.nativeEvent, gs);
+      },
+      onPanResponderMove: (e, gs) => handleMove(e.nativeEvent, gs),
+      onPanResponderRelease: (e, gs) => {
+        // compute final percentage from event and track position to avoid stale coords
+        const computeFinalPct = (): Promise<number> => {
+          return new Promise((resolve) => {
+            const pageX = e.nativeEvent.pageX ?? gs?.moveX;
+            if (pageX != null && trackRef.current && trackRef.current.measure) {
+              trackRef.current.measure((fx: number, fy: number, width: number, height: number, px: number, py: number) => {
+                const pct = clamp((pageX - px) / (width || trackWidth.current));
+                resolve(pct);
+              });
+              return;
+            }
+            const locationX = e.nativeEvent.locationX ?? gs?.moveX ?? 0;
+            resolve(clamp(locationX / trackWidth.current));
+          });
+        };
+
+        computeFinalPct().then((finalPct) => {
+          setValue(finalPct);
+          const result: any = onComplete(finalPct);
+          if (result && typeof result.then === 'function') {
+            result.then(() => setDragging(false)).catch(() => setDragging(false));
+          } else {
+            setDragging(false);
+          }
+        });
+      },
+      onPanResponderTerminate: (e, gs) => {
+        const computeFinalPct = (): Promise<number> => {
+          return new Promise((resolve) => {
+            const pageX = e.nativeEvent.pageX ?? gs?.moveX;
+            if (pageX != null && trackRef.current && trackRef.current.measure) {
+              trackRef.current.measure((fx: number, fy: number, width: number, height: number, px: number, py: number) => {
+                const pct = clamp((pageX - px) / (width || trackWidth.current));
+                resolve(pct);
+              });
+              return;
+            }
+            const locationX = e.nativeEvent.locationX ?? gs?.moveX ?? 0;
+            resolve(clamp(locationX / trackWidth.current));
+          });
+        };
+
+        computeFinalPct().then((finalPct) => {
+          setValue(finalPct);
+          const result: any = onComplete(finalPct);
+          if (result && typeof result.then === 'function') {
+            result.then(() => setDragging(false)).catch(() => setDragging(false));
+          } else {
+            setDragging(false);
+          }
+        });
+      },
+    })
+  ).current;
+
+  return (
+    <View style={styles.sliderContainer}>
+      <View
+        ref={trackRef}
+        style={[styles.sliderTrack, { backgroundColor: trackColor }]}
+        onLayout={(e) => {
+          const w = e.nativeEvent.layout.width;
+          trackWidth.current = w || 200;
+        }}
+        {...panResponder.panHandlers}
+      >
+        <View
+          style={[
+            styles.sliderProgress,
+            { width: `${value * 100}%`, backgroundColor: progressColor },
+          ]}
+        />
+        <View
+          style={[
+            styles.sliderThumb,
+            { left: `${value * 100}%`, backgroundColor: thumbColor },
+          ]}
+        />
+      </View>
+    </View>
+  );
+};
+
+interface ItemRowProps {
+  item: InventoryItem;
+  theme: any;
+  onIncrement: (item: InventoryItem) => void;
+  onDecrement: (item: InventoryItem) => void;
+  onUpdate: (item: InventoryItem, q: number) => void;
+  onDelete: (item: InventoryItem) => void;
+  onEdit: (item: InventoryItem) => void;
+}
+
+const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, onUpdate, onDelete, onEdit }: ItemRowProps) => {
+  const stockColor = getStockColor(item.quantity, theme.dark);
+
+  const renderRightActions = (progress: Animated.AnimatedInterpolation<number>, dragX: Animated.AnimatedInterpolation<number>) => {
+    const trans = dragX.interpolate({
+      inputRange: [-80, 0],
+      outputRange: [0, 80],
+      extrapolate: 'clamp',
+    });
+
+    return (
+      <Animated.View
+        style={[
+          styles.swipeAction,
+          styles.deleteAction,
+          { transform: [{ translateX: trans }] },
+        ]}
+      >
+        <TouchableOpacity
+          style={styles.swipeActionButton}
+          onPress={() => onDelete(item)}
+        >
+          <Icon name="delete" size={20} color="#fff" />
+          <Text style={styles.swipeActionText}>Delete</Text>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
+
+  const renderLeftActions = (progress: Animated.AnimatedInterpolation<number>, dragX: Animated.AnimatedInterpolation<number>) => {
+    const trans = dragX.interpolate({
+      inputRange: [0, 80],
+      outputRange: [-80, 0],
+      extrapolate: 'clamp',
+    });
+
+    return (
+      <Animated.View
+        style={[
+          styles.swipeAction,
+          styles.editAction,
+          { transform: [{ translateX: trans }] },
+        ]}
+      >
+        <TouchableOpacity
+          style={styles.swipeActionButton}
+          onPress={() => onEdit(item)}
+        >
+          <Icon name="pencil" size={20} color="#fff" />
+          <Text style={styles.swipeActionText}>Edit</Text>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
+
+  return (
+    <Swipeable
+      key={item.id}
+      renderRightActions={renderRightActions}
+      renderLeftActions={renderLeftActions}
+      overshootRight={false}
+      overshootLeft={false}
+      containerStyle={{ overflow: 'visible' }}
+      childrenContainerStyle={{ overflow: 'visible' }}
+    >
+      <Card style={styles.itemCard}>
+        <Card.Content style={styles.compactItemContent}>
+          <View style={styles.itemHeaderCompact}>
+            <Text style={[styles.itemTitle, { color: theme.colors.onSurface }]}>
+              {item.name}
+            </Text>
+            <Text style={[styles.itemPercentage, { color: stockColor }]}>
+              {Math.round(item.quantity * 100)}%
+            </Text>
+          </View>
+
+          <View style={styles.stockControlsCompact}>
+            <IconButton
+              icon="minus"
+              size={20}
+              iconColor={theme.colors.primary}
+              style={styles.quantityButton}
+              onPress={() => onDecrement(item)}
+            />
+            <View style={styles.sliderWrapper}>
+              <SliderControl
+                initialValue={item.quantity}
+                onComplete={(q) => onUpdate(item, q)}
+                trackColor={theme.colors.outline}
+                progressColor={stockColor}
+                thumbColor={theme.colors.primary}
+              />
+            </View>
+            <IconButton
+              icon="plus"
+              size={20}
+              iconColor={theme.colors.primary}
+              style={styles.quantityButton}
+              onPress={() => onIncrement(item)}
+            />
+          </View>
+
+          {item.quantity <= 0.25 && (
+            <View style={styles.lowStockWarningCompact}>
+              <Icon name="alert-circle" size={14} color={theme.colors.error} />
+              <Text style={[styles.lowStockTextCompact, { color: theme.colors.error }]}>
+                Low stock
+              </Text>
+            </View>
+          )}
+        </Card.Content>
+      </Card>
+    </Swipeable>
+  );
+});
+
 const InventoryScreen: React.FC = () => {
   const theme = useTheme();
   const navigationObj = useNavigation();
@@ -238,157 +496,20 @@ const InventoryScreen: React.FC = () => {
     return inventoryItems.filter(item => item.subcategory === subcategory);
   };
 
-  const handleQuantityUpdate = async (item: InventoryItem, newQuantity: number) => {
-    // Optimistic UI update with pending marker
+  const handleQuantityUpdate = useCallback(async (item: InventoryItem, newQuantity: number) => {
     pendingUpdatesRef.current[item.id] = newQuantity;
     setInventoryItems(prev => prev.map(it => it.id === item.id ? { ...it, quantity: newQuantity } : it));
 
     try {
-      const res = await inventoryManager.updateItemQuantity(item.id, newQuantity);
-      // clear pending and refresh data
+      await inventoryManager.updateItemQuantity(item.id, newQuantity);
       delete pendingUpdatesRef.current[item.id];
-      loadInventoryData();
-      return res;
     } catch (err) {
-      // Revert local UI to stored values
       delete pendingUpdatesRef.current[item.id];
       loadInventoryData();
-      throw err;
     }
-  };
+  }, []);
 
 
-  // Slider control that allows dragging and only updates the DB on release
-  const SliderControl: React.FC<{
-    initialValue: number;
-    onComplete: (value: number) => void;
-    trackColor: string;
-    progressColor: string;
-    thumbColor: string;
-  }> = ({ initialValue, onComplete, trackColor, progressColor, thumbColor }) => {
-    const [value, setValue] = useState<number>(initialValue);
-    const [dragging, setDragging] = useState(false);
-    const trackWidth = useRef<number>(200);
-    const trackRef = useRef<any>(null);
-
-    useEffect(() => {
-      if (!dragging) setValue(initialValue);
-    }, [initialValue, dragging]);
-
-    const clamp = (v: number) => Math.max(0, Math.min(1, v));
-
-    const handleMove = (nativeEvent: any, gestureState?: any) => {
-      const w = trackWidth.current || 200;
-
-      // Prefer pageX + measure for reliable global coords
-      const pageX = nativeEvent.pageX ?? gestureState?.moveX;
-
-      if (pageX != null && trackRef.current && trackRef.current.measure) {
-        trackRef.current.measure((fx: number, fy: number, width: number, height: number, px: number, py: number) => {
-          const pct = clamp((pageX - px) / (width || w));
-          setValue(pct);
-        });
-        return;
-      }
-
-      // Fallback to locationX
-      const locationX = nativeEvent.locationX ?? gestureState?.x0 ?? 0;
-      const pct = clamp(locationX / w);
-      setValue(pct);
-    };
-
-    const panResponder = useRef(
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: () => true,
-        onPanResponderGrant: (e, gs) => {
-          setDragging(true);
-          handleMove(e.nativeEvent, gs);
-        },
-        onPanResponderMove: (e, gs) => handleMove(e.nativeEvent, gs),
-        onPanResponderRelease: (e, gs) => {
-          // compute final percentage from event and track position to avoid stale coords
-          const computeFinalPct = (): Promise<number> => {
-            return new Promise((resolve) => {
-              const pageX = e.nativeEvent.pageX ?? gs?.moveX;
-              if (pageX != null && trackRef.current && trackRef.current.measure) {
-                trackRef.current.measure((fx: number, fy: number, width: number, height: number, px: number, py: number) => {
-                  const pct = clamp((pageX - px) / (width || trackWidth.current));
-                  resolve(pct);
-                });
-                return;
-              }
-              const locationX = e.nativeEvent.locationX ?? gs?.moveX ?? 0;
-              resolve(clamp(locationX / trackWidth.current));
-            });
-          };
-
-          computeFinalPct().then((finalPct) => {
-            setValue(finalPct);
-            const result: any = onComplete(finalPct);
-            if (result && typeof result.then === 'function') {
-              result.then(() => setDragging(false)).catch(() => setDragging(false));
-            } else {
-              setDragging(false);
-            }
-          });
-        },
-        onPanResponderTerminate: (e, gs) => {
-          const computeFinalPct = (): Promise<number> => {
-            return new Promise((resolve) => {
-              const pageX = e.nativeEvent.pageX ?? gs?.moveX;
-              if (pageX != null && trackRef.current && trackRef.current.measure) {
-                trackRef.current.measure((fx: number, fy: number, width: number, height: number, px: number, py: number) => {
-                  const pct = clamp((pageX - px) / (width || trackWidth.current));
-                  resolve(pct);
-                });
-                return;
-              }
-              const locationX = e.nativeEvent.locationX ?? gs?.moveX ?? 0;
-              resolve(clamp(locationX / trackWidth.current));
-            });
-          };
-
-          computeFinalPct().then((finalPct) => {
-            setValue(finalPct);
-            const result: any = onComplete(finalPct);
-            if (result && typeof result.then === 'function') {
-              result.then(() => setDragging(false)).catch(() => setDragging(false));
-            } else {
-              setDragging(false);
-            }
-          });
-        },
-      })
-    ).current;
-
-    return (
-      <View style={styles.sliderContainer}>
-        <View
-          ref={trackRef}
-          style={[styles.sliderTrack, { backgroundColor: trackColor }]}
-          onLayout={(e) => {
-            const w = e.nativeEvent.layout.width;
-            trackWidth.current = w || 200;
-          }}
-          {...panResponder.panHandlers}
-        >
-          <View
-            style={[
-              styles.sliderProgress,
-              { width: `${value * 100}%`, backgroundColor: progressColor },
-            ]}
-          />
-          <View
-            style={[
-              styles.sliderThumb,
-              { left: `${value * 100}%`, backgroundColor: thumbColor },
-            ]}
-          />
-        </View>
-      </View>
-    );
-  };
 
   const handleAddItem = async () => {
     if (!newItemName.trim() || !navigation.subcategory) return;
@@ -466,7 +587,7 @@ const InventoryScreen: React.FC = () => {
     </View>
   );
 
-  const renderCategoryCard = (category: InventoryCategory) => {
+  const renderCategoryCard = useCallback((category: InventoryCategory) => {
     const config = CATEGORY_CONFIG[category];
     const subcategories = inventoryManager.getSubcategoriesForCategory(category);
     const itemsCount = inventoryManager.getItemsForCategory(category).length;
@@ -498,7 +619,7 @@ const InventoryScreen: React.FC = () => {
         </Card.Content>
       </Card>
     );
-  };
+  }, [cardWidth, theme]);
 
   const renderSubcategoryRow = (subName: string) => {
     const items = getItemsForSubcategory(subName as InventorySubcategory);
@@ -579,19 +700,24 @@ const InventoryScreen: React.FC = () => {
     );
   };
 
-  const handleIncrementQuantity = async (item: InventoryItem) => {
-    const newQuantity = Math.min(1, item.quantity + 0.01); // Increment by 1%, max 100%
+  const handleIncrementQuantity = useCallback(async (item: InventoryItem) => {
+    const newQuantity = Math.min(1, item.quantity + 0.01); 
     await handleQuantityUpdate(item, newQuantity);
-  };
+  }, [handleQuantityUpdate]);
 
-  const handleDecrementQuantity = async (item: InventoryItem) => {
-    const newQuantity = Math.max(0, item.quantity - 0.01); // Decrement by 1%, min 0%
+  const handleDecrementQuantity = useCallback(async (item: InventoryItem) => {
+    const newQuantity = Math.max(0, item.quantity - 0.01); 
     await handleQuantityUpdate(item, newQuantity);
-  };
+  }, [handleQuantityUpdate]);
 
-  const confirmDelete = (item: InventoryItem) => {
+  const confirmDelete = useCallback((item: InventoryItem) => {
     setDeleteConfirmItem(item);
-  };
+  }, []);
+
+  const confirmEdit = useCallback((item: InventoryItem) => {
+    setEditingItem(item);
+    setEditedName(item.name);
+  }, []);
 
   const handleConfirmDelete = async () => {
     if (deleteConfirmItem) {
@@ -600,125 +726,18 @@ const InventoryScreen: React.FC = () => {
     }
   };
 
-  const confirmEdit = (item: InventoryItem) => {
-    setEditingItem(item);
-    setEditedName(item.name);
-  };
-
   const renderItemRow = (item: InventoryItem) => {
-    const subcategoryConfig = SUBCATEGORY_CONFIG[item.subcategory];
-    const stockColor = getStockColor(item.quantity, theme.dark);
-
-    const renderRightActions = (progress: Animated.AnimatedInterpolation<number>, dragX: Animated.AnimatedInterpolation<number>) => {
-      const trans = dragX.interpolate({
-        inputRange: [-80, 0],
-        outputRange: [0, 80],
-        extrapolate: 'clamp',
-      });
-
-      return (
-        <Animated.View
-          style={[
-            styles.swipeAction,
-            styles.deleteAction,
-            { transform: [{ translateX: trans }] },
-          ]}
-        >
-          <TouchableOpacity
-            style={styles.swipeActionButton}
-            onPress={() => confirmDelete(item)}
-          >
-            <Icon name="delete" size={20} color="#fff" />
-            <Text style={styles.swipeActionText}>Delete</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      );
-    };
-
-    const renderLeftActions = (progress: Animated.AnimatedInterpolation<number>, dragX: Animated.AnimatedInterpolation<number>) => {
-      const trans = dragX.interpolate({
-        inputRange: [0, 80],
-        outputRange: [-80, 0],
-        extrapolate: 'clamp',
-      });
-
-      return (
-        <Animated.View
-          style={[
-            styles.swipeAction,
-            styles.editAction,
-            { transform: [{ translateX: trans }] },
-          ]}
-        >
-          <TouchableOpacity
-            style={styles.swipeActionButton}
-            onPress={() => confirmEdit(item)}
-          >
-            <Icon name="pencil" size={20} color="#fff" />
-            <Text style={styles.swipeActionText}>Edit</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      );
-    };
-
     return (
-      <Swipeable
+      <InventoryItemRow
         key={item.id}
-        renderRightActions={renderRightActions}
-        renderLeftActions={renderLeftActions}
-        overshootRight={false}
-        overshootLeft={false}
-        containerStyle={{ overflow: 'visible' }}
-        childrenContainerStyle={{ overflow: 'visible' }}
-      >
-        <Card style={styles.itemCard}>
-          <Card.Content style={styles.compactItemContent}>
-            <View style={styles.itemHeaderCompact}>
-              <Text style={[styles.itemTitle, { color: theme.colors.onSurface }]}>
-                {item.name}
-              </Text>
-              <Text style={[styles.itemPercentage, { color: stockColor }]}>
-                {Math.round(item.quantity * 100)}%
-              </Text>
-            </View>
-
-            <View style={styles.stockControlsCompact}>
-              <IconButton
-                icon="minus"
-                size={20}
-                iconColor={theme.colors.primary}
-                style={styles.quantityButton}
-                onPress={() => handleDecrementQuantity(item)}
-              />
-              <View style={styles.sliderWrapper}>
-                <SliderControl
-                  initialValue={item.quantity}
-                  onComplete={(q) => handleQuantityUpdate(item, q)}
-                  trackColor={theme.colors.outline}
-                  progressColor={stockColor}
-                  thumbColor={theme.colors.primary}
-                />
-              </View>
-              <IconButton
-                icon="plus"
-                size={20}
-                iconColor={theme.colors.primary}
-                style={styles.quantityButton}
-                onPress={() => handleIncrementQuantity(item)}
-              />
-            </View>
-
-            {item.quantity <= 0.25 && (
-              <View style={styles.lowStockWarningCompact}>
-                <Icon name="alert-circle" size={14} color={theme.colors.error} />
-                <Text style={[styles.lowStockTextCompact, { color: theme.colors.error }]}>
-                  Low stock
-                </Text>
-              </View>
-            )}
-          </Card.Content>
-        </Card>
-      </Swipeable>
+        item={item}
+        theme={theme}
+        onIncrement={handleIncrementQuantity}
+        onDecrement={handleDecrementQuantity}
+        onUpdate={handleQuantityUpdate}
+        onDelete={confirmDelete}
+        onEdit={confirmEdit}
+      />
     );
   };
 
