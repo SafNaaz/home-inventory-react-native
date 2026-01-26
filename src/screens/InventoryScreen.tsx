@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   ScrollView,
@@ -24,6 +24,7 @@ import {
   TextInput,
   ProgressBar,
 } from 'react-native-paper';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { settingsManager } from '../managers/SettingsManager';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { inventoryManager } from '../managers/InventoryManager';
@@ -44,6 +45,7 @@ interface NavigationContext {
 
 const InventoryScreen: React.FC = () => {
   const theme = useTheme();
+  const navigationObj = useNavigation();
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const pendingUpdatesRef = useRef<Record<string, number>>({});
   const [refreshing, setRefreshing] = useState(false);
@@ -80,6 +82,21 @@ const InventoryScreen: React.FC = () => {
       backHandler.remove();
     };
   }, [navigation]);
+
+  // Reset to home view when Inventory tab is pressed
+  useEffect(() => {
+    const unsubscribe = (navigationObj as any).addListener('tabPress', (e: any) => {
+      // Reset to home if not already there
+      setNavigation(prevNav => {
+        if (prevNav.state !== 'home') {
+          return { state: 'home' };
+        }
+        return prevNav;
+      });
+    });
+
+    return unsubscribe;
+  }, [navigationObj]);
 
   const loadInventoryData = () => {
     const items = inventoryManager.getInventoryItems().map(it => {
