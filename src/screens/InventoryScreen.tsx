@@ -962,11 +962,30 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, items, lowStock
         <Dialog.Content>
           <Text>{shoppingDialogState ? getShoppingStateMessage(shoppingDialogState) : ''}</Text>
         </Dialog.Content>
-        <Dialog.Actions>
-          <Button onPress={() => setShowingShoppingDialog(false)}>Cancel</Button>
-          <Button onPress={handleContinueShopping}>Continue Current</Button>
-          <Button onPress={handleStartFreshShopping} textColor={theme.colors.error}>Start New</Button>
-        </Dialog.Actions>
+        <View style={{ padding: 16, gap: 12 }}>
+          <Button 
+            mode="contained" 
+            onPress={handleContinueShopping}
+            style={{ borderRadius: 8 }}
+          >
+            Continue Current Trip
+          </Button>
+          <Button 
+            mode="outlined" 
+            onPress={handleStartFreshShopping} 
+            textColor={theme.colors.error}
+            style={{ borderRadius: 8, borderColor: theme.colors.error }}
+          >
+            Start New List
+          </Button>
+          <Button 
+            mode="text" 
+            onPress={() => setShowingShoppingDialog(false)}
+            textColor={theme.colors.onSurfaceVariant}
+          >
+            Cancel
+          </Button>
+        </View>
       </Dialog>
     </Portal>
   );
