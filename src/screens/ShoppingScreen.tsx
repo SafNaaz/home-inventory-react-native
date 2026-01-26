@@ -200,6 +200,7 @@ const ShoppingScreen: React.FC = () => {
 
   const renderEmptyState = () => (
     <View style={[styles.emptyState, { backgroundColor: theme.colors.background }]}>
+      <DoodleBackground />
       <Icon name="cart-outline" size={64} color={theme.colors.onSurfaceVariant} />
       <Text variant="headlineSmall" style={[styles.emptyTitle, { color: theme.colors.onBackground }]}>No Shopping List</Text>
       <Text variant="bodyLarge" style={[styles.emptyText, { color: theme.colors.onSurfaceVariant }]}>
