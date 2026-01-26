@@ -56,7 +56,7 @@ interface NavigationContext {
 const CATEGORY_ICONS: Record<InventoryCategory, string[]> = {
   [InventoryCategory.FRIDGE]: [
     'fridge', 'snowflake', 'bottle-wine', 'tray', 'carrot', 'cube-outline', 
-    'egg', 'cheese', 'ice-cream', 'fish', 'meat', 'fruit-grapes', 'food-apple', 'food-drumstick'
+    'egg', 'cheese', 'ice-cream', 'fish', 'food-steak', 'fruit-grapes', 'food-apple', 'food-drumstick'
   ],
   [InventoryCategory.GROCERY]: [
     'basket', 'rice', 'bowl', 'bottle-soda', 'oil', 'leaf', 'grain', 
