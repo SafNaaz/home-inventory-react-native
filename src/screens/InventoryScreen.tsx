@@ -217,6 +217,12 @@ interface ItemRowProps {
 const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, onUpdate, onDelete, onEdit }: ItemRowProps) => {
   const stockColor = getStockColor(item.quantity, theme.dark);
 
+  const swipeableRef = useRef<Swipeable>(null);
+
+  const closeSwipeable = () => {
+    swipeableRef.current?.close();
+  };
+
   const renderRightActions = (progress: Animated.AnimatedInterpolation<number>, dragX: Animated.AnimatedInterpolation<number>) => {
     const trans = dragX.interpolate({
       inputRange: [-80, 0],
@@ -234,7 +240,10 @@ const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, on
       >
         <TouchableOpacity
           style={styles.swipeActionButton}
-          onPress={() => onDelete(item)}
+          onPress={() => {
+            closeSwipeable();
+            onDelete(item);
+          }}
         >
           <Icon name="delete" size={20} color="#fff" />
           <Text style={styles.swipeActionText}>Delete</Text>
@@ -260,7 +269,10 @@ const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, on
       >
         <TouchableOpacity
           style={styles.swipeActionButton}
-          onPress={() => onEdit(item)}
+          onPress={() => {
+            closeSwipeable();
+            onEdit(item);
+          }}
         >
           <Icon name="pencil" size={20} color="#fff" />
           <Text style={styles.swipeActionText}>Edit</Text>
@@ -271,6 +283,7 @@ const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, on
 
   return (
     <Swipeable
+      ref={swipeableRef}
       key={item.id}
       renderRightActions={renderRightActions}
       renderLeftActions={renderLeftActions}
@@ -641,84 +654,91 @@ const InventoryScreen: React.FC = () => {
     );
   }, [cardWidth, theme]);
 
-  const renderSubcategoryRow = (subName: string) => {
-    const items = getItemsForSubcategory(subName as InventorySubcategory);
-    const lowStockCount = items.filter(it => it.quantity <= 0.25).length;
-    const config = inventoryManager.getSubcategoryConfig(subName as InventorySubcategory);
-    
-    const renderRightActions = (progress: Animated.AnimatedInterpolation<number>, dragX: Animated.AnimatedInterpolation<number>) => {
-      const trans = dragX.interpolate({
-        inputRange: [-80, 0],
-        outputRange: [0, 80],
-        extrapolate: 'clamp',
-      });
+const SubcategoryRow = React.memo(({ subName, navigation, theme, items, lowStockCount, config, onDelete, onEdit, setNavigationFluid }: any) => {
+  const swipeableRef = useRef<Swipeable>(null);
 
-      return (
-        <Animated.View style={[styles.swipeAction, styles.deleteAction, { transform: [{ translateX: trans }] }]}>
-          <TouchableOpacity style={styles.swipeActionButton} onPress={() => {
-            setSubToDeleteId(subName);
-          }}>
-            <Icon name="delete" size={20} color="#fff" />
-            <Text style={styles.swipeActionText}>Delete</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      );
-    };
+  const closeSwipeable = () => {
+    swipeableRef.current?.close();
+  };
 
-    const renderLeftActions = (progress: Animated.AnimatedInterpolation<number>, dragX: Animated.AnimatedInterpolation<number>) => {
-      const trans = dragX.interpolate({
-        inputRange: [0, 80],
-        outputRange: [-80, 0],
-        extrapolate: 'clamp',
-      });
-
-      return (
-        <Animated.View style={[styles.swipeAction, styles.editAction, { transform: [{ translateX: trans }] }]}>
-          <TouchableOpacity style={styles.swipeActionButton} onPress={() => openSubEditDialog(subName)}>
-            <Icon name="pencil" size={20} color="#fff" />
-            <Text style={styles.swipeActionText}>Edit</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      );
-    };
+  const renderRightActions = (progress: Animated.AnimatedInterpolation<number>, dragX: Animated.AnimatedInterpolation<number>) => {
+    const trans = dragX.interpolate({
+      inputRange: [-80, 0],
+      outputRange: [0, 80],
+      extrapolate: 'clamp',
+    });
 
     return (
-      <Swipeable
-        key={subName}
-        renderRightActions={renderRightActions}
-        renderLeftActions={renderLeftActions}
-        overshootRight={false}
-        overshootLeft={false}
-        containerStyle={{ overflow: 'visible' }}
-        childrenContainerStyle={{ overflow: 'visible' }}
-      >
-        <Card
-          style={styles.subcategoryCard}
-          onPress={() => setNavigationFluid({ state: 'subcategory', category: navigation.category, subcategory: subName as InventorySubcategory })}
-        >
-          <Card.Content style={styles.subcategoryContent}>
-            <View style={[styles.iconContainer, { backgroundColor: (config?.color || theme.colors.primary) + '15' }]}>
-              <Icon name={(config?.icon || 'help-circle') as any} size={24} color={config?.color || theme.colors.primary} />
-            </View>
-            <View style={styles.subcategoryInfo}>
-              <Title style={[styles.subcategoryTitle, { color: theme.colors.onSurface }]}>
-                {subName}
-              </Title>
-              <Text style={[styles.subcategoryStats, { color: theme.colors.onSurfaceVariant }]}>
-                {items.length} items
-              </Text>
-              {lowStockCount > 0 && (
-                <Text style={[styles.subcategoryStats, { color: theme.colors.error, fontWeight: '600' }]}>
-                  {lowStockCount} need restocking
-                </Text>
-              )}
-            </View>
-            <Icon name="chevron-right" size={24} color={theme.colors.outline} />
-          </Card.Content>
-        </Card>
-      </Swipeable>
+      <Animated.View style={[styles.swipeAction, styles.deleteAction, { transform: [{ translateX: trans }] }]}>
+        <TouchableOpacity style={styles.swipeActionButton} onPress={() => {
+          closeSwipeable();
+          onDelete(subName);
+        }}>
+          <Icon name="delete" size={20} color="#fff" />
+          <Text style={styles.swipeActionText}>Delete</Text>
+        </TouchableOpacity>
+      </Animated.View>
     );
   };
+
+  const renderLeftActions = (progress: Animated.AnimatedInterpolation<number>, dragX: Animated.AnimatedInterpolation<number>) => {
+    const trans = dragX.interpolate({
+      inputRange: [0, 80],
+      outputRange: [-80, 0],
+      extrapolate: 'clamp',
+    });
+
+    return (
+      <Animated.View style={[styles.swipeAction, styles.editAction, { transform: [{ translateX: trans }] }]}>
+        <TouchableOpacity style={styles.swipeActionButton} onPress={() => {
+          closeSwipeable();
+          onEdit(subName);
+        }}>
+          <Icon name="pencil" size={20} color="#fff" />
+          <Text style={styles.swipeActionText}>Edit</Text>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
+
+  return (
+    <Swipeable
+      ref={swipeableRef}
+      key={subName}
+      renderRightActions={renderRightActions}
+      renderLeftActions={renderLeftActions}
+      overshootRight={false}
+      overshootLeft={false}
+      containerStyle={{ overflow: 'visible' }}
+      childrenContainerStyle={{ overflow: 'visible' }}
+    >
+      <Card
+        style={styles.subcategoryCard}
+        onPress={() => setNavigationFluid({ state: 'subcategory', category: navigation.category, subcategory: subName as InventorySubcategory })}
+      >
+        <Card.Content style={styles.subcategoryContent}>
+          <View style={[styles.iconContainer, { backgroundColor: (config?.color || theme.colors.primary) + '15' }]}>
+            <Icon name={(config?.icon || 'help-circle') as any} size={24} color={config?.color || theme.colors.primary} />
+          </View>
+          <View style={styles.subcategoryInfo}>
+            <Title style={[styles.subcategoryTitle, { color: theme.colors.onSurface }]}>
+              {subName}
+            </Title>
+            <Text style={[styles.subcategoryStats, { color: theme.colors.onSurfaceVariant }]}>
+              {items.length} items
+            </Text>
+            {lowStockCount > 0 && (
+              <Text style={[styles.subcategoryStats, { color: theme.colors.error, fontWeight: '600' }]}>
+                {lowStockCount} need restocking
+              </Text>
+            )}
+          </View>
+          <Icon name="chevron-right" size={24} color={theme.colors.outline} />
+        </Card.Content>
+      </Card>
+    </Swipeable>
+  );
+});
 
   const handleIncrementQuantity = useCallback(async (item: InventoryItem) => {
     const newQuantity = Math.min(1, item.quantity + 0.01); 
@@ -808,7 +828,25 @@ const InventoryScreen: React.FC = () => {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
           <View style={styles.subcategoriesList}>
-            {subcategories.map(renderSubcategoryRow)}
+            {subcategories.map(subName => {
+              const items = getItemsForSubcategory(subName as InventorySubcategory);
+              const lowStockCount = items.filter(it => it.quantity <= 0.25).length;
+              const config = inventoryManager.getSubcategoryConfig(subName as InventorySubcategory);
+              return (
+                <SubcategoryRow
+                  key={subName}
+                  subName={subName}
+                  navigation={navigation}
+                  theme={theme}
+                  items={items}
+                  lowStockCount={lowStockCount}
+                  config={config}
+                  onDelete={setSubToDeleteId}
+                  onEdit={openSubEditDialog}
+                  setNavigationFluid={setNavigationFluid}
+                />
+              );
+            })}
           </View>
         </ScrollView>
       </View>
@@ -1011,7 +1049,7 @@ const InventoryScreen: React.FC = () => {
         <Dialog.Title>Delete Type</Dialog.Title>
         <Dialog.Content>
           <Text style={{ color: theme.colors.onSurface }}>
-            Are you sure you want to delete this type? All items inside it will also be deleted.
+            Are you sure you want to delete "{subToDeleteId}"? All items inside it will also be deleted.
           </Text>
         </Dialog.Content>
         <Dialog.Actions>
@@ -1299,16 +1337,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: 80,
     marginVertical: 8,
+    // Add margin to match card indentation so it blends
   },
   deleteAction: {
     backgroundColor: '#FF3B30',
     borderTopRightRadius: 24,
     borderBottomRightRadius: 24,
+    marginRight: 4,
+    marginLeft: -20, // Overlap with card to hide gap
+    paddingLeft: 20, // Center icon
+    width: 100, // 80 visible + 20 overlap
   },
   editAction: {
     backgroundColor: '#007AFF',
     borderTopLeftRadius: 24,
     borderBottomLeftRadius: 24,
+    marginLeft: 4,
+    marginRight: -20, // Overlap with card
+    paddingRight: 20, // Center icon
+    width: 100, // 80 visible + 20 overlap
   },
   swipeActionButton: {
     flex: 1,
