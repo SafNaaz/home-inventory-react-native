@@ -3,7 +3,6 @@ import {
   View,
   ScrollView,
   StyleSheet,
-  Alert,
   RefreshControl,
   Dimensions,
 } from 'react-native';
@@ -37,6 +36,9 @@ const NotesScreen: React.FC = () => {
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [editContent, setEditContent] = useState('');
+  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
+  const [noteToDelete, setNoteToDelete] = useState<Note | null>(null);
+  const [limitAlertVisible, setLimitAlertVisible] = useState(false);
 
   const styles = StyleSheet.create({
     container: {
@@ -250,10 +252,7 @@ const NotesScreen: React.FC = () => {
     if (newNote) {
       openEditDialog(newNote);
     } else {
-      Alert.alert(
-        'Note Limit Reached',
-        `You can only have up to ${notesManager.getMaxNotes()} notes. Please delete one and try again.`
-      );
+      setLimitAlertVisible(true);
     }
   };
 
@@ -275,18 +274,16 @@ const NotesScreen: React.FC = () => {
   };
 
   const handleDeleteNote = (note: Note) => {
-    Alert.alert(
-      'Delete Note',
-      'Are you sure you want to delete this note?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => notesManager.deleteNote(note.id),
-        },
-      ]
-    );
+    setNoteToDelete(note);
+    setDeleteConfirmVisible(true);
+  };
+
+  const onConfirmDelete = async () => {
+    if (noteToDelete) {
+      await notesManager.deleteNote(noteToDelete.id);
+      setDeleteConfirmVisible(false);
+      setNoteToDelete(null);
+    }
   };
 
   const formatDate = (date: Date): string => {
@@ -449,6 +446,35 @@ const NotesScreen: React.FC = () => {
     </Portal>
   );
 
+  const renderLimitAlertDialog = () => (
+    <Portal>
+      <Dialog visible={limitAlertVisible} onDismiss={() => setLimitAlertVisible(false)}>
+        <Dialog.Title>Note Limit Reached</Dialog.Title>
+        <Dialog.Content>
+          <Text style={{ color: theme.colors.onSurface }}>You can only have up to {notesManager.getMaxNotes()} notes. Please delete one and try again.</Text>
+        </Dialog.Content>
+        <Dialog.Actions>
+          <Button onPress={() => setLimitAlertVisible(false)}>OK</Button>
+        </Dialog.Actions>
+      </Dialog>
+    </Portal>
+  );
+
+  const renderDeleteConfirmDialog = () => (
+    <Portal>
+      <Dialog visible={deleteConfirmVisible} onDismiss={() => setDeleteConfirmVisible(false)}>
+        <Dialog.Title>Delete Note</Dialog.Title>
+        <Dialog.Content>
+          <Text style={{ color: theme.colors.onSurface }}>Are you sure you want to delete this note?</Text>
+        </Dialog.Content>
+        <Dialog.Actions>
+          <Button onPress={() => setDeleteConfirmVisible(false)}>Cancel</Button>
+          <Button onPress={onConfirmDelete} textColor={theme.colors.error}>Delete</Button>
+        </Dialog.Actions>
+      </Dialog>
+    </Portal>
+  );
+
   const renderNotesGrid = () => {
     const rows = [];
     for (let i = 0; i < notes.length; i += 2) {
@@ -486,11 +512,14 @@ const NotesScreen: React.FC = () => {
         <FAB
           icon="plus"
           style={[styles.fab, { backgroundColor: theme.colors.primary }]}
+          color={theme.dark ? '#000' : '#fff'}
           onPress={handleAddNote}
         />
       )}
 
       {renderEditDialog()}
+      {renderLimitAlertDialog()}
+      {renderDeleteConfirmDialog()}
     </View>
   );
 };

@@ -4,7 +4,6 @@ import {
   ScrollView,
   StyleSheet,
   RefreshControl,
-  Alert,
   Dimensions,
   TouchableOpacity,
   PanResponder,
@@ -25,6 +24,7 @@ import {
   Dialog,
   TextInput,
   ProgressBar,
+  Snackbar,
 } from 'react-native-paper';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { settingsManager } from '../managers/SettingsManager';
@@ -56,6 +56,11 @@ const InventoryScreen: React.FC = () => {
   const [newItemName, setNewItemName] = useState('');
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [editedName, setEditedName] = useState('');
+  const [deleteConfirmItem, setDeleteConfirmItem] = useState<InventoryItem | null>(null);
+  const [showingShoppingDialog, setShowingShoppingDialog] = useState(false);
+  const [shoppingDialogState, setShoppingDialogState] = useState<ShoppingState | null>(null);
+  const [snackbarVisible, setSnackbarVisible] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
 
   useEffect(() => {
     loadInventoryData();
@@ -151,20 +156,6 @@ const InventoryScreen: React.FC = () => {
     }
   };
 
-  const handleDeleteItem = (item: InventoryItem) => {
-    Alert.alert(
-      'Delete Item',
-      `Are you sure you want to delete "${item.name}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => inventoryManager.removeItem(item.id),
-        },
-      ]
-    );
-  };
 
   // Slider control that allows dragging and only updates the DB on release
   const SliderControl: React.FC<{
@@ -319,33 +310,27 @@ const InventoryScreen: React.FC = () => {
     const currentState = inventoryManager.getShoppingState();
     
     if (currentState !== ShoppingState.EMPTY) {
-      Alert.alert(
-        'Start New Shopping Trip?',
-        getShoppingStateMessage(currentState),
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Continue Current',
-            onPress: () => {
-              // Switch to shopping tab - would need navigation prop
-              Alert.alert('Info', 'Switch to Shopping tab to continue current trip.');
-            },
-          },
-          {
-            text: 'Start New',
-            style: 'destructive',
-            onPress: async () => {
-              await inventoryManager.cancelShopping();
-              await inventoryManager.startGeneratingShoppingList();
-              Alert.alert('Success', 'New shopping list started! Check the Shopping tab.');
-            },
-          },
-        ]
-      );
+      setShoppingDialogState(currentState);
+      setShowingShoppingDialog(true);
     } else {
       await inventoryManager.startGeneratingShoppingList();
-      Alert.alert('Success', 'Shopping list generated! Check the Shopping tab.');
+      setSnackbarMessage('Shopping list generated! Check the Shopping tab.');
+      setSnackbarVisible(true);
     }
+  };
+
+  const handleContinueShopping = () => {
+    setShowingShoppingDialog(false);
+    setSnackbarMessage('Switch to Shopping tab to continue current trip.');
+    setSnackbarVisible(true);
+  };
+
+  const handleStartFreshShopping = async () => {
+    setShowingShoppingDialog(false);
+    await inventoryManager.cancelShopping();
+    await inventoryManager.startGeneratingShoppingList();
+    setSnackbarMessage('New shopping list started! Check the Shopping tab.');
+    setSnackbarVisible(true);
   };
 
   const getShoppingStateMessage = (state: string): string => {
@@ -464,18 +449,14 @@ const InventoryScreen: React.FC = () => {
   };
 
   const confirmDelete = (item: InventoryItem) => {
-    Alert.alert(
-      'Delete Item',
-      `Are you sure you want to delete "${item.name}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => inventoryManager.removeItem(item.id),
-        },
-      ]
-    );
+    setDeleteConfirmItem(item);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (deleteConfirmItem) {
+      await inventoryManager.removeItem(deleteConfirmItem.id);
+      setDeleteConfirmItem(null);
+    }
   };
 
   const confirmEdit = (item: InventoryItem) => {
@@ -724,6 +705,39 @@ const InventoryScreen: React.FC = () => {
     </Portal>
   );
 
+  const renderDeleteConfirmDialog = () => (
+    <Portal>
+      <Dialog visible={!!deleteConfirmItem} onDismiss={() => setDeleteConfirmItem(null)}>
+        <Dialog.Title>Delete Item</Dialog.Title>
+        <Dialog.Content>
+          <Text>Are you sure you want to delete "{deleteConfirmItem?.name}"?</Text>
+        </Dialog.Content>
+        <Dialog.Actions>
+          <Button onPress={() => setDeleteConfirmItem(null)}>Cancel</Button>
+          <Button onPress={handleConfirmDelete} textColor={theme.colors.error}>
+            Delete
+          </Button>
+        </Dialog.Actions>
+      </Dialog>
+    </Portal>
+  );
+
+  const renderShoppingConfirmDialog = () => (
+    <Portal>
+      <Dialog visible={showingShoppingDialog} onDismiss={() => setShowingShoppingDialog(false)}>
+        <Dialog.Title>Start New Shopping Trip?</Dialog.Title>
+        <Dialog.Content>
+          <Text>{shoppingDialogState ? getShoppingStateMessage(shoppingDialogState) : ''}</Text>
+        </Dialog.Content>
+        <Dialog.Actions>
+          <Button onPress={() => setShowingShoppingDialog(false)}>Cancel</Button>
+          <Button onPress={handleContinueShopping}>Continue Current</Button>
+          <Button onPress={handleStartFreshShopping} textColor={theme.colors.error}>Start New</Button>
+        </Dialog.Actions>
+      </Dialog>
+    </Portal>
+  );
+
   const renderFloatingActionButton = () => {
     if (navigation.state !== 'home') return null;
     
@@ -731,6 +745,7 @@ const InventoryScreen: React.FC = () => {
       <FAB
         icon="auto-fix"
         style={[styles.fab, { backgroundColor: theme.colors.primary }]}
+        color={theme.dark ? '#000' : '#fff'}
         onPress={handleStartShopping}
       />
     );
@@ -745,6 +760,19 @@ const InventoryScreen: React.FC = () => {
       {renderFloatingActionButton()}
       {renderAddItemDialog()}
       {renderEditItemDialog()}
+      {renderDeleteConfirmDialog()}
+      {renderShoppingConfirmDialog()}
+      <Snackbar
+        visible={snackbarVisible}
+        onDismiss={() => setSnackbarVisible(false)}
+        duration={3000}
+        action={{
+          label: 'OK',
+          onPress: () => setSnackbarVisible(false),
+        }}
+      >
+        {snackbarMessage}
+      </Snackbar>
     </View>
   );
 };

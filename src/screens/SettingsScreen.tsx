@@ -3,7 +3,6 @@ import {
   View,
   ScrollView,
   StyleSheet,
-  Alert,
   RefreshControl,
 } from 'react-native';
 import {
@@ -19,6 +18,7 @@ import {
   Portal,
   Dialog,
   TextInput,
+  Snackbar,
 } from 'react-native-paper';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
@@ -38,6 +38,11 @@ const SettingsScreen: React.FC = () => {
   const [resetDialogVisible, setResetDialogVisible] = useState(false);
   const [exportDialogVisible, setExportDialogVisible] = useState(false);
   const [exportData, setExportData] = useState('');
+  const [clearAllConfirmVisible, setClearAllConfirmVisible] = useState(false);
+  const [snackbarVisible, setSnackbarVisible] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [errorAlertVisible, setErrorAlertVisible] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
     // Load initial data
@@ -93,25 +98,18 @@ const SettingsScreen: React.FC = () => {
   };
 
   const handleResetAllData = () => {
-    Alert.alert(
-      'Reset All Data',
-      'This will permanently delete all your inventory items, shopping lists, notes, and settings. This action cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Reset All Data',
-          style: 'destructive',
-          onPress: async () => {
-            await Promise.all([
-              inventoryManager.clearAllData(),
-              notesManager.clearAllNotes(),
-              settingsManager.resetToDefaults(),
-            ]);
-            Alert.alert('Data Reset', 'All data has been cleared successfully.');
-          },
-        },
-      ]
-    );
+    setClearAllConfirmVisible(true);
+  };
+
+  const onConfirmClearAll = async () => {
+    setClearAllConfirmVisible(false);
+    await Promise.all([
+      inventoryManager.clearAllData(),
+      notesManager.clearAllNotes(),
+      settingsManager.resetToDefaults(),
+    ]);
+    setSnackbarMessage('All data has been cleared successfully.');
+    setSnackbarVisible(true);
   };
 
   const handleResetToDefaults = () => {
@@ -121,10 +119,8 @@ const SettingsScreen: React.FC = () => {
   const handleConfirmResetToDefaults = async () => {
     await inventoryManager.resetToDefaults();
     setResetDialogVisible(false);
-    Alert.alert(
-      'Defaults Restored',
-      'Your inventory has been reset with sample items. Your notes and settings remain unchanged.'
-    );
+    setSnackbarMessage('Your inventory has been reset with sample items.');
+    setSnackbarVisible(true);
   };
 
   const handleExportData = async () => {
@@ -147,7 +143,8 @@ const SettingsScreen: React.FC = () => {
       setExportData(JSON.stringify(exportData, null, 2));
       setExportDialogVisible(true);
     } catch (error) {
-      Alert.alert('Export Error', 'Failed to export data. Please try again.');
+      setErrorMessage('Failed to export data. Please try again.');
+      setErrorAlertVisible(true);
     }
   };
 
@@ -381,8 +378,8 @@ const SettingsScreen: React.FC = () => {
           <Button onPress={() => setExportDialogVisible(false)}>Close</Button>
           <Button 
             onPress={() => {
-              // In a real app, you would implement sharing functionality here
-              Alert.alert('Export', 'Copy the text above to save your data.');
+              setSnackbarMessage('Copy the text above to save your data.');
+              setSnackbarVisible(true);
             }}
             mode="contained"
           >
@@ -419,6 +416,41 @@ const SettingsScreen: React.FC = () => {
       {renderTimePicker()}
       {renderResetDialog()}
       {renderExportDialog()}
+
+      {/* Clear All Confirmation Dialog */}
+      <Portal>
+        <Dialog visible={clearAllConfirmVisible} onDismiss={() => setClearAllConfirmVisible(false)}>
+          <Dialog.Title>Reset All Data</Dialog.Title>
+          <Dialog.Content>
+            <Text style={{ color: theme.colors.onSurface }}>This will permanently delete all your inventory items, shopping lists, notes, and settings. This action cannot be undone.</Text>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setClearAllConfirmVisible(false)}>Cancel</Button>
+            <Button onPress={onConfirmClearAll} textColor={theme.colors.error}>Reset All Data</Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
+
+      {/* Error Alert Dialog */}
+      <Portal>
+        <Dialog visible={errorAlertVisible} onDismiss={() => setErrorAlertVisible(false)}>
+          <Dialog.Title>Error</Dialog.Title>
+          <Dialog.Content>
+            <Text style={{ color: theme.colors.onSurface }}>{errorMessage}</Text>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setErrorAlertVisible(false)}>OK</Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
+
+      <Snackbar
+        visible={snackbarVisible}
+        onDismiss={() => setSnackbarVisible(false)}
+        duration={3000}
+      >
+        {snackbarMessage}
+      </Snackbar>
     </View>
   );
 };

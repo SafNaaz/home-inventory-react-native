@@ -3,7 +3,6 @@ import {
   View,
   ScrollView,
   StyleSheet,
-  Alert,
   RefreshControl,
 } from 'react-native';
 import {
@@ -20,6 +19,7 @@ import {
   Portal,
   Dialog,
   TextInput,
+  Snackbar,
 } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 
@@ -36,6 +36,12 @@ const ShoppingScreen: React.FC = () => {
   const [addItemDialogVisible, setAddItemDialogVisible] = useState(false);
   const [newItemName, setNewItemName] = useState('');
   const [miscSuggestions, setMiscSuggestions] = useState<string[]>([]);
+  const [snackbarVisible, setSnackbarVisible] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [completeConfirmVisible, setCompleteConfirmVisible] = useState(false);
+  const [cancelConfirmVisible, setCancelConfirmVisible] = useState(false);
+  const [emptyListAlertVisible, setEmptyListAlertVisible] = useState(false);
+  const [invalidInputAlertVisible, setInvalidInputAlertVisible] = useState(false);
 
   useEffect(() => {
     // Load initial data
@@ -71,7 +77,7 @@ const ShoppingScreen: React.FC = () => {
 
   const handleFinalizeList = async () => {
     if (shoppingList.length === 0) {
-      Alert.alert('Empty List', 'Add some items to your shopping list before finalizing.');
+      setEmptyListAlertVisible(true);
       return;
     }
     await inventoryManager.finalizeShoppingList();
@@ -82,35 +88,23 @@ const ShoppingScreen: React.FC = () => {
   };
 
   const handleCompleteAndRestore = async () => {
-    Alert.alert(
-      'Complete Shopping',
-      'This will mark checked items as restocked and clear your shopping list. Continue?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Complete',
-          onPress: async () => {
-            await inventoryManager.completeAndRestoreShopping();
-            Alert.alert('Shopping Complete', 'Your inventory has been updated with purchased items.');
-          },
-        },
-      ]
-    );
+    setCompleteConfirmVisible(true);
+  };
+
+  const onConfirmComplete = async () => {
+    setCompleteConfirmVisible(false);
+    await inventoryManager.completeAndRestoreShopping();
+    setSnackbarMessage('Your inventory has been updated with purchased items.');
+    setSnackbarVisible(true);
   };
 
   const handleCancelShopping = async () => {
-    Alert.alert(
-      'Cancel Shopping',
-      'This will clear your shopping list. Are you sure?',
-      [
-        { text: 'No', style: 'cancel' },
-        {
-          text: 'Yes, Cancel',
-          style: 'destructive',
-          onPress: () => inventoryManager.cancelShopping(),
-        },
-      ]
-    );
+    setCancelConfirmVisible(true);
+  };
+
+  const onConfirmCancel = async () => {
+    setCancelConfirmVisible(false);
+    await inventoryManager.cancelShopping();
   };
 
   const handleToggleItem = async (item: ShoppingListItem) => {
@@ -124,7 +118,7 @@ const ShoppingScreen: React.FC = () => {
   const handleAddMiscItem = async () => {
     const trimmedName = newItemName.trim();
     if (!trimmedName) {
-      Alert.alert('Invalid Input', 'Please enter an item name.');
+      setInvalidInputAlertVisible(true);
       return;
     }
 
@@ -262,6 +256,7 @@ const ShoppingScreen: React.FC = () => {
       <FAB
         icon="plus"
         style={styles.fab}
+        color={theme.dark ? '#000' : '#fff'}
         onPress={() => setAddItemDialogVisible(true)}
       />
     </View>
@@ -324,7 +319,7 @@ const ShoppingScreen: React.FC = () => {
             </View>
             <Paragraph>{getStateDescription()}</Paragraph>
             <View style={styles.progressInfo}>
-              <Text>Progress: {checkedItems.length} of {shoppingList.length} items</Text>
+              <Text style={{ color: theme.colors.onSurface }}>Progress: {checkedItems.length} of {shoppingList.length} items</Text>
             </View>
           </Card.Content>
         </Card>
@@ -388,7 +383,7 @@ const ShoppingScreen: React.FC = () => {
           
           {miscSuggestions.length > 0 && (
             <View style={styles.suggestions}>
-              <Text style={styles.suggestionsTitle}>Recent items:</Text>
+              <Text style={[styles.suggestionsTitle, { color: theme.colors.onSurface }]}>Recent items:</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 {miscSuggestions.map((suggestion, index) => (
                   <Button
@@ -413,20 +408,114 @@ const ShoppingScreen: React.FC = () => {
     </Portal>
   );
 
+  const renderConfirmDialogs = () => (
+    <Portal>
+      {/* Complete Shopping Dialog */}
+      <Dialog visible={completeConfirmVisible} onDismiss={() => setCompleteConfirmVisible(false)}>
+        <Dialog.Title>Complete Shopping</Dialog.Title>
+        <Dialog.Content>
+          <Text style={{ color: theme.colors.onSurface }}>This will mark checked items as restocked and clear your shopping list. Continue?</Text>
+        </Dialog.Content>
+        <Dialog.Actions>
+          <Button onPress={() => setCompleteConfirmVisible(false)}>Cancel</Button>
+          <Button onPress={onConfirmComplete}>Complete</Button>
+        </Dialog.Actions>
+      </Dialog>
+
+      {/* Cancel Shopping Dialog */}
+      <Dialog visible={cancelConfirmVisible} onDismiss={() => setCancelConfirmVisible(false)}>
+        <Dialog.Title>Cancel Shopping</Dialog.Title>
+        <Dialog.Content>
+          <Text style={{ color: theme.colors.onSurface }}>This will clear your shopping list. Are you sure?</Text>
+        </Dialog.Content>
+        <Dialog.Actions>
+          <Button onPress={() => setCancelConfirmVisible(false)}>No</Button>
+          <Button onPress={onConfirmCancel} textColor={theme.colors.error}>Yes, Cancel</Button>
+        </Dialog.Actions>
+      </Dialog>
+
+      {/* Empty List Alert Dialog */}
+      <Dialog visible={emptyListAlertVisible} onDismiss={() => setEmptyListAlertVisible(false)}>
+        <Dialog.Title>Empty List</Dialog.Title>
+        <Dialog.Content>
+          <Text style={{ color: theme.colors.onSurface }}>Add some items to your shopping list before finalizing.</Text>
+        </Dialog.Content>
+        <Dialog.Actions>
+          <Button onPress={() => setEmptyListAlertVisible(false)}>OK</Button>
+        </Dialog.Actions>
+      </Dialog>
+
+      {/* Invalid Input Alert Dialog */}
+      <Dialog visible={invalidInputAlertVisible} onDismiss={() => setInvalidInputAlertVisible(false)}>
+        <Dialog.Title>Invalid Input</Dialog.Title>
+        <Dialog.Content>
+          <Text style={{ color: theme.colors.onSurface }}>Please enter an item name.</Text>
+        </Dialog.Content>
+        <Dialog.Actions>
+          <Button onPress={() => setInvalidInputAlertVisible(false)}>OK</Button>
+        </Dialog.Actions>
+      </Dialog>
+    </Portal>
+  );
+
   // Render based on current state
   if (shoppingState === ShoppingState.EMPTY) {
-    return renderEmptyState();
+    return (
+      <>
+        {renderEmptyState()}
+        {renderConfirmDialogs()}
+        <Snackbar
+          visible={snackbarVisible}
+          onDismiss={() => setSnackbarVisible(false)}
+          duration={3000}
+        >
+          {snackbarMessage}
+        </Snackbar>
+      </>
+    );
   } else if (shoppingState === ShoppingState.GENERATING) {
     return (
       <>
         {renderGeneratingState()}
         {renderAddItemDialog()}
+        {renderConfirmDialogs()}
+        <Snackbar
+          visible={snackbarVisible}
+          onDismiss={() => setSnackbarVisible(false)}
+          duration={3000}
+        >
+          {snackbarMessage}
+        </Snackbar>
       </>
     );
   } else if (shoppingState === ShoppingState.LIST_READY) {
-    return renderListReadyState();
+    return (
+      <>
+        {renderListReadyState()}
+        {renderConfirmDialogs()}
+        <Snackbar
+          visible={snackbarVisible}
+          onDismiss={() => setSnackbarVisible(false)}
+          duration={3000}
+        >
+          {snackbarMessage}
+        </Snackbar>
+      </>
+    );
   } else if (shoppingState === ShoppingState.SHOPPING) {
-    return renderShoppingState();
+    return (
+      <>
+        {renderShoppingState()}
+        {renderConfirmDialogs()}
+        <Snackbar
+          visible={snackbarVisible}
+          onDismiss={() => setSnackbarVisible(false)}
+          duration={3000}
+        >
+          {snackbarMessage}
+        </Snackbar>
+      </>
+    );
   }
 
   return <View />;
