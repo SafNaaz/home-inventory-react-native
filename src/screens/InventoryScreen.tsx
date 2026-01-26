@@ -8,6 +8,7 @@ import {
   Dimensions,
   TouchableOpacity,
   PanResponder,
+  BackHandler,
 } from 'react-native';
 import {
   Card,
@@ -59,8 +60,26 @@ const InventoryScreen: React.FC = () => {
       loadInventoryData();
     });
 
-    return unsubscribe;
-  }, []);
+    // Handle Android back button
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (navigation.state === 'subcategory') {
+        // Go back to category view
+        setNavigation({ state: 'category', category: navigation.category });
+        return true; // Prevent default behavior (closing app)
+      } else if (navigation.state === 'category') {
+        // Go back to home view
+        setNavigation({ state: 'home' });
+        return true; // Prevent default behavior (closing app)
+      }
+      // If we're on home, let the default behavior happen (close app or go to previous screen)
+      return false;
+    });
+
+    return () => {
+      unsubscribe();
+      backHandler.remove();
+    };
+  }, [navigation]);
 
   const loadInventoryData = () => {
     const items = inventoryManager.getInventoryItems().map(it => {
