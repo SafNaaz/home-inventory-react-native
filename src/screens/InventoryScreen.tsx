@@ -61,6 +61,8 @@ const InventoryScreen: React.FC = () => {
   const [shoppingDialogState, setShoppingDialogState] = useState<ShoppingState | null>(null);
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [showingSuccessDialog, setShowingSuccessDialog] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
     loadInventoryData();
@@ -314,23 +316,22 @@ const InventoryScreen: React.FC = () => {
       setShowingShoppingDialog(true);
     } else {
       await inventoryManager.startGeneratingShoppingList();
-      setSnackbarMessage('Shopping list generated! Check the Shopping tab.');
-      setSnackbarVisible(true);
+      setSuccessMessage('Shopping list generated successfully!');
+      setShowingSuccessDialog(true);
     }
   };
 
   const handleContinueShopping = () => {
     setShowingShoppingDialog(false);
-    setSnackbarMessage('Switch to Shopping tab to continue current trip.');
-    setSnackbarVisible(true);
+    (navigationObj as any).navigate('Shopping');
   };
 
   const handleStartFreshShopping = async () => {
     setShowingShoppingDialog(false);
     await inventoryManager.cancelShopping();
     await inventoryManager.startGeneratingShoppingList();
-    setSnackbarMessage('New shopping list started! Check the Shopping tab.');
-    setSnackbarVisible(true);
+    setSuccessMessage('New shopping list started!');
+    setShowingSuccessDialog(true);
   };
 
   const getShoppingStateMessage = (state: string): string => {
@@ -738,6 +739,29 @@ const InventoryScreen: React.FC = () => {
     </Portal>
   );
 
+  const renderSuccessDialog = () => (
+    <Portal>
+      <Dialog visible={showingSuccessDialog} onDismiss={() => setShowingSuccessDialog(false)}>
+        <Dialog.Title>Success</Dialog.Title>
+        <Dialog.Content>
+          <Text style={{ color: theme.colors.onSurface }}>{successMessage}</Text>
+        </Dialog.Content>
+        <Dialog.Actions>
+          <Button onPress={() => setShowingSuccessDialog(false)}>Later</Button>
+          <Button 
+            onPress={() => {
+              setShowingSuccessDialog(false);
+              (navigationObj as any).navigate('Shopping');
+            }}
+            mode="contained"
+          >
+            Go There
+          </Button>
+        </Dialog.Actions>
+      </Dialog>
+    </Portal>
+  );
+
   const renderFloatingActionButton = () => {
     if (navigation.state !== 'home') return null;
     
@@ -762,6 +786,7 @@ const InventoryScreen: React.FC = () => {
       {renderEditItemDialog()}
       {renderDeleteConfirmDialog()}
       {renderShoppingConfirmDialog()}
+      {renderSuccessDialog()}
       <Snackbar
         visible={snackbarVisible}
         onDismiss={() => setSnackbarVisible(false)}
