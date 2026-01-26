@@ -1,4 +1,4 @@
-import { AppSettings, InventoryCategory } from '../models/Types';
+import { AppSettings, InventoryCategory, SecurityLockTimeout } from '../models/Types';
 import { StorageService } from '../services/StorageService';
 import { inventoryManager } from './InventoryManager';
 import * as LocalAuthentication from 'expo-local-authentication';
@@ -10,10 +10,16 @@ export class SettingsManager {
   private settings: AppSettings;
   private listeners: Set<() => void> = new Set();
 
+  private initializationPromise: Promise<void>;
+
   constructor() {
     this.settings = this.getDefaultSettings();
-    this.loadSettings();
+    this.initializationPromise = this.loadSettings();
     this.initializePushNotifications();
+  }
+
+  async waitForInitialization(): Promise<void> {
+    await this.initializationPromise;
   }
 
   // MARK: - Event Listeners
@@ -34,6 +40,7 @@ export class SettingsManager {
       this.settings = {
         ...this.getDefaultSettings(),
         ...loaded,
+        isAuthenticated: false, // Always require authentication on startup
         activityThresholds: {
           ...this.getDefaultSettings().activityThresholds,
           ...(loaded?.activityThresholds || {}),
@@ -52,7 +59,12 @@ export class SettingsManager {
 
   private async saveSettings(): Promise<void> {
     try {
-      await StorageService.saveSettings(this.settings);
+      // Don't persist authentication status
+      const settingsToSave = {
+        ...this.settings,
+        isAuthenticated: false
+      };
+      await StorageService.saveSettings(settingsToSave);
       this.notifyListeners();
     } catch (error) {
       console.error('❌ Error saving settings:', error);
@@ -80,12 +92,73 @@ export class SettingsManager {
         [InventoryCategory.PERSONAL_CARE]: 30,
       },
       isHealthAlertsEnabled: true,
+      securityLockTimeout: SecurityLockTimeout.IMMEDIATELY,
     };
+  }
+
+  // MARK: - App State Management
+  private isAuthenticating: boolean = false;
+
+  // MARK: - App State Management
+  private backgroundTimestamp: number | null = null;
+
+  recordBackgroundTime(): void {
+    this.backgroundTimestamp = Date.now();
+  }
+
+  shouldLockApp(): boolean {
+    if (!this.settings.isSecurityEnabled) return false;
+    if (this.isAuthenticating) return false; // Don't lock if currently authenticating
+    
+    if (this.settings.securityLockTimeout === SecurityLockTimeout.IMMEDIATELY) return true;
+    if (!this.backgroundTimestamp) return false;
+
+    const elapsed = Date.now() - this.backgroundTimestamp;
+    return elapsed >= this.settings.securityLockTimeout;
+  }
+  
+  async authenticateUser(): Promise<boolean> {
+    if (this.isAuthenticating) return false; // Prevent concurrent auth requests
+    this.isAuthenticating = true;
+    
+    try {
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+
+      if (!hasHardware || !isEnrolled) {
+        console.warn('🔒 Biometric hardware not available or not enrolled');
+        return true; 
+      }
+
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: 'Authenticate to access Home Inventory',
+        fallbackLabel: 'Use Passcode',
+        disableDeviceFallback: false,
+      });
+
+      return result.success;
+    } catch (error) {
+      console.error('❌ Authentication error:', error);
+      return false;
+    } finally {
+      // Small delay to allow AppState to settle after auth dialog closes
+      setTimeout(() => {
+        this.isAuthenticating = false;
+      }, 1000);
+    }
+  }
+
+  clearBackgroundTime(): void {
+    this.backgroundTimestamp = null;
   }
 
   // MARK: - Settings Getters
   getSettings(): AppSettings {
     return { ...this.settings };
+  }
+
+  getSecurityLockTimeout(): number {
+    return this.settings.securityLockTimeout;
   }
 
   getThemeMode(): string {
@@ -172,29 +245,13 @@ export class SettingsManager {
     await this.saveSettings();
   }
 
-  // MARK: - Biometric Authentication
-  async authenticateUser(): Promise<boolean> {
-    try {
-      const hasHardware = await LocalAuthentication.hasHardwareAsync();
-      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-
-      if (!hasHardware || !isEnrolled) {
-        console.warn('🔒 Biometric hardware not available or not enrolled');
-        return true; // Fallback or handle differently in production
-      }
-
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Authenticate to access Home Inventory',
-        fallbackLabel: 'Use Passcode',
-        disableDeviceFallback: false,
-      });
-
-      return result.success;
-    } catch (error) {
-      console.error('❌ Authentication error:', error);
-      return false;
-    }
+  async setSecurityLockTimeout(timeout: number): Promise<void> {
+    this.settings.securityLockTimeout = timeout;
+    await this.saveSettings();
+    console.log(`⏱️ Security lock timeout set to: ${timeout}ms`);
   }
+
+
 
   async checkAuthenticationIfNeeded(): Promise<boolean> {
     if (this.settings.isSecurityEnabled && !this.settings.isAuthenticated) {

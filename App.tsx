@@ -5,7 +5,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Provider as PaperProvider, IconButton, Title, Paragraph, Button } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
-import { StatusBar, Alert, View, StyleSheet } from 'react-native';
+import { StatusBar, Alert, View, StyleSheet, AppState } from 'react-native';
 
 // Screens
 import InventoryScreen from './src/screens/InventoryScreen';
@@ -34,6 +34,8 @@ const App: React.FC = () => {
   const [isSecurityEnabled, setIsSecurityEnabled] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
+
+
   useEffect(() => {
     // Initialize app
     initializeApp();
@@ -46,13 +48,40 @@ const App: React.FC = () => {
       setIsSecurityEnabled(currentSettings.isSecurityEnabled);
     });
 
+    // AppState listener
+    const appStateSubscription = AppState.addEventListener('change', async (nextAppState) => {
+      if (nextAppState === 'background') {
+        settingsManager.recordBackgroundTime();
+      } else if (nextAppState === 'active') {
+        // Check if we need to lock the app
+        if (settingsManager.shouldLockApp()) {
+          console.log('🔒 Auto-locking app due to timeout');
+          // Update local state first to show lock screen
+          setIsAuthenticated(false);
+          // Update manager state
+          await settingsManager.setAuthenticated(false);
+          
+          // Trigger authentication
+          const authSuccess = await settingsManager.checkAuthenticationIfNeeded();
+          setIsAuthenticated(authSuccess);
+        } else {
+           console.log('🔓 App stays unlocked (within timeout)');
+        }
+        settingsManager.clearBackgroundTime();
+      }
+    });
+
     return () => {
       settingsUnsubscribe();
+      appStateSubscription.remove();
     };
   }, []);
 
   const initializeApp = async () => {
     try {
+      // Wait for settings to be fully loaded
+      await settingsManager.waitForInitialization();
+
       // Load initial settings
       const settings = settingsManager.getSettings();
       setThemeMode(settings.themeMode);
@@ -63,20 +92,6 @@ const App: React.FC = () => {
       if (settings.isSecurityEnabled && !settings.isAuthenticated) {
         const authSuccess = await settingsManager.checkAuthenticationIfNeeded();
         setIsAuthenticated(authSuccess);
-        
-        if (!authSuccess) {
-          Alert.alert(
-            'Authentication Required',
-            'Please authenticate to access the app.',
-            [
-              {
-                text: 'Retry',
-                onPress: () => initializeApp(),
-              }
-            ]
-          );
-          return;
-        }
       }
 
       setIsLoading(false);

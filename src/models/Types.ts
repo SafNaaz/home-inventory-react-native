@@ -121,6 +121,15 @@ export interface AppSettings {
   miscItemHistory: string[];
   activityThresholds: Record<InventoryCategory, number>;
   isHealthAlertsEnabled: boolean;
+  securityLockTimeout: number; // in milliseconds, 0 = immediately
+}
+
+export enum SecurityLockTimeout {
+  IMMEDIATELY = 0,
+  ONE_MINUTE = 60000,
+  FIVE_MINUTES = 300000,
+  FIFTEEN_MINUTES = 900000,
+  THIRTY_MINUTES = 1800000,
 }
 
 // MARK: - Category Configuration

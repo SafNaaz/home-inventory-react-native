@@ -26,7 +26,7 @@ import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { settingsManager } from '../managers/SettingsManager';
 import { inventoryManager } from '../managers/InventoryManager';
 import { notesManager } from '../managers/NotesManager';
-import { AppSettings } from '../models/Types';
+import { AppSettings, SecurityLockTimeout } from '../models/Types';
 import { commonStyles } from '../themes/AppTheme';
 import DoodleBackground from '../components/DoodleBackground';
 import { useNavigation } from '@react-navigation/native';
@@ -46,6 +46,23 @@ const SettingsScreen: React.FC = () => {
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [errorAlertVisible, setErrorAlertVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [lockTimeoutDialogVisible, setLockTimeoutDialogVisible] = useState(false);
+
+  const handleLockTimeoutSelect = async (timeout: number) => {
+    await settingsManager.setSecurityLockTimeout(timeout);
+    setLockTimeoutDialogVisible(false);
+  };
+
+  const getLockTimeoutLabel = (timeout: number) => {
+    switch(timeout) {
+      case SecurityLockTimeout.IMMEDIATELY: return 'Immediately';
+      case SecurityLockTimeout.ONE_MINUTE: return 'After 1 minute';
+      case SecurityLockTimeout.FIVE_MINUTES: return 'After 5 minutes';
+      case SecurityLockTimeout.FIFTEEN_MINUTES: return 'After 15 minutes';
+      case SecurityLockTimeout.THIRTY_MINUTES: return 'After 30 minutes';
+      default: return 'Immediately';
+    }
+  };
 
   useEffect(() => {
     // Load initial data
@@ -219,9 +236,47 @@ const SettingsScreen: React.FC = () => {
           )}
         />
         
+        {settings?.isSecurityEnabled && (
+          <List.Item
+            title="Auto-Lock"
+            description={getLockTimeoutLabel(settings.securityLockTimeout)}
+            left={() => <Icon name="timer-outline" size={24} color={theme.colors.onSurface} />}
+            onPress={() => setLockTimeoutDialogVisible(true)}
+          />
+        )}
+        
 
       </Card.Content>
     </Card>
+  );
+
+  const renderLockTimeoutDialog = () => (
+    <Portal>
+      <Dialog visible={lockTimeoutDialogVisible} onDismiss={() => setLockTimeoutDialogVisible(false)}>
+        <Dialog.Title>Auto-Lock Timeout</Dialog.Title>
+        <Dialog.Content>
+          <List.Section>
+            {[
+              SecurityLockTimeout.IMMEDIATELY,
+              SecurityLockTimeout.ONE_MINUTE,
+              SecurityLockTimeout.FIVE_MINUTES,
+              SecurityLockTimeout.FIFTEEN_MINUTES,
+              SecurityLockTimeout.THIRTY_MINUTES
+            ].map((timeout) => (
+              <List.Item
+                key={timeout}
+                title={getLockTimeoutLabel(timeout)}
+                right={() => settings?.securityLockTimeout === timeout ? <List.Icon icon="check" /> : null}
+                onPress={() => handleLockTimeoutSelect(timeout)}
+              />
+            ))}
+          </List.Section>
+        </Dialog.Content>
+        <Dialog.Actions>
+          <Button onPress={() => setLockTimeoutDialogVisible(false)}>Cancel</Button>
+        </Dialog.Actions>
+      </Dialog>
+    </Portal>
   );
 
   const renderNotificationsSection = () => (
@@ -441,6 +496,7 @@ const SettingsScreen: React.FC = () => {
       </ScrollView>
       
       {renderTimePicker()}
+      {renderLockTimeoutDialog()}
       {renderResetDialog()}
       {renderExportDialog()}
 
