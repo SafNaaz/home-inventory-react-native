@@ -1,11 +1,11 @@
 
 import React, { useEffect, useState } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme as NavDefaultTheme, DarkTheme as NavDarkTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Provider as PaperProvider, IconButton, Title, Paragraph, Button } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
-import { StatusBar, Alert, View } from 'react-native';
+import { StatusBar, Alert, View, StyleSheet } from 'react-native';
 
 // Screens
 import InventoryScreen from './src/screens/InventoryScreen';
@@ -290,47 +290,63 @@ const App: React.FC = () => {
 
   return (
     <PaperProvider theme={theme}>
-      <StatusBar
-        barStyle={isDark ? 'light-content' : 'dark-content'}
-        backgroundColor={theme.colors.surface}
-      />
-      <NavigationContainer>
-        <Stack.Navigator
-          screenOptions={{
-            headerStyle: {
-              backgroundColor: theme.colors.surface,
+      <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+        <StatusBar
+          barStyle={isDark ? 'light-content' : 'dark-content'}
+          backgroundColor={theme.colors.surface}
+        />
+        <NavigationContainer
+          theme={{
+            ... (isDark ? NavDarkTheme : NavDefaultTheme),
+            colors: {
+              ...(isDark ? NavDarkTheme.colors : NavDefaultTheme.colors),
+              primary: theme.colors.primary,
+              background: theme.colors.background,
+              card: theme.colors.surface,
+              text: theme.colors.onSurface,
+              border: theme.colors.outline,
+              notification: theme.colors.error,
             },
-            headerTintColor: theme.colors.onSurface,
-            headerTitleStyle: {
-              fontWeight: '600',
-              textAlign: 'left',
-            },
-            headerTitleAlign: 'left',
           }}
         >
-          <Stack.Screen 
-            name="MainTabs" 
-            component={TabNavigator}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen 
-            name="Settings" 
-            component={SettingsScreen}
-            options={{ 
-              title: 'Settings',
-              headerBackTitleVisible: false,
+          <Stack.Navigator
+            screenOptions={{
+              headerStyle: {
+                backgroundColor: theme.colors.surface,
+              },
+              headerTintColor: theme.colors.onSurface,
+              headerTitleStyle: {
+                fontWeight: '600',
+                textAlign: 'left',
+              },
+              headerTitleAlign: 'left',
+              cardStyle: { backgroundColor: theme.colors.background },
             }}
-          />
-          <Stack.Screen 
-            name="NotificationSettings" 
-            component={NotificationSettingsScreen}
-            options={{ 
-              title: 'Notification Settings',
-              headerBackTitleVisible: false,
-            }}
-          />
-        </Stack.Navigator>
-      </NavigationContainer>
+          >
+            <Stack.Screen 
+              name="MainTabs" 
+              component={TabNavigator}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="Settings" 
+              component={SettingsScreen}
+              options={{ 
+                title: 'Settings',
+                headerBackTitleVisible: false,
+              }}
+            />
+            <Stack.Screen 
+              name="NotificationSettings" 
+              component={NotificationSettingsScreen}
+              options={{ 
+                title: 'Notification Settings',
+                headerBackTitleVisible: false,
+              }}
+            />
+          </Stack.Navigator>
+        </NavigationContainer>
+      </View>
     </PaperProvider>
   );
 };
