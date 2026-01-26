@@ -31,7 +31,7 @@ import { settingsManager } from '../managers/SettingsManager';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { inventoryManager } from '../managers/InventoryManager';
 import { InventoryItem, InventoryCategory, InventorySubcategory, ShoppingState } from '../models/Types';
-import { CATEGORY_CONFIG, SUBCATEGORY_CONFIG, getAllCategories } from '../constants/CategoryConfig';
+import { CATEGORY_CONFIG, SUBCATEGORY_CONFIG, getAllCategories, getCategoryConfig, getSubcategoryConfig } from '../constants/CategoryConfig';
 import { getStockColor, getCategoryColor, commonStyles } from '../themes/AppTheme';
 
 const { width } = Dimensions.get('window');
@@ -44,6 +44,25 @@ interface NavigationContext {
   category?: InventoryCategory;
   subcategory?: InventorySubcategory;
 }
+
+const CATEGORY_ICONS: Record<InventoryCategory, string[]> = {
+  [InventoryCategory.FRIDGE]: [
+    'fridge', 'snowflake', 'bottle-wine', 'tray', 'carrot', 'cube-outline', 
+    'egg', 'cheese', 'ice-cream', 'fish', 'meat', 'fruit-grapes', 'food-apple', 'food-drumstick'
+  ],
+  [InventoryCategory.GROCERY]: [
+    'basket', 'rice', 'bowl', 'bottle-soda', 'oil', 'leaf', 'grain', 
+    'bread-slice', 'cookie', 'coffee', 'tea', 'candy', 'corn', 'peanut'
+  ],
+  [InventoryCategory.HYGIENE]: [
+    'water', 'tshirt-crew', 'silverware-fork-knife', 'toilet', 'baby-face', 
+    'spray', 'soap', 'shower', 'mop', 'trash-can'
+  ],
+  [InventoryCategory.PERSONAL_CARE]: [
+    'account-heart', 'face-woman', 'human', 'head-outline', 'brush', 
+    'lipstick', 'mirror', 'spa', 'tooth-outline', 'medical-bag'
+  ],
+};
 
 const InventoryScreen: React.FC = () => {
   const theme = useTheme();
@@ -63,6 +82,11 @@ const InventoryScreen: React.FC = () => {
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [showingSuccessDialog, setShowingSuccessDialog] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [showingSubAddDialog, setShowingSubAddDialog] = useState(false);
+  const [editingSubId, setEditingSubId] = useState<string | null>(null);
+  const [newSubName, setNewSubName] = useState('');
+  const [newSubIcon, setNewSubIcon] = useState('');
+  const [subToDeleteId, setSubToDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     loadInventoryData();
@@ -133,6 +157,62 @@ const InventoryScreen: React.FC = () => {
       const subcategoryConfig = SUBCATEGORY_CONFIG[item.subcategory];
       return subcategoryConfig.category === category;
     });
+  };
+
+  const handleAddSubcategory = async () => {
+    if (!newSubName.trim() || !newSubIcon || !navigation.category) return;
+
+    if (editingSubId) {
+      if (editingSubId.startsWith('builtin:')) {
+        const builtinName = editingSubId.replace('builtin:', '');
+        // Hide builtin and add as custom
+        await inventoryManager.removeSubcategory(builtinName);
+        await inventoryManager.addCustomSubcategory(newSubName, newSubIcon, theme.colors.primary, navigation.category);
+      } else {
+        await inventoryManager.updateSubcategory(editingSubId, newSubName, newSubIcon, theme.colors.primary);
+      }
+    } else {
+      await inventoryManager.addCustomSubcategory(newSubName, newSubIcon, theme.colors.primary, navigation.category);
+    }
+
+    setShowingSubAddDialog(false);
+    setNewSubName('');
+    setNewSubIcon('');
+    setEditingSubId(null);
+  };
+
+  const handleConfirmSubDelete = async () => {
+    if (subToDeleteId) {
+      await inventoryManager.removeSubcategory(subToDeleteId);
+      setSubToDeleteId(null);
+    }
+  };
+
+  const openSubAddDialog = () => {
+    setEditingSubId(null);
+    setNewSubName('');
+    if (navigation.category) {
+      setNewSubIcon(CATEGORY_ICONS[navigation.category][0]);
+    }
+    setShowingSubAddDialog(true);
+  };
+
+  const openSubEditDialog = (sub: string) => {
+    const customSubs = inventoryManager.getCustomSubcategories();
+    const subObj = customSubs.find(cs => cs.name === sub);
+    
+    if (subObj) {
+      setEditingSubId(subObj.id);
+      setNewSubName(subObj.name);
+      setNewSubIcon(subObj.icon);
+    } else {
+      // It's a builtin, convert to dynamic edit
+      const config = getSubcategoryConfig(sub as any);
+      setEditingSubId(`builtin:${sub}`);
+      setNewSubName(sub);
+      setNewSubIcon(config?.icon || 'help-circle');
+    }
+    setShowingSubAddDialog(true);
   };
 
   const getItemsForSubcategory = (subcategory: InventorySubcategory): InventoryItem[] => {
@@ -403,39 +483,80 @@ const InventoryScreen: React.FC = () => {
     );
   };
 
-  const renderSubcategoryRow = (subcategory: InventorySubcategory) => {
-    const config = SUBCATEGORY_CONFIG[subcategory];
-    const items = getItemsForSubcategory(subcategory);
-    const lowStockCount = items.filter(item => item.quantity <= 0.25).length;
+  const renderSubcategoryRow = (subName: string) => {
+    const items = getItemsForSubcategory(subName as InventorySubcategory);
+    const lowStockCount = items.filter(it => it.quantity <= 0.25).length;
+    const config = inventoryManager.getSubcategoryConfig(subName as InventorySubcategory);
+    
+    const renderRightActions = (progress: Animated.AnimatedInterpolation<number>, dragX: Animated.AnimatedInterpolation<number>) => {
+      const trans = dragX.interpolate({
+        inputRange: [-80, 0],
+        outputRange: [0, 80],
+        extrapolate: 'clamp',
+      });
+
+      return (
+        <Animated.View style={[styles.swipeAction, styles.deleteAction, { transform: [{ translateX: trans }] }]}>
+          <TouchableOpacity style={styles.swipeActionButton} onPress={() => {
+            setSubToDeleteId(subName);
+          }}>
+            <Icon name="delete" size={20} color="#fff" />
+            <Text style={styles.swipeActionText}>Delete</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      );
+    };
+
+    const renderLeftActions = (progress: Animated.AnimatedInterpolation<number>, dragX: Animated.AnimatedInterpolation<number>) => {
+      const trans = dragX.interpolate({
+        inputRange: [0, 80],
+        outputRange: [-80, 0],
+        extrapolate: 'clamp',
+      });
+
+      return (
+        <Animated.View style={[styles.swipeAction, styles.editAction, { transform: [{ translateX: trans }] }]}>
+          <TouchableOpacity style={styles.swipeActionButton} onPress={() => openSubEditDialog(subName)}>
+            <Icon name="pencil" size={20} color="#fff" />
+            <Text style={styles.swipeActionText}>Edit</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      );
+    };
 
     return (
-      <Card
-        key={subcategory}
-        style={styles.subcategoryCard}
-        onPress={() => setNavigation({ ...navigation, state: 'subcategory', subcategory })}
+      <Swipeable
+        key={subName}
+        renderRightActions={renderRightActions}
+        renderLeftActions={renderLeftActions}
+        overshootRight={false}
+        overshootLeft={false}
       >
-        <Card.Content style={styles.subcategoryContent}>
-          <Icon
-            name={config.icon as any}
-            size={30}
-            color={getCategoryColor(config.category, theme.dark)}
-            style={styles.subcategoryIcon}
-          />
-          <View style={styles.subcategoryInfo}>
-            <Title style={[styles.subcategoryTitle, { color: theme.colors.onSurface }]}>
-              {subcategory}
-            </Title>
-            <Text style={[styles.subcategoryStats, { color: theme.colors.onSurfaceVariant }]}>
-              {items.length} items
-            </Text>
-            {lowStockCount > 0 && (
-              <Text style={[styles.subcategoryStats, { color: theme.colors.error }]}>
-                {lowStockCount} need restocking
+        <Card
+          style={styles.subcategoryCard}
+          onPress={() => setNavigation({ state: 'subcategory', category: navigation.category, subcategory: subName as InventorySubcategory })}
+        >
+          <Card.Content style={styles.subcategoryContent}>
+            <View style={[styles.iconContainer, { backgroundColor: (config?.color || theme.colors.primary) + '20' }]}>
+              <Icon name={(config?.icon || 'help-circle') as any} size={24} color={config?.color || theme.colors.primary} />
+            </View>
+            <View style={styles.subcategoryInfo}>
+              <Title style={[styles.subcategoryTitle, { color: theme.colors.onSurface }]}>
+                {subName}
+              </Title>
+              <Text style={[styles.subcategoryStats, { color: theme.colors.onSurfaceVariant }]}>
+                {items.length} items
               </Text>
-            )}
-          </View>
-        </Card.Content>
-      </Card>
+              {lowStockCount > 0 && (
+                <Text style={[styles.subcategoryStats, { color: theme.colors.error }]}>
+                  {lowStockCount} need restocking
+                </Text>
+              )}
+            </View>
+            <Icon name="chevron-right" size={24} color={theme.colors.onSurfaceVariant} />
+          </Card.Content>
+        </Card>
+      </Swipeable>
     );
   };
 
@@ -600,7 +721,8 @@ const InventoryScreen: React.FC = () => {
   const renderCategoryScreen = () => {
     if (!navigation.category) return null;
     
-    const config = CATEGORY_CONFIG[navigation.category];
+    const config = getCategoryConfig(navigation.category);
+    const subcategories = inventoryManager.getSubcategoriesForCategory(navigation.category);
     
     return (
       <View style={styles.container}>
@@ -613,14 +735,18 @@ const InventoryScreen: React.FC = () => {
           <Title style={[styles.headerTitle, { color: theme.colors.onSurface }]}>
             {navigation.category}
           </Title>
-          <View style={{ width: 48 }} />
+          <IconButton
+            icon="plus"
+            size={24}
+            onPress={openSubAddDialog}
+          />
         </View>
         <ScrollView
           style={styles.scrollView}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
           <View style={styles.subcategoriesList}>
-            {config.subcategories.map(renderSubcategoryRow)}
+            {subcategories.map(renderSubcategoryRow)}
           </View>
         </ScrollView>
       </View>
@@ -672,6 +798,8 @@ const InventoryScreen: React.FC = () => {
             value={newItemName}
             onChangeText={setNewItemName}
             mode="outlined"
+            onSubmitEditing={handleAddItem}
+            returnKeyType="done"
           />
         </Dialog.Content>
         <Dialog.Actions>
@@ -694,6 +822,8 @@ const InventoryScreen: React.FC = () => {
             value={editedName}
             onChangeText={setEditedName}
             mode="outlined"
+            onSubmitEditing={handleEditItem}
+            returnKeyType="done"
           />
         </Dialog.Content>
         <Dialog.Actions>
@@ -763,8 +893,6 @@ const InventoryScreen: React.FC = () => {
   );
 
   const renderFloatingActionButton = () => {
-    if (navigation.state !== 'home') return null;
-    
     return (
       <FAB
         icon="auto-fix"
@@ -774,6 +902,61 @@ const InventoryScreen: React.FC = () => {
       />
     );
   };
+  const renderSubAddDialog = () => (
+    <Portal>
+      <Dialog visible={showingSubAddDialog} onDismiss={() => setShowingSubAddDialog(false)}>
+        <Dialog.Title>{editingSubId ? 'Edit Type' : 'Add New Type'}</Dialog.Title>
+        <Dialog.Content>
+          <TextInput
+            label="Type Name"
+            value={newSubName}
+            onChangeText={setNewSubName}
+            mode="outlined"
+            style={{ marginBottom: 16 }}
+            onSubmitEditing={handleAddSubcategory}
+            returnKeyType="done"
+          />
+          <Text style={{ marginBottom: 8, color: theme.colors.onSurface }}>Select Icon:</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {navigation.category && CATEGORY_ICONS[navigation.category].map(icon => (
+              <IconButton
+                key={icon}
+                icon={icon}
+                mode={newSubIcon === icon ? 'contained' : 'outlined'}
+                onPress={() => setNewSubIcon(icon)}
+                size={24}
+                iconColor={newSubIcon === icon ? theme.colors.onPrimary : theme.colors.primary}
+                containerColor={newSubIcon === icon ? theme.colors.primary : undefined}
+              />
+            ))}
+          </View>
+        </Dialog.Content>
+        <Dialog.Actions>
+          <Button onPress={() => setShowingSubAddDialog(false)}>Cancel</Button>
+          <Button onPress={handleAddSubcategory} disabled={!newSubName.trim()}>
+            {editingSubId ? 'Save' : 'Add'}
+          </Button>
+        </Dialog.Actions>
+      </Dialog>
+    </Portal>
+  );
+
+  const renderSubDeleteConfirmDialog = () => (
+    <Portal>
+      <Dialog visible={!!subToDeleteId} onDismiss={() => setSubToDeleteId(null)}>
+        <Dialog.Title>Delete Type</Dialog.Title>
+        <Dialog.Content>
+          <Text style={{ color: theme.colors.onSurface }}>
+            Are you sure you want to delete this type? All items inside it will also be deleted.
+          </Text>
+        </Dialog.Content>
+        <Dialog.Actions>
+          <Button onPress={() => setSubToDeleteId(null)}>Cancel</Button>
+          <Button onPress={handleConfirmSubDelete} textColor={theme.colors.error}>Delete</Button>
+        </Dialog.Actions>
+      </Dialog>
+    </Portal>
+  );
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -787,6 +970,8 @@ const InventoryScreen: React.FC = () => {
       {renderDeleteConfirmDialog()}
       {renderShoppingConfirmDialog()}
       {renderSuccessDialog()}
+      {renderSubAddDialog()}
+      {renderSubDeleteConfirmDialog()}
       <Snackbar
         visible={snackbarVisible}
         onDismiss={() => setSnackbarVisible(false)}
@@ -886,12 +1071,23 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderRadius: 12,
   },
+  addSubCard: {
+    borderStyle: 'dashed',
+    borderWidth: 1,
+    elevation: 0,
+    backgroundColor: 'transparent',
+  },
   subcategoryContent: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
   },
-  subcategoryIcon: {
+  iconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 16,
   },
   subcategoryInfo: {

@@ -379,6 +379,8 @@ const ShoppingScreen: React.FC = () => {
             onChangeText={setNewItemName}
             mode="outlined"
             autoFocus
+            onSubmitEditing={handleAddMiscItem}
+            returnKeyType="done"
           />
           
           {miscSuggestions.length > 0 && (

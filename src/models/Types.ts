@@ -7,7 +7,7 @@ export enum InventoryCategory {
 }
 
 // MARK: - Inventory Subcategories
-export enum InventorySubcategory {
+export enum BuiltinSubcategory {
   // Fridge subcategories
   DOOR_BOTTLES = 'Door Bottles',
   TRAY = 'Tray Section',
@@ -34,6 +34,17 @@ export enum InventorySubcategory {
   FACE = 'Face',
   BODY = 'Body',
   HEAD = 'Head',
+}
+
+export type InventorySubcategory = BuiltinSubcategory | string;
+
+// MARK: - Custom Subcategory Interface
+export interface CustomSubcategory {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  category: InventoryCategory;
 }
 
 // MARK: - Shopping States

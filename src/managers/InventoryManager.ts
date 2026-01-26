@@ -1,4 +1,4 @@
-import { InventoryItem, ShoppingListItem, ShoppingState, InventoryCategory, InventorySubcategory } from '../models/Types';
+import { InventoryItem, ShoppingListItem, ShoppingState, InventoryCategory, InventorySubcategory, CustomSubcategory, SubcategoryConfig } from '../models/Types';
 import { StorageService } from '../services/StorageService';
 import { SUBCATEGORY_CONFIG } from '../constants/CategoryConfig';
 import { v4 as uuidv4 } from 'uuid';
@@ -6,6 +6,8 @@ import { v4 as uuidv4 } from 'uuid';
 // MARK: - Inventory Manager Class
 export class InventoryManager {
   private inventoryItems: InventoryItem[] = [];
+  private customSubcategories: CustomSubcategory[] = [];
+  private hiddenBuiltinSubs: string[] = [];
   private shoppingList: ShoppingListItem[] = [];
   private shoppingState: ShoppingState = ShoppingState.EMPTY;
   private listeners: Set<() => void> = new Set();
@@ -29,13 +31,17 @@ export class InventoryManager {
     try {
       console.log('📂 Loading data from storage...');
       
-      const [items, shoppingItems, state] = await Promise.all([
+      const [items, shoppingItems, state, customSubs, hiddenSubs] = await Promise.all([
         StorageService.loadInventoryItems(),
         StorageService.loadShoppingList(),
         StorageService.loadShoppingState(),
+        StorageService.loadCustomSubcategories(),
+        StorageService.loadHiddenBuiltinSubs(),
       ]);
 
       this.inventoryItems = items;
+      this.customSubcategories = customSubs;
+      this.hiddenBuiltinSubs = hiddenSubs || [];
       this.shoppingList = shoppingItems;
       this.shoppingState = state;
 
@@ -56,13 +62,31 @@ export class InventoryManager {
 
   getItemsForCategory(category: InventoryCategory): InventoryItem[] {
     return this.inventoryItems.filter(item => {
-      const subcategoryConfig = SUBCATEGORY_CONFIG[item.subcategory];
-      return subcategoryConfig.category === category;
+      const config = this.getSubcategoryConfigInternal(item.subcategory);
+      return config?.category === category;
     });
   }
 
   getItemsForSubcategory(subcategory: InventorySubcategory): InventoryItem[] {
     return this.inventoryItems.filter(item => item.subcategory === subcategory);
+  }
+
+  private getSubcategoryConfigInternal(subcategory: InventorySubcategory): SubcategoryConfig | null {
+    // Check built-in first
+    if (SUBCATEGORY_CONFIG[subcategory]) {
+      return SUBCATEGORY_CONFIG[subcategory];
+    }
+    // Check custom
+    const custom = this.customSubcategories.find(cs => cs.name === subcategory || cs.id === subcategory);
+    if (custom) {
+      return {
+        icon: custom.icon,
+        color: custom.color,
+        category: custom.category,
+        sampleItems: []
+      };
+    }
+    return null;
   }
 
   async addCustomItem(name: string, subcategory: InventorySubcategory): Promise<void> {
@@ -181,6 +205,101 @@ export class InventoryManager {
     await StorageService.saveInventoryItems(this.inventoryItems);
     console.log(`🔄 Restocked ${item.name} to 100%`);
     
+    this.notifyListeners();
+  }
+
+  // MARK: - Subcategory Management
+  getCustomSubcategories(): CustomSubcategory[] {
+    return [...this.customSubcategories];
+  }
+
+  getSubcategoriesForCategory(category: InventoryCategory): InventorySubcategory[] {
+    const builtin = Object.entries(SUBCATEGORY_CONFIG)
+      .filter(([sub, config]) => config.category === category && !this.hiddenBuiltinSubs.includes(sub))
+      .map(([sub, _]) => sub);
+    
+    const custom = this.customSubcategories
+      .filter(cs => cs.category === category)
+      .map(cs => cs.name);
+      
+    return [...builtin, ...custom];
+  }
+
+  getSubcategoryConfig(subcategory: InventorySubcategory): SubcategoryConfig | null {
+    return this.getSubcategoryConfigInternal(subcategory);
+  }
+
+  async addCustomSubcategory(name: string, icon: string, color: string, category: InventoryCategory): Promise<void> {
+    const newSub: CustomSubcategory = {
+      id: uuidv4(),
+      name: name.trim(),
+      icon,
+      color,
+      category,
+    };
+
+    this.customSubcategories.push(newSub);
+    await StorageService.saveCustomSubcategories(this.customSubcategories);
+    this.notifyListeners();
+  }
+
+  async updateSubcategory(id: string, name: string, icon: string, color: string): Promise<void> {
+    const subIndex = this.customSubcategories.findIndex(s => s.id === id);
+    if (subIndex === -1) return;
+
+    const oldName = this.customSubcategories[subIndex].name;
+    const newName = name.trim();
+
+    this.customSubcategories[subIndex] = {
+      ...this.customSubcategories[subIndex],
+      name: newName,
+      icon,
+      color,
+    };
+
+    // If name changed, update all items belonging to this subcategory
+    if (oldName !== newName) {
+      this.inventoryItems.forEach(item => {
+        if (item.subcategory === oldName) {
+          item.subcategory = newName;
+        }
+      });
+      await StorageService.saveInventoryItems(this.inventoryItems);
+    }
+
+    await StorageService.saveCustomSubcategories(this.customSubcategories);
+    this.notifyListeners();
+  }
+
+  async removeSubcategory(idOrName: string): Promise<void> {
+    // Check if it's a builtin name first
+    if (SUBCATEGORY_CONFIG[idOrName]) {
+      if (!this.hiddenBuiltinSubs.includes(idOrName)) {
+        this.hiddenBuiltinSubs.push(idOrName);
+        await StorageService.saveHiddenBuiltinSubs(this.hiddenBuiltinSubs);
+        
+        // Remove all items belonging to this subcategory
+        const itemsToRemove = this.inventoryItems.filter(item => item.subcategory === idOrName);
+        for (const item of itemsToRemove) {
+          await this.removeItem(item.id);
+        }
+        
+        this.notifyListeners();
+      }
+      return;
+    }
+
+    const sub = this.customSubcategories.find(s => s.id === idOrName || s.name === idOrName);
+    if (!sub) return;
+
+    // Remove all items belonging to this subcategory
+    const itemsToRemove = this.inventoryItems.filter(item => item.subcategory === sub.name);
+    for (const item of itemsToRemove) {
+      await this.removeItem(item.id);
+    }
+
+    this.customSubcategories = this.customSubcategories.filter(s => s.id !== sub.id);
+    await StorageService.saveCustomSubcategories(this.customSubcategories);
     this.notifyListeners();
   }
 
@@ -409,7 +528,8 @@ export class InventoryManager {
 
   getActiveCategoriesCount(): number {
     const activeCategories = new Set(
-      this.inventoryItems.map(item => SUBCATEGORY_CONFIG[item.subcategory].category)
+      this.inventoryItems.map(item => this.getSubcategoryConfigInternal(item.subcategory)?.category)
+        .filter(cat => cat !== undefined)
     );
     return activeCategories.size;
   }

@@ -8,6 +8,8 @@ const STORAGE_KEYS = {
   SHOPPING_STATE: 'shopping_state',
   NOTES: 'notes',
   SETTINGS: 'app_settings',
+  CUSTOM_SUBCATEGORIES: 'custom_subcategories',
+  HIDDEN_BUILTIN_SUBS: 'hidden_builtin_subs',
 } as const;
 
 // MARK: - Storage Service Class
@@ -209,6 +211,50 @@ export class StorageService {
     };
   }
 
+  // MARK: - Custom Subcategories
+  static async saveCustomSubcategories(subcategories: any[]): Promise<void> {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.CUSTOM_SUBCATEGORIES, JSON.stringify(subcategories));
+      console.log('✅ Custom subcategories saved to storage');
+    } catch (error) {
+      console.error('❌ Error saving custom subcategories:', error);
+      throw error;
+    }
+  }
+
+  static async loadCustomSubcategories(): Promise<any[]> {
+    try {
+      const serialized = await AsyncStorage.getItem(STORAGE_KEYS.CUSTOM_SUBCATEGORIES);
+      if (!serialized) return [];
+      return JSON.parse(serialized);
+    } catch (error) {
+      console.error('❌ Error loading custom subcategories:', error);
+      return [];
+    }
+  }
+
+  // MARK: - Hidden Builtin Subs
+  static async saveHiddenBuiltinSubs(subs: string[]): Promise<void> {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.HIDDEN_BUILTIN_SUBS, JSON.stringify(subs));
+      console.log('✅ Hidden builtin subcategories saved to storage');
+    } catch (error) {
+      console.error('❌ Error saving hidden builtin subcategories:', error);
+      throw error;
+    }
+  }
+
+  static async loadHiddenBuiltinSubs(): Promise<string[]> {
+    try {
+      const serialized = await AsyncStorage.getItem(STORAGE_KEYS.HIDDEN_BUILTIN_SUBS);
+      if (!serialized) return [];
+      return JSON.parse(serialized);
+    } catch (error) {
+      console.error('❌ Error loading hidden builtin subcategories:', error);
+      return [];
+    }
+  }
+
   // MARK: - Clear All Data
   static async clearAllData(): Promise<void> {
     try {
@@ -218,6 +264,8 @@ export class StorageService {
         STORAGE_KEYS.SHOPPING_STATE,
         STORAGE_KEYS.NOTES,
         STORAGE_KEYS.SETTINGS,
+        STORAGE_KEYS.CUSTOM_SUBCATEGORIES,
+        STORAGE_KEYS.HIDDEN_BUILTIN_SUBS,
       ]);
       console.log('🗑️ All data cleared from storage');
     } catch (error) {
