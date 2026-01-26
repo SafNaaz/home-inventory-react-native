@@ -548,6 +548,8 @@ const InventoryScreen: React.FC = () => {
         renderLeftActions={renderLeftActions}
         overshootRight={false}
         overshootLeft={false}
+        containerStyle={{ overflow: 'visible' }}
+        childrenContainerStyle={{ overflow: 'visible' }}
       >
         <Card
           style={styles.subcategoryCard}
@@ -666,6 +668,8 @@ const InventoryScreen: React.FC = () => {
         renderLeftActions={renderLeftActions}
         overshootRight={false}
         overshootLeft={false}
+        containerStyle={{ overflow: 'visible' }}
+        childrenContainerStyle={{ overflow: 'visible' }}
       >
         <Card style={styles.itemCard}>
           <Card.Content style={styles.compactItemContent}>
@@ -1085,7 +1089,8 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   subcategoryCard: {
-    marginBottom: 16,
+    marginVertical: 8,
+    marginHorizontal: 4,
     borderRadius: 24,
     ...commonStyles.shadow,
   },
@@ -1124,7 +1129,8 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   itemCard: {
-    marginBottom: 16,
+    marginVertical: 8,
+    marginHorizontal: 4,
     borderRadius: 24,
     ...commonStyles.shadow,
   },
@@ -1250,17 +1256,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     width: 80,
-    marginBottom: 12,
+    marginVertical: 8,
   },
   deleteAction: {
     backgroundColor: '#FF3B30',
-    borderTopRightRadius: 12,
-    borderBottomRightRadius: 12,
+    borderTopRightRadius: 24,
+    borderBottomRightRadius: 24,
   },
   editAction: {
     backgroundColor: '#007AFF',
-    borderTopLeftRadius: 12,
-    borderBottomLeftRadius: 12,
+    borderTopLeftRadius: 24,
+    borderBottomLeftRadius: 24,
   },
   swipeActionButton: {
     flex: 1,
