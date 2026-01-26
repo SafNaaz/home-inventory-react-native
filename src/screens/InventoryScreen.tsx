@@ -9,7 +9,9 @@ import {
   TouchableOpacity,
   PanResponder,
   BackHandler,
+  Animated,
 } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 import {
   Card,
   Title,
@@ -451,60 +453,148 @@ const InventoryScreen: React.FC = () => {
     );
   };
 
+  const handleIncrementQuantity = async (item: InventoryItem) => {
+    const newQuantity = Math.min(1, item.quantity + 0.01); // Increment by 1%, max 100%
+    await handleQuantityUpdate(item, newQuantity);
+  };
+
+  const handleDecrementQuantity = async (item: InventoryItem) => {
+    const newQuantity = Math.max(0, item.quantity - 0.01); // Decrement by 1%, min 0%
+    await handleQuantityUpdate(item, newQuantity);
+  };
+
+  const confirmDelete = (item: InventoryItem) => {
+    Alert.alert(
+      'Delete Item',
+      `Are you sure you want to delete "${item.name}"?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => inventoryManager.removeItem(item.id),
+        },
+      ]
+    );
+  };
+
+  const confirmEdit = (item: InventoryItem) => {
+    setEditingItem(item);
+    setEditedName(item.name);
+  };
+
   const renderItemRow = (item: InventoryItem) => {
     const subcategoryConfig = SUBCATEGORY_CONFIG[item.subcategory];
     const stockColor = getStockColor(item.quantity, theme.dark);
 
+    const renderRightActions = (progress: Animated.AnimatedInterpolation<number>, dragX: Animated.AnimatedInterpolation<number>) => {
+      const trans = dragX.interpolate({
+        inputRange: [-80, 0],
+        outputRange: [0, 80],
+        extrapolate: 'clamp',
+      });
+
+      return (
+        <Animated.View
+          style={[
+            styles.swipeAction,
+            styles.deleteAction,
+            { transform: [{ translateX: trans }] },
+          ]}
+        >
+          <TouchableOpacity
+            style={styles.swipeActionButton}
+            onPress={() => confirmDelete(item)}
+          >
+            <Icon name="delete" size={20} color="#fff" />
+            <Text style={styles.swipeActionText}>Delete</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      );
+    };
+
+    const renderLeftActions = (progress: Animated.AnimatedInterpolation<number>, dragX: Animated.AnimatedInterpolation<number>) => {
+      const trans = dragX.interpolate({
+        inputRange: [0, 80],
+        outputRange: [-80, 0],
+        extrapolate: 'clamp',
+      });
+
+      return (
+        <Animated.View
+          style={[
+            styles.swipeAction,
+            styles.editAction,
+            { transform: [{ translateX: trans }] },
+          ]}
+        >
+          <TouchableOpacity
+            style={styles.swipeActionButton}
+            onPress={() => confirmEdit(item)}
+          >
+            <Icon name="pencil" size={20} color="#fff" />
+            <Text style={styles.swipeActionText}>Edit</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      );
+    };
+
     return (
-      <Card key={item.id} style={styles.itemCard}>
-        <Card.Content>
-          <View style={styles.itemHeader}>
-            <Text style={[styles.itemTitle, { color: theme.colors.onSurface }]}>
-              {item.name}
-            </Text>
-            <View style={styles.itemActions}>
-              <IconButton
-                icon="pencil"
-                size={16}
-                onPress={() => {
-                  setEditingItem(item);
-                  setEditedName(item.name);
-                }}
-              />
+      <Swipeable
+        key={item.id}
+        renderRightActions={renderRightActions}
+        renderLeftActions={renderLeftActions}
+        overshootRight={false}
+        overshootLeft={false}
+      >
+        <Card style={styles.itemCard}>
+          <Card.Content style={styles.compactItemContent}>
+            <View style={styles.itemHeaderCompact}>
+              <Text style={[styles.itemTitle, { color: theme.colors.onSurface }]}>
+                {item.name}
+              </Text>
               <Text style={[styles.itemPercentage, { color: stockColor }]}>
                 {Math.round(item.quantity * 100)}%
               </Text>
             </View>
-          </View>
 
-          <View style={styles.stockSliderContainer}>
-            <Text style={[styles.stockLabel, { color: theme.colors.onSurfaceVariant }]}>
-              Stock Level
-            </Text>
-            <View style={styles.stockControls}>
-              <Text style={[styles.stockValue, { color: theme.colors.onSurface }]}>
-                {Math.round(item.quantity * 100)}%
-              </Text>
-              <SliderControl
-                initialValue={item.quantity}
-                onComplete={(q) => handleQuantityUpdate(item, q)}
-                trackColor={theme.colors.outline}
-                progressColor={stockColor}
-                thumbColor={theme.colors.primary}
+            <View style={styles.stockControlsCompact}>
+              <IconButton
+                icon="minus"
+                size={20}
+                iconColor={theme.colors.primary}
+                style={styles.quantityButton}
+                onPress={() => handleDecrementQuantity(item)}
+              />
+              <View style={styles.sliderWrapper}>
+                <SliderControl
+                  initialValue={item.quantity}
+                  onComplete={(q) => handleQuantityUpdate(item, q)}
+                  trackColor={theme.colors.outline}
+                  progressColor={stockColor}
+                  thumbColor={theme.colors.primary}
+                />
+              </View>
+              <IconButton
+                icon="plus"
+                size={20}
+                iconColor={theme.colors.primary}
+                style={styles.quantityButton}
+                onPress={() => handleIncrementQuantity(item)}
               />
             </View>
-          </View>
 
-          {item.quantity <= 0.25 && (
-            <View style={styles.lowStockWarning}>
-              <Icon name="alert-circle" size={16} color={theme.colors.error} />
-              <Text style={[styles.lowStockText, { color: theme.colors.error }]}>
-                Needs restocking
-              </Text>
-            </View>
-          )}
-        </Card.Content>
-      </Card>
+            {item.quantity <= 0.25 && (
+              <View style={styles.lowStockWarningCompact}>
+                <Icon name="alert-circle" size={14} color={theme.colors.error} />
+                <Text style={[styles.lowStockTextCompact, { color: theme.colors.error }]}>
+                  Low stock
+                </Text>
+              </View>
+            )}
+          </Card.Content>
+        </Card>
+      </Swipeable>
     );
   };
 
@@ -853,6 +943,69 @@ const styles = StyleSheet.create({
   lowStockText: {
     fontSize: 12,
     marginLeft: 4,
+  },
+  // New compact styles
+  compactItemContent: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  itemHeaderCompact: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  stockControlsCompact: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  quantityButton: {
+    margin: 0,
+    width: 36,
+    height: 36,
+  },
+  sliderWrapper: {
+    flex: 1,
+    marginHorizontal: 4,
+  },
+  lowStockWarningCompact: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  lowStockTextCompact: {
+    fontSize: 11,
+    marginLeft: 4,
+  },
+  // Swipe action styles
+  swipeAction: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 80,
+    marginBottom: 12,
+  },
+  deleteAction: {
+    backgroundColor: '#FF3B30',
+    borderTopRightRadius: 12,
+    borderBottomRightRadius: 12,
+  },
+  editAction: {
+    backgroundColor: '#007AFF',
+    borderTopLeftRadius: 12,
+    borderBottomLeftRadius: 12,
+  },
+  swipeActionButton: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+  },
+  swipeActionText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 4,
   },
   fab: {
     position: 'absolute',
