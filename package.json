@@ -29,7 +29,8 @@
     "react-refresh": "^0.17.0",
     "uuid": "^3.4.0",
     "expo-local-authentication": "~14.0.1",
-    "expo-notifications": "~0.28.19"
+    "expo-notifications": "~0.28.19",
+    "@react-native-community/slider": "4.5.2"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",

@@ -580,6 +580,22 @@ export class InventoryManager {
     console.log(`🔄 Reset to defaults with ${sampleItems.length} sample items`);
     this.notifyListeners();
   }
+  // MARK: - Activity Analysis
+  getStaleItemsByThreshold(thresholds: Record<InventoryCategory, number>): InventoryItem[] {
+    const now = new Date();
+    return this.inventoryItems.filter(item => {
+      const config = this.getSubcategoryConfigInternal(item.subcategory);
+      if (!config) return false;
+      
+      const thresholdDays = thresholds[config.category];
+      if (thresholdDays === undefined) return false;
+
+      const diffTime = Math.abs(now.getTime() - new Date(item.lastUpdated).getTime());
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      
+      return diffDays >= thresholdDays;
+    });
+  }
 }
 
 // Export singleton instance

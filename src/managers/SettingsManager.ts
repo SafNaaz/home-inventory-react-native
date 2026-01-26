@@ -1,5 +1,6 @@
-import { AppSettings } from '../models/Types';
+import { AppSettings, InventoryCategory } from '../models/Types';
 import { StorageService } from '../services/StorageService';
+import { inventoryManager } from './InventoryManager';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
@@ -28,7 +29,21 @@ export class SettingsManager {
   // MARK: - Settings Loading
   private async loadSettings(): Promise<void> {
     try {
-      this.settings = await StorageService.loadSettings();
+      const loaded = await StorageService.loadSettings();
+      // Merge defaults with loaded settings to ensure new keys exist
+      this.settings = {
+        ...this.getDefaultSettings(),
+        ...loaded,
+        activityThresholds: {
+          ...this.getDefaultSettings().activityThresholds,
+          ...(loaded?.activityThresholds || {}),
+        }
+      };
+
+      if (this.settings.isInventoryReminderEnabled) {
+        this.scheduleInventoryReminders();
+      }
+
       this.notifyListeners();
     } catch (error) {
       console.error('❌ Error loading settings:', error);
@@ -50,7 +65,7 @@ export class SettingsManager {
     const evening = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 18, 0);
 
     return {
-      isDarkMode: false,
+      themeMode: 'system',
       isSecurityEnabled: false,
       isAuthenticated: false,
       isInventoryReminderEnabled: false,
@@ -58,6 +73,13 @@ export class SettingsManager {
       reminderTime1: morning,
       reminderTime2: evening,
       miscItemHistory: [],
+      activityThresholds: {
+        [InventoryCategory.FRIDGE]: 3,
+        [InventoryCategory.GROCERY]: 7,
+        [InventoryCategory.HYGIENE]: 15,
+        [InventoryCategory.PERSONAL_CARE]: 30,
+      },
+      isHealthAlertsEnabled: true,
     };
   }
 
@@ -66,8 +88,12 @@ export class SettingsManager {
     return { ...this.settings };
   }
 
+  getThemeMode(): string {
+    return this.settings.themeMode;
+  }
+
   isDarkModeEnabled(): boolean {
-    return this.settings.isDarkMode;
+    return this.settings.themeMode === 'dark';
   }
 
   isSecurityEnabled(): boolean {
@@ -86,6 +112,10 @@ export class SettingsManager {
     return this.settings.isSecondReminderEnabled;
   }
 
+  isHealthAlertsEnabled(): boolean {
+    return this.settings.isHealthAlertsEnabled;
+  }
+
   getReminderTime1(): Date {
     return this.settings.reminderTime1;
   }
@@ -98,11 +128,24 @@ export class SettingsManager {
     return [...this.settings.miscItemHistory];
   }
 
+  getActivityThresholds(): Record<InventoryCategory, number> {
+    return { ...this.settings.activityThresholds };
+  }
+
+  getActivityThreshold(category: InventoryCategory): number {
+    return this.settings.activityThresholds[category] || 30;
+  }
+
   // MARK: - Settings Management
   async toggleDarkMode(): Promise<void> {
-    this.settings.isDarkMode = !this.settings.isDarkMode;
+    const newMode = this.settings.themeMode === 'dark' ? 'light' : 'dark';
+    await this.setThemeMode(newMode as any);
+  }
+
+  async setThemeMode(mode: 'light' | 'dark' | 'system'): Promise<void> {
+    this.settings.themeMode = mode;
     await this.saveSettings();
-    console.log(`🌓 Dark mode ${this.settings.isDarkMode ? 'enabled' : 'disabled'}`);
+    console.log(`🌓 Theme mode set to: ${mode}`);
   }
 
   async toggleSecurity(): Promise<void> {
@@ -208,6 +251,17 @@ export class SettingsManager {
     console.log(`🔔 Second reminder ${this.settings.isSecondReminderEnabled ? 'enabled' : 'disabled'}`);
   }
 
+  async toggleHealthAlerts(): Promise<void> {
+    this.settings.isHealthAlertsEnabled = !this.settings.isHealthAlertsEnabled;
+    
+    if (this.settings.isInventoryReminderEnabled) {
+      await this.scheduleInventoryReminders();
+    }
+    
+    await this.saveSettings();
+    console.log(`🔔 Health alerts ${this.settings.isHealthAlertsEnabled ? 'enabled' : 'disabled'}`);
+  }
+
   async updateReminderTime1(time: Date): Promise<void> {
     this.settings.reminderTime1 = time;
     
@@ -263,7 +317,7 @@ export class SettingsManager {
     await this.scheduleDailyReminder(
       this.settings.reminderTime1, 
       'Time to check your inventory!',
-      'Stay on top of your supplies and restock low items.'
+      this.getFreshnessSummary()
     );
     
     // Schedule second reminder only if enabled
@@ -294,14 +348,39 @@ export class SettingsManager {
   }
 
   async sendTestNotification(): Promise<void> {
+    const summary = this.getFreshnessSummary();
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: "Test Notification 🔔",
-        body: "Inventory reminders are working correctly!",
+        title: "Inventory Check 🔔",
+        body: summary || "Inventory reminders are working correctly!",
         data: { data: 'test' },
       },
       trigger: null, // Send immediately
     });
+  }
+
+  private getFreshnessSummary(): string {
+    const thresholds = this.settings.activityThresholds;
+    
+    if (!this.settings.isHealthAlertsEnabled) {
+      return 'Stay on top of your supplies and restock low items.';
+    }
+
+    const staleItems = inventoryManager.getStaleItemsByThreshold(thresholds);
+    
+    if (staleItems.length === 0) {
+      return 'Stay on top of your supplies and restock low items.';
+    }
+
+    const categories = new Set(staleItems.map(item => {
+      const config = inventoryManager.getSubcategoryConfig(item.subcategory);
+      return config?.category;
+    }).filter(Boolean));
+
+    const staleCount = staleItems.length;
+    const categoryNames = Array.from(categories).join(', ');
+    
+    return `${staleCount} items in ${categoryNames} need a status update. Please check them today!`;
   }
 
   private async cancelInventoryReminders(): Promise<void> {
@@ -311,6 +390,13 @@ export class SettingsManager {
 
   private formatTime(date: Date): string {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  // MARK: - Activity Thresholds Management
+  async updateActivityThreshold(category: InventoryCategory, days: number): Promise<void> {
+    this.settings.activityThresholds[category] = days;
+    await this.saveSettings();
+    console.log(`⏱️ Updated ${category} activity threshold to ${days} days`);
   }
 
   // MARK: - Misc Item History

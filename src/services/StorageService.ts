@@ -208,6 +208,12 @@ export class StorageService {
       reminderTime1: morning,
       reminderTime2: evening,
       miscItemHistory: [],
+      activityThresholds: {
+        ['Fridge']: 3,
+        ['Grocery']: 7,
+        ['Hygiene']: 15,
+        ['Personal Care']: 30,
+      } as any,
     };
   }
 

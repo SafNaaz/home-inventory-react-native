@@ -14,6 +14,7 @@ import InsightsScreen from './src/screens/InsightsScreen';
 import NotesScreen from './src/screens/NotesScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import NotificationSettingsScreen from './src/screens/NotificationSettingsScreen';
+import { useColorScheme } from 'react-native';
 
 // Managers
 import { inventoryManager } from './src/managers/InventoryManager';
@@ -27,7 +28,8 @@ const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
 
 const App: React.FC = () => {
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>('system');
+  const systemColorScheme = useColorScheme();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isSecurityEnabled, setIsSecurityEnabled] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -38,9 +40,10 @@ const App: React.FC = () => {
 
     // Set up listeners
     const settingsUnsubscribe = settingsManager.addListener(() => {
-      setIsDarkMode(settingsManager.isDarkModeEnabled());
-      setIsAuthenticated(settingsManager.isAuthenticated());
-      setIsSecurityEnabled(settingsManager.isSecurityEnabled());
+      const currentSettings = settingsManager.getSettings();
+      setThemeMode(currentSettings.themeMode);
+      setIsAuthenticated(currentSettings.isAuthenticated);
+      setIsSecurityEnabled(currentSettings.isSecurityEnabled);
     });
 
     return () => {
@@ -52,7 +55,7 @@ const App: React.FC = () => {
     try {
       // Load initial settings
       const settings = settingsManager.getSettings();
-      setIsDarkMode(settings.isDarkMode);
+      setThemeMode(settings.themeMode);
       setIsSecurityEnabled(settings.isSecurityEnabled);
       setIsAuthenticated(settings.isAuthenticated);
 
@@ -88,26 +91,28 @@ const App: React.FC = () => {
     setIsAuthenticated(success);
   };
 
+  // Calculated effective theme
+  const isDark = themeMode === 'system' ? systemColorScheme === 'dark' : themeMode === 'dark';
+  const theme = isDark ? darkTheme : lightTheme;
+
   // Show loading screen while initializing
   if (isLoading) {
     return (
-      <PaperProvider theme={isDarkMode ? darkTheme : lightTheme}>
+      <PaperProvider theme={theme}>
         <StatusBar
-          barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-          backgroundColor={isDarkMode ? '#121212' : '#ffffff'}
+          barStyle={isDark ? 'light-content' : 'dark-content'}
+          backgroundColor={theme.colors.surface}
         />
-        {/* You can create a proper loading screen component here */}
       </PaperProvider>
     );
   }
 
   // Show authentication screen if security is enabled but not authenticated
   if (isSecurityEnabled && !isAuthenticated) {
-    const theme = isDarkMode ? darkTheme : lightTheme;
     return (
       <PaperProvider theme={theme}>
         <StatusBar
-          barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+          barStyle={isDark ? 'light-content' : 'dark-content'}
           backgroundColor={theme.colors.surface}
         />
         <View style={{ 
@@ -135,175 +140,158 @@ const App: React.FC = () => {
     );
   }
 
-  const theme = isDarkMode ? darkTheme : lightTheme;
-
   // Tab Navigator Component
   const TabNavigator = () => {
-    const currentTheme = isDarkMode ? darkTheme : lightTheme;
-    
     return (
-    <Tab.Navigator
-          screenOptions={({ route }) => ({
-            tabBarIcon: ({ focused, color, size }) => {
-              let iconName: string;
+      <Tab.Navigator
+        screenOptions={({ route }) => ({
+          tabBarIcon: ({ focused, color, size }) => {
+            let iconName: string;
 
-              switch (route.name) {
-                case 'Inventory':
-                  iconName = focused ? 'fridge' : 'fridge-outline';
-                  break;
-                case 'Shopping':
-                  iconName = focused ? 'cart' : 'cart-outline';
-                  break;
-                case 'Insights':
-                  iconName = focused ? 'chart-bar' : 'chart-bar';
-                  break;
-                case 'Notes':
-                  iconName = focused ? 'note-text' : 'note-text-outline';
-                  break;
-                
-                default:
-                  iconName = 'circle';
-              }
+            switch (route.name) {
+              case 'Inventory':
+                iconName = focused ? 'fridge' : 'fridge-outline';
+                break;
+              case 'Shopping':
+                iconName = focused ? 'cart' : 'cart-outline';
+                break;
+              case 'Insights':
+                iconName = focused ? 'chart-bar' : 'chart-bar';
+                break;
+              case 'Notes':
+                iconName = focused ? 'note-text' : 'note-text-outline';
+                break;
+              default:
+                iconName = 'circle';
+            }
 
-              return <Icon name={iconName as any} size={size} color={color} />;
-            },
-            tabBarActiveTintColor: theme.colors.primary,
-            tabBarInactiveTintColor: theme.colors.onSurfaceVariant,
-            tabBarShowLabel: true,
-            tabBarLabelStyle: {
-              fontSize: 12,
-              fontWeight: '600',
-              marginBottom: 4,
-            },
-            tabBarStyle: {
-              backgroundColor: theme.colors.surface,
-              borderTopWidth: 0,
-              height: 65,
-              paddingBottom: 10,
-              paddingTop: 10,
-              position: 'absolute',
-              bottom: 20,
-              left: 20,
-              right: 20,
-              borderRadius: 32,
-              ...commonStyles.shadow,
-              elevation: 8,
-            },
-            headerStyle: {
-              backgroundColor: theme.colors.background,
-              elevation: 0,
-              shadowOpacity: 0,
-              borderBottomWidth: 0,
-            },
-            headerTitleAlign: 'center',
-            headerTitleStyle: {
-              fontWeight: '800',
-              fontSize: 22,
-              color: theme.colors.onBackground,
-              letterSpacing: -0.5,
-            },
-            headerLeft: () => null,
+            return <Icon name={iconName as any} size={size} color={color} />;
+          },
+          tabBarActiveTintColor: theme.colors.primary,
+          tabBarInactiveTintColor: theme.colors.onSurfaceVariant,
+          tabBarShowLabel: true,
+          tabBarLabelStyle: {
+            fontSize: 12,
+            fontWeight: '600',
+            marginBottom: 4,
+          },
+          tabBarStyle: {
+            backgroundColor: theme.colors.surface,
+            borderTopWidth: 0,
+            height: 65,
+            paddingBottom: 10,
+            paddingTop: 10,
+            position: 'absolute',
+            bottom: 20,
+            left: 20,
+            right: 20,
+            borderRadius: 32,
+            ...commonStyles.shadow,
+            elevation: 8,
+          },
+          headerStyle: {
+            backgroundColor: theme.colors.background,
+            elevation: 0,
+            shadowOpacity: 0,
+            borderBottomWidth: 0,
+          },
+          headerTitleAlign: 'center',
+          headerTitleStyle: {
+            fontWeight: '800',
+            fontSize: 22,
+            color: theme.colors.onBackground,
+            letterSpacing: -0.5,
+          },
+          headerLeft: () => null,
+        })}
+      >
+        <Tab.Screen 
+          name="Inventory" 
+          component={InventoryScreen}
+          options={({ navigation }) => ({
+            title: 'Inventory',
+            headerRight: () => (
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 12, gap: 4 }}>
+                <IconButton
+                  icon={settingsManager.isInventoryReminderEnabled() ? "bell" : "bell-outline"}
+                  size={22}
+                  iconColor={settingsManager.isInventoryReminderEnabled() ? theme.colors.primary : theme.colors.onSurfaceVariant}
+                  onPress={() => navigation.navigate('NotificationSettings')}
+                  style={{ margin: 0, backgroundColor: theme.colors.surfaceVariant }}
+                />
+                <IconButton
+                  icon="cog"
+                  size={22}
+                  iconColor={theme.colors.onSurfaceVariant}
+                  onPress={() => navigation.navigate('Settings')}
+                  style={{ margin: 0, backgroundColor: theme.colors.surfaceVariant }}
+                />
+              </View>
+            ),
           })}
-        >
-          <Tab.Screen 
-            name="Inventory" 
-            component={InventoryScreen}
-            options={({ navigation }) => ({
-              title: 'Inventory',
-              headerRight: () => (
-                <View style={{ 
-                  flexDirection: 'row', 
-                  alignItems: 'center', 
-                  marginRight: 12,
-                  gap: 4,
-                }}>
-                  <IconButton
-                    icon={settingsManager.isInventoryReminderEnabled() ? "bell" : "bell-outline"}
-                    size={22}
-                    iconColor={settingsManager.isInventoryReminderEnabled() ? theme.colors.primary : theme.colors.onSurfaceVariant}
-                    onPress={() => navigation.navigate('NotificationSettings')}
-                    style={{ margin: 0, backgroundColor: theme.colors.surfaceVariant }}
-                  />
-                  <IconButton
-                    icon="cog"
-                    size={22}
-                    iconColor={theme.colors.onSurfaceVariant}
-                    onPress={() => navigation.navigate('Settings')}
-                    style={{ margin: 0, backgroundColor: theme.colors.surfaceVariant }}
-                  />
-                  <IconButton
-                    icon={settingsManager.isDarkModeEnabled() ? "white-balance-sunny" : "moon-waning-crescent"}
-                    size={22}
-                    iconColor={theme.colors.primary}
-                    onPress={async () => await settingsManager.toggleDarkMode()}
-                    style={{ margin: 0, backgroundColor: theme.colors.surfaceVariant }}
-                  />
-                </View>
-              ),
-            })}
-          />
-          <Tab.Screen 
-            name="Shopping" 
-            component={ShoppingScreen}
-            options={({ navigation }) => ({
-              title: 'Shopping List',
-              headerRight: () => (
-                <View style={{ marginRight: 16 }}>
-                  <IconButton
-                    icon={settingsManager.isDarkModeEnabled() ? "white-balance-sunny" : "moon-waning-crescent"}
-                    size={24}
-                    iconColor={theme.colors.primary}
-                    onPress={async () => await settingsManager.toggleDarkMode()}
-                    style={{ margin: 0, backgroundColor: theme.colors.surfaceVariant }}
-                  />
-                </View>
-              ),
-            })}
-          />
-          <Tab.Screen 
-            name="Insights" 
-            component={InsightsScreen}
-            options={({ navigation }) => ({
-              title: 'Insights',
-              headerRight: () => (
-                <View style={{ marginRight: 16 }}>
-                  <IconButton
-                    icon={settingsManager.isDarkModeEnabled() ? "white-balance-sunny" : "moon-waning-crescent"}
-                    size={24}
-                    iconColor={theme.colors.primary}
-                    onPress={async () => await settingsManager.toggleDarkMode()}
-                    style={{ margin: 0, backgroundColor: theme.colors.surfaceVariant }}
-                  />
-                </View>
-              ),
-            })}
-          />
-          <Tab.Screen 
-            name="Notes" 
-            component={NotesScreen}
-            options={({ navigation }) => ({
-              title: 'Notes',
-              headerRight: () => (
-                <View style={{ marginRight: 16 }}>
-                  <IconButton
-                    icon={settingsManager.isDarkModeEnabled() ? "white-balance-sunny" : "moon-waning-crescent"}
-                    size={24}
-                    iconColor={theme.colors.primary}
-                    onPress={async () => await settingsManager.toggleDarkMode()}
-                    style={{ margin: 0, backgroundColor: theme.colors.surfaceVariant }}
-                  />
-                </View>
-              ),
-            })}
-          />
-        </Tab.Navigator>
+        />
+        <Tab.Screen 
+          name="Shopping" 
+          component={ShoppingScreen}
+          options={({ navigation }) => ({
+            title: 'Shopping List',
+            headerRight: () => (
+              <View style={{ marginRight: 16 }}>
+                <IconButton
+                  icon="cog"
+                  size={22}
+                  iconColor={theme.colors.onSurfaceVariant}
+                  onPress={() => navigation.navigate('Settings')}
+                  style={{ margin: 0, backgroundColor: theme.colors.surfaceVariant }}
+                />
+              </View>
+            ),
+          })}
+        />
+        <Tab.Screen 
+          name="Insights" 
+          component={InsightsScreen}
+          options={({ navigation }) => ({
+            title: 'Insights',
+            headerRight: () => (
+              <View style={{ marginRight: 16 }}>
+                <IconButton
+                  icon="cog"
+                  size={22}
+                  iconColor={theme.colors.onSurfaceVariant}
+                  onPress={() => navigation.navigate('Settings')}
+                  style={{ margin: 0, backgroundColor: theme.colors.surfaceVariant }}
+                />
+              </View>
+            ),
+          })}
+        />
+        <Tab.Screen 
+          name="Notes" 
+          component={NotesScreen}
+          options={({ navigation }) => ({
+            title: 'Notes',
+            headerRight: () => (
+              <View style={{ marginRight: 16 }}>
+                <IconButton
+                  icon="cog"
+                  size={22}
+                  iconColor={theme.colors.onSurfaceVariant}
+                  onPress={() => navigation.navigate('Settings')}
+                  style={{ margin: 0, backgroundColor: theme.colors.surfaceVariant }}
+                />
+              </View>
+            ),
+          })}
+        />
+      </Tab.Navigator>
     );
   };
 
   return (
     <PaperProvider theme={theme}>
       <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+        barStyle={isDark ? 'light-content' : 'dark-content'}
         backgroundColor={theme.colors.surface}
       />
       <NavigationContainer>

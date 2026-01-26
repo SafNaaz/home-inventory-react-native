@@ -98,7 +98,11 @@ const InventoryScreen: React.FC = () => {
   useEffect(() => {
     loadInventoryData();
 
-    const unsubscribe = inventoryManager.addListener(() => {
+    const unsubscribeInventory = inventoryManager.addListener(() => {
+      loadInventoryData();
+    });
+
+    const unsubscribeSettings = settingsManager.addListener(() => {
       loadInventoryData();
     });
 
@@ -118,7 +122,8 @@ const InventoryScreen: React.FC = () => {
     });
 
     return () => {
-      unsubscribe();
+      unsubscribeInventory();
+      unsubscribeSettings();
       backHandler.remove();
     };
   }, [navigation]);
@@ -1267,7 +1272,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     margin: 20,
     right: 0,
-    bottom: 100,
+    bottom: 120,
     borderRadius: 28,
   },
 });

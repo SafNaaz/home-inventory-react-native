@@ -155,7 +155,7 @@ const NotesScreen: React.FC = () => {
       position: 'absolute',
       margin: 16,
       right: 0,
-      bottom: 100,
+      bottom: 120,
       backgroundColor: theme.colors.primary,
     },
     fullScreenDialog: {

@@ -28,9 +28,11 @@ import { inventoryManager } from '../managers/InventoryManager';
 import { notesManager } from '../managers/NotesManager';
 import { AppSettings } from '../models/Types';
 import { commonStyles } from '../themes/AppTheme';
+import { useNavigation } from '@react-navigation/native';
 
 const SettingsScreen: React.FC = () => {
   const theme = useTheme();
+  const navigation = useNavigation<any>();
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [timePickerVisible, setTimePickerVisible] = useState(false);
@@ -67,8 +69,10 @@ const SettingsScreen: React.FC = () => {
     setRefreshing(false);
   };
 
-  const handleToggleDarkMode = async () => {
-    await settingsManager.toggleDarkMode();
+  const handleThemeChange = async (mode: 'light' | 'dark' | 'system') => {
+    await settingsManager.setThemeMode(mode);
+    setSnackbarMessage(`Theme set to ${mode === 'system' ? 'Auto' : (mode === 'dark' ? 'Night' : 'Day')}.`);
+    setSnackbarVisible(true);
   };
 
   const handleToggleSecurity = async () => {
@@ -166,18 +170,33 @@ const SettingsScreen: React.FC = () => {
     <Card style={styles.sectionCard}>
       <Card.Content>
         <Title style={styles.sectionTitle}>Appearance</Title>
+        <Paragraph style={[styles.sectionDescription, { color: theme.colors.onSurfaceVariant }]}>
+          Choose how the app looks on your device.
+        </Paragraph>
         
-        <List.Item
-          title="Dark Mode"
-          description="Use dark theme throughout the app"
-          left={() => <Icon name="weather-night" size={24} color={theme.colors.onSurface} />}
-          right={() => (
-            <Switch
-              value={settings?.isDarkMode || false}
-              onValueChange={handleToggleDarkMode}
-            />
-          )}
-        />
+        <View style={styles.themeSelector}>
+          <Button 
+            mode={settings?.themeMode === 'light' ? "contained" : "outlined"}
+            onPress={() => handleThemeChange('light')}
+            style={styles.themeButton}
+            icon="weather-sunny"
+            compact
+          > Day </Button>
+          <Button 
+            mode={settings?.themeMode === 'dark' ? "contained" : "outlined"}
+            onPress={() => handleThemeChange('dark')}
+            style={styles.themeButton}
+            icon="weather-night"
+            compact
+          > Night </Button>
+          <Button 
+            mode={settings?.themeMode === 'system' ? "contained" : "outlined"}
+            onPress={() => handleThemeChange('system')}
+            style={styles.themeButton}
+            icon="theme-light-dark"
+            compact
+          > Auto </Button>
+        </View>
       </Card.Content>
     </Card>
   );
@@ -199,11 +218,7 @@ const SettingsScreen: React.FC = () => {
           )}
         />
         
-        {settings?.isSecurityEnabled && (
-          <Paragraph style={styles.securityNote}>
-            Authentication status: {settings.isAuthenticated ? 'Authenticated' : 'Not authenticated'}
-          </Paragraph>
-        )}
+
       </Card.Content>
     </Card>
   );
@@ -252,6 +267,15 @@ const SettingsScreen: React.FC = () => {
             />
           </>
         )}
+        
+        <Divider style={styles.divider} />
+        <List.Item
+          title="Advanced Settings"
+          description="Edit health tracking, specific times, and more"
+          left={() => <Icon name="tune" size={24} color={theme.colors.primary} />}
+          right={() => <List.Icon icon="chevron-right" />}
+          onPress={() => navigation.navigate('NotificationSettings')}
+        />
       </Card.Content>
     </Card>
   );
@@ -406,9 +430,9 @@ const SettingsScreen: React.FC = () => {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        {renderAppearanceSection()}
-        {renderSecuritySection()}
         {renderNotificationsSection()}
+        {renderSecuritySection()}
+        {renderAppearanceSection()}
         {renderDataSection()}
         {renderAboutSection()}
       </ScrollView>
@@ -504,6 +528,19 @@ const styles = StyleSheet.create({
   exportTextInput: {
     fontFamily: 'Courier',
     fontSize: 12,
+  },
+  sectionDescription: {
+    fontSize: 14,
+    marginBottom: 16,
+  },
+  themeSelector: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  themeButton: {
+    flex: 1,
+    borderRadius: 12,
   },
 });
 

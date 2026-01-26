@@ -200,14 +200,15 @@ const ShoppingScreen: React.FC = () => {
   const renderEmptyState = () => (
     <View style={[styles.emptyState, { backgroundColor: theme.colors.background }]}>
       <Icon name="cart-outline" size={64} color={theme.colors.onSurfaceVariant} />
-      <Title style={[styles.emptyTitle, { color: theme.colors.onBackground }]}>No Shopping List</Title>
-      <Paragraph style={[styles.emptyText, { color: theme.colors.onBackground }]}>
+      <Text variant="headlineSmall" style={[styles.emptyTitle, { color: theme.colors.onBackground }]}>No Shopping List</Text>
+      <Text variant="bodyLarge" style={[styles.emptyText, { color: theme.colors.onSurfaceVariant }]}>
         Generate a shopping list based on your low stock items to get started.
-      </Paragraph>
+      </Text>
       <Button
         mode="contained"
         onPress={handleStartGenerating}
         style={styles.generateButton}
+        icon="plus"
       >
         Generate Shopping List
       </Button>
@@ -216,13 +217,13 @@ const ShoppingScreen: React.FC = () => {
 
   const renderGeneratingState = () => (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <Card style={styles.statusCard}>
+      <Card style={[styles.statusCard, { backgroundColor: theme.colors.surface }]} mode="elevated">
         <Card.Content>
           <View style={styles.statusHeader}>
             <Icon name="cart-plus" size={24} color={theme.colors.primary} />
-            <Title style={styles.statusTitle}>Editing Shopping List</Title>
+            <Text style={[styles.statusTitle, { color: theme.colors.onSurface }]}>Editing Shopping List</Text>
           </View>
-          <Paragraph>{getStateDescription()}</Paragraph>
+          <Text style={{ color: theme.colors.onSurfaceVariant }}>{getStateDescription()}</Text>
         </Card.Content>
       </Card>
 
@@ -273,13 +274,13 @@ const ShoppingScreen: React.FC = () => {
 
   const renderListReadyState = () => (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <Card style={styles.statusCard}>
+      <Card style={[styles.statusCard, { backgroundColor: theme.colors.surface }]} mode="elevated">
         <Card.Content>
           <View style={styles.statusHeader}>
             <Icon name="clipboard-list" size={24} color={theme.colors.primary} />
-            <Title style={styles.statusTitle}>Shopping List Ready</Title>
+            <Text style={[styles.statusTitle, { color: theme.colors.onSurface }]}>Shopping List Ready</Text>
           </View>
-          <Paragraph>{getStateDescription()}</Paragraph>
+          <Text style={{ color: theme.colors.onSurfaceVariant }}>{getStateDescription()}</Text>
         </Card.Content>
       </Card>
 
@@ -320,15 +321,17 @@ const ShoppingScreen: React.FC = () => {
 
     return (
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        <Card style={styles.statusCard}>
+        <Card style={[styles.statusCard, { backgroundColor: theme.colors.surface }]} mode="elevated">
           <Card.Content>
             <View style={styles.statusHeader}>
               <Icon name="cart" size={24} color={theme.colors.primary} />
-              <Title style={styles.statusTitle}>Shopping in Progress</Title>
+              <Text style={[styles.statusTitle, { color: theme.colors.onSurface }]}>Shopping in Progress</Text>
             </View>
-            <Paragraph>{getStateDescription()}</Paragraph>
+            <Text style={{ color: theme.colors.onSurfaceVariant }}>{getStateDescription()}</Text>
             <View style={styles.progressInfo}>
-              <Text style={{ color: theme.colors.onSurface }}>Progress: {checkedItems.length} of {shoppingList.length} items</Text>
+              <Text style={{ color: theme.colors.onSurface, fontWeight: '600' }}>
+                Progress: {checkedItems.length} of {shoppingList.length} items
+              </Text>
             </View>
           </Card.Content>
         </Card>
@@ -551,10 +554,8 @@ const styles = StyleSheet.create({
   statusCard: {
     margin: 16,
     borderRadius: 24,
-    backgroundColor: 'transparent',
-    elevation: 0,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
+    ...commonStyles.shadow,
+    elevation: 3,
   },
   statusHeader: {
     flexDirection: 'row',

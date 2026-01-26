@@ -13,11 +13,15 @@ import {
   Button,
   Portal,
   Dialog,
+  TextInput as PaperTextInput,
 } from 'react-native-paper';
+import Slider from '@react-native-community/slider';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 
 import { settingsManager } from '../managers/SettingsManager';
+import { InventoryCategory } from '../models/Types';
+import { CATEGORY_CONFIG } from '../constants/CategoryConfig';
 
 const NotificationSettingsScreen: React.FC = () => {
   const theme = useTheme();
@@ -27,6 +31,8 @@ const NotificationSettingsScreen: React.FC = () => {
   const [reminderTime2, setReminderTime2] = useState(new Date());
   const [timePickerVisible, setTimePickerVisible] = useState(false);
   const [timePickerType, setTimePickerType] = useState<'time1' | 'time2'>('time1');
+  const [thresholds, setThresholds] = useState<Record<string, number>>({});
+  const [isHealthAlertsEnabled, setIsHealthAlertsEnabled] = useState(true);
 
   useEffect(() => {
     loadSettings();
@@ -42,8 +48,10 @@ const NotificationSettingsScreen: React.FC = () => {
     const settings = settingsManager.getSettings();
     setIsInventoryReminderEnabled(settings.isInventoryReminderEnabled);
     setIsSecondReminderEnabled(settings.isSecondReminderEnabled);
-    setReminderTime1(settings.reminderTime1);
-    setReminderTime2(settings.reminderTime2);
+    setReminderTime1(new Date(settings.reminderTime1));
+    setReminderTime2(new Date(settings.reminderTime2));
+    setThresholds(settings.activityThresholds);
+    setIsHealthAlertsEnabled(settings.isHealthAlertsEnabled);
   };
 
   const handleInventoryReminderToggle = async () => {
@@ -52,6 +60,10 @@ const NotificationSettingsScreen: React.FC = () => {
 
   const handleSecondReminderToggle = async () => {
     await settingsManager.toggleSecondReminder();
+  };
+
+  const handleHealthAlertsToggle = async () => {
+    await settingsManager.toggleHealthAlerts();
   };
 
   const formatTime = (date: Date): string => {
@@ -144,6 +156,67 @@ const NotificationSettingsScreen: React.FC = () => {
               )}
             </>
           )}
+        </List.Section>
+
+        {/* Inventory Health Section */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.onBackground }]}>
+            Health Tracking Settings
+          </Text>
+          <Text style={[styles.sectionDescription, { color: theme.colors.onSurfaceVariant }]}>
+            Define when an item should be flagged for health review based on its last update.
+          </Text>
+        </View>
+
+        <List.Section>
+          <List.Item
+            title="Enable Health Notifications"
+            description="Include health analysis in your reminders"
+            left={(props) => <List.Icon {...props} icon="heart-pulse" />}
+            right={() => (
+              <Switch
+                value={isHealthAlertsEnabled}
+                onValueChange={handleHealthAlertsToggle}
+                color={theme.colors.primary}
+              />
+            )}
+          />
+
+          <Divider />
+
+          {isHealthAlertsEnabled && Object.values(InventoryCategory).map((category) => {
+            const config = CATEGORY_CONFIG[category];
+            const days = thresholds[category] || 0;
+            
+            return (
+              <React.Fragment key={category}>
+                <View style={styles.thresholdItem}>
+                  <View style={styles.thresholdHeader}>
+                    <View style={styles.thresholdTitleRow}>
+                      <Icon name={config.icon as any} size={24} color={config.color} />
+                      <Text style={[styles.thresholdLabel, { color: theme.colors.onSurface }]}>{category}</Text>
+                    </View>
+                    <Text style={[styles.thresholdValue, { color: theme.colors.primary }]}>
+                      Every {days} {days === 1 ? 'day' : 'days'}
+                    </Text>
+                  </View>
+                  <Slider
+                    style={styles.slider}
+                    minimumValue={1}
+                    maximumValue={30}
+                    step={1}
+                    value={days}
+                    onValueChange={(val) => setThresholds(prev => ({ ...prev, [category]: val }))}
+                    onSlidingComplete={(value: number) => settingsManager.updateActivityThreshold(category, value)}
+                    minimumTrackTintColor={theme.colors.primary}
+                    maximumTrackTintColor={theme.colors.surfaceVariant}
+                    thumbTintColor={theme.colors.primary}
+                  />
+                </View>
+                <Divider />
+              </React.Fragment>
+            );
+          })}
         </List.Section>
 
         {/* Information Section */}
@@ -240,6 +313,33 @@ const styles = StyleSheet.create({
   testButton: {
     marginTop: 12,
     borderRadius: 16,
+  },
+  thresholdItem: {
+    padding: 16,
+    paddingBottom: 24,
+  },
+  thresholdHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  thresholdTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  thresholdLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  thresholdValue: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  slider: {
+    width: '100%',
+    height: 40,
   },
 });
 

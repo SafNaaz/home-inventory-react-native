@@ -13,10 +13,12 @@ import {
   Text,
   useTheme,
   ProgressBar,
+  Surface,
+  List,
 } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
-
 import { inventoryManager } from '../managers/InventoryManager';
+import { settingsManager } from '../managers/SettingsManager';
 import { InventoryItem, InventoryCategory } from '../models/Types';
 import { CATEGORY_CONFIG, getAllCategories } from '../constants/CategoryConfig';
 import { getCategoryColor, commonStyles } from '../themes/AppTheme';
@@ -32,11 +34,18 @@ const InsightsScreen: React.FC = () => {
   useEffect(() => {
     loadInventoryData();
 
-    const unsubscribe = inventoryManager.addListener(() => {
+    const unsubscribeInventory = inventoryManager.addListener(() => {
       loadInventoryData();
     });
 
-    return unsubscribe;
+    const unsubscribeSettings = settingsManager.addListener(() => {
+      loadInventoryData();
+    });
+
+    return () => {
+      unsubscribeInventory();
+      unsubscribeSettings();
+    };
   }, []);
 
   const loadInventoryData = () => {
@@ -100,222 +109,336 @@ const InsightsScreen: React.FC = () => {
     return inventoryItems.filter(item => config.subcategories.includes(item.subcategory));
   };
 
-  const renderInsightCard = (title: string, value: string, icon: string, color: string) => (
-    <Card style={[styles.insightCard, { width: cardWidth }]}>
-      <Card.Content style={styles.insightCardContent}>
-        <Icon name={icon as any} size={32} color={color} style={styles.insightIcon} />
-        <Text style={[styles.insightValue, { color }]}>{value}</Text>
-        <Text style={[styles.insightTitle, { color: theme.colors.onSurfaceVariant }]}>
-          {title}
+  const renderOverviewSection = () => {
+    const avgStock = getAverageStockLevel();
+    const lowStock = getLowStockCount();
+    const thresholds = settingsManager.getActivityThresholds();
+    const staleItems = inventoryManager.getStaleItemsByThreshold(thresholds);
+    
+    // Group stale items by category
+    const staleCategories = new Set();
+    staleItems.forEach(item => {
+      const config = inventoryManager.getSubcategoryConfig(item.subcategory);
+      if (config) staleCategories.add(config.category);
+    });
+    
+    return (
+      <View style={[styles.section, { paddingHorizontal: 16, marginBottom: 12 }]}>
+        <Text variant="headlineSmall" style={[styles.sectionTitle, { color: theme.colors.onBackground }]}>
+          Inventory Overview
         </Text>
-      </Card.Content>
-    </Card>
-  );
+        
+        <Surface 
+          style={[
+            styles.summaryCard, 
+            { backgroundColor: theme.dark ? theme.colors.surfaceVariant : theme.colors.primary, marginBottom: 16 }
+          ]} 
+          elevation={theme.dark ? 1 : 4}
+        >
+          <View style={styles.summaryHeader}>
+            <View>
+              <Text style={[styles.summaryLabel, { color: theme.dark ? theme.colors.onSurfaceVariant : 'rgba(255,255,255,0.8)' }]}>
+                Overall Stock Health
+              </Text>
+              <Text style={[styles.summaryValue, { color: theme.dark ? theme.colors.primary : '#FFFFFF' }]}>
+                {avgStock}%
+              </Text>
+            </View>
+            <Icon 
+              name="chart-arc" 
+              size={48} 
+              color={theme.dark ? theme.colors.primary + '40' : 'rgba(255,255,255,0.8)'} 
+            />
+          </View>
+          <ProgressBar 
+            progress={avgStock / 100} 
+            color={theme.dark ? theme.colors.primary : '#FFFFFF'} 
+            style={[styles.summaryProgress, { backgroundColor: theme.dark ? theme.colors.surface : 'rgba(255,255,255,0.2)' }]} 
+          />
+          <View style={styles.summaryStats}>
+            <View style={styles.summaryStatItem}>
+              <Text style={[styles.summaryStatValue, { color: theme.dark ? theme.colors.onSurface : '#FFFFFF' }]}>
+                {getTotalItems()}
+              </Text>
+              <Text style={[styles.summaryStatLabel, { color: theme.dark ? theme.colors.onSurfaceVariant : 'rgba(255,255,255,0.7)' }]}>
+                Total Items
+              </Text>
+            </View>
+            <View style={[styles.summaryStatDivider, { backgroundColor: theme.dark ? theme.colors.outlineVariant : 'rgba(255,255,255,0.2)' }]} />
+            <View style={styles.summaryStatItem}>
+              <Text style={[styles.summaryStatValue, { color: theme.dark ? theme.colors.onSurface : '#FFFFFF' }]}>
+                {lowStock}
+              </Text>
+              <Text style={[styles.summaryStatLabel, { color: theme.dark ? theme.colors.onSurfaceVariant : 'rgba(255,255,255,0.7)' }]}>
+                Low Stock
+              </Text>
+            </View>
+            <View style={[styles.summaryStatDivider, { backgroundColor: theme.dark ? theme.colors.outlineVariant : 'rgba(255,255,255,0.2)' }]} />
+            <View style={styles.summaryStatItem}>
+              <Text style={[styles.summaryStatValue, { color: theme.dark ? theme.colors.onSurface : '#FFFFFF' }]}>
+                {getActiveCategoriesCount()}
+              </Text>
+              <Text style={[styles.summaryStatLabel, { color: theme.dark ? theme.colors.onSurfaceVariant : 'rgba(255,255,255,0.7)' }]}>
+                Categories
+              </Text>
+            </View>
+          </View>
+        </Surface>
 
-  const renderOverviewSection = () => (
-    <View style={styles.section}>
-      <Title style={[styles.sectionTitle, { color: theme.colors.onBackground }]}>
-        Overview
-      </Title>
-      <View style={styles.overviewGrid}>
-        <View style={styles.overviewRow}>
-          {renderInsightCard('Total Items', getTotalItems().toString(), 'cube-outline', theme.colors.primary)}
-          {renderInsightCard(
-            'Low Stock', 
-            getLowStockCount().toString(), 
-            'alert-circle', 
-            getLowStockCount() > 0 ? theme.colors.error : theme.colors.primary
-          )}
-        </View>
-        <View style={styles.overviewRow}>
-          {renderInsightCard('Avg Stock', `${getAverageStockLevel()}%`, 'chart-bar', '#FF9500')}
-          {renderInsightCard('Categories', getActiveCategoriesCount().toString(), 'folder', '#8E44AD')}
-        </View>
+        <Surface 
+          style={[
+            styles.summaryCard, 
+            { backgroundColor: theme.dark ? theme.colors.surfaceVariant : theme.colors.secondary }
+          ]} 
+          elevation={theme.dark ? 1 : 4}
+        >
+          <View style={styles.summaryHeader}>
+            <View>
+              <Text style={[styles.summaryLabel, { color: theme.dark ? theme.colors.onSurfaceVariant : 'rgba(255,255,255,0.8)' }]}>
+                Integrity & Freshness
+              </Text>
+              <Text style={[styles.summaryValue, { color: theme.dark ? theme.colors.secondary : '#FFFFFF' }]}>
+                {staleItems.length > 0 ? 'Attention' : 'Healthy'}
+              </Text>
+            </View>
+            <Icon 
+              name="heart-pulse" 
+              size={48} 
+              color={theme.dark ? theme.colors.secondary + '40' : 'rgba(255,255,255,0.8)'} 
+            />
+          </View>
+          <View style={styles.summaryStats}>
+            <View style={styles.summaryStatItem}>
+              <Text style={[styles.summaryStatValue, { color: theme.dark ? theme.colors.onSurface : '#FFFFFF' }]}>
+                {staleItems.length}
+              </Text>
+              <Text style={[styles.summaryStatLabel, { color: theme.dark ? theme.colors.onSurfaceVariant : 'rgba(255,255,255,0.7)' }]}>
+                Stale Items
+              </Text>
+            </View>
+            <View style={[styles.summaryStatDivider, { backgroundColor: theme.dark ? theme.colors.outlineVariant : 'rgba(255,255,255,0.2)' }]} />
+            <View style={styles.summaryStatItem}>
+              <Text style={[styles.summaryStatValue, { color: theme.dark ? theme.colors.onSurface : '#FFFFFF' }]}>
+                {staleCategories.size}
+              </Text>
+              <Text style={[styles.summaryStatLabel, { color: theme.dark ? theme.colors.onSurfaceVariant : 'rgba(255,255,255,0.7)' }]}>
+                Stale Cats
+              </Text>
+            </View>
+            <View style={[styles.summaryStatDivider, { backgroundColor: theme.dark ? theme.colors.outlineVariant : 'rgba(255,255,255,0.2)' }]} />
+            <View style={styles.summaryStatItem}>
+              <Text style={[styles.summaryStatValue, { color: theme.dark ? theme.colors.onSurface : '#FFFFFF' }]}>
+                {Math.round((1 - (staleItems.length / (inventoryItems.length || 1))) * 100)}%
+              </Text>
+              <Text style={[styles.summaryStatLabel, { color: theme.dark ? theme.colors.onSurfaceVariant : 'rgba(255,255,255,0.7)' }]}>
+                Freshness
+              </Text>
+            </View>
+          </View>
+        </Surface>
       </View>
-    </View>
-  );
+    );
+  };
 
   const renderUsagePatternsSection = () => {
     const mostRestocked = getMostRestockedItem();
     const leastUsed = getLeastUsedItem();
-    const needingAttention = getItemsNeedingAttention();
 
     return (
-      <View style={styles.section}>
-        <Title style={[styles.sectionTitle, { color: theme.colors.onBackground }]}>
-          Usage Patterns
-        </Title>
-        <View style={styles.patternsList}>
-          <Card style={styles.patternCard}>
-            <Card.Content style={styles.patternContent}>
-              <Icon name="refresh-circle" size={24} color="#27AE60" style={styles.patternIcon} />
-              <View style={styles.patternInfo}>
-                <Text style={[styles.patternTitle, { color: theme.colors.onSurface }]}>
-                  Most Restocked
-                </Text>
-                <Text style={[styles.patternSubtitle, { color: theme.colors.onSurfaceVariant }]}>
-                  {mostRestocked?.name || 'No data yet'}
-                </Text>
-              </View>
-              <Text style={[styles.patternValue, { color: '#27AE60' }]}>
-                {mostRestocked ? `${mostRestocked.purchaseHistory?.length || 0} times` : ''}
+      <View style={styles.patternsList}>
+        <Card style={styles.patternCard} mode="contained">
+          <Card.Content style={styles.patternContent}>
+            <View style={[styles.patternIconContainer, { backgroundColor: theme.dark ? 'rgba(46, 125, 50, 0.2)' : '#E8F5E9' }]}>
+              <Icon name="trending-up" size={24} color={theme.dark ? '#81C784' : '#2E7D32'} />
+            </View>
+            <View style={styles.patternInfo}>
+              <Text variant="labelLarge" style={{ color: theme.colors.onSurfaceVariant }}>Most Restocked</Text>
+              <Text variant="titleMedium" style={{ fontWeight: '700', color: theme.colors.onSurface }}>
+                {mostRestocked?.name || 'No data yet'}
               </Text>
-            </Card.Content>
-          </Card>
+            </View>
+            <View style={[styles.patternBadge, { backgroundColor: theme.dark ? 'rgba(46, 125, 50, 0.3)' : '#E8F5E9' }]}>
+              <Text style={[styles.patternBadgeText, { color: theme.dark ? '#81C784' : '#2E7D32' }]}>
+                {mostRestocked ? `${mostRestocked.purchaseHistory?.length || 0}x` : '-'}
+              </Text>
+            </View>
+          </Card.Content>
+        </Card>
 
-          <Card style={styles.patternCard}>
-            <Card.Content style={styles.patternContent}>
-              <Icon name="clock" size={24} color="#95A5A6" style={styles.patternIcon} />
-              <View style={styles.patternInfo}>
-                <Text style={[styles.patternTitle, { color: theme.colors.onSurface }]}>
-                  Least Used
-                </Text>
-                <Text style={[styles.patternSubtitle, { color: theme.colors.onSurfaceVariant }]}>
-                  {leastUsed?.name || 'No data yet'}
-                </Text>
-              </View>
-              <Text style={[styles.patternValue, { color: '#95A5A6' }]}>
-                {leastUsed ? `${getDaysSinceLastUpdate(leastUsed)} days ago` : ''}
+        <Card style={styles.patternCard} mode="contained">
+          <Card.Content style={styles.patternContent}>
+            <View style={[styles.patternIconContainer, { backgroundColor: theme.dark ? 'rgba(239, 108, 0, 0.2)' : '#FFF3E0' }]}>
+              <Icon name="clock-alert-outline" size={24} color={theme.dark ? '#FFB74D' : '#EF6C00'} />
+            </View>
+            <View style={styles.patternInfo}>
+              <Text variant="labelLarge" style={{ color: theme.colors.onSurfaceVariant }}>Least Used</Text>
+              <Text variant="titleMedium" style={{ fontWeight: '700', color: theme.colors.onSurface }}>
+                {leastUsed?.name || 'No data yet'}
               </Text>
-            </Card.Content>
-          </Card>
+            </View>
+            <Text variant="bodySmall" style={{ color: theme.dark ? '#FFB74D' : '#EF6C00', fontWeight: '700' }}>
+              {leastUsed ? `${getDaysSinceLastUpdate(leastUsed)}d` : ''}
+            </Text>
+          </Card.Content>
+        </Card>
+      </View>
+    );
+  };
 
-          <Card style={styles.patternCard}>
-            <Card.Content style={styles.patternContent}>
-              <Icon name="eye" size={24} color={needingAttention.length > 0 ? '#F39C12' : '#27AE60'} style={styles.patternIcon} />
-              <View style={styles.patternInfo}>
-                <Text style={[styles.patternTitle, { color: theme.colors.onSurface }]}>
-                  Need Attention
-                </Text>
-                <Text style={[styles.patternSubtitle, { color: theme.colors.onSurfaceVariant }]}>
-                  {needingAttention.length} items below 25%
-                </Text>
-              </View>
-              <Text style={[styles.patternValue, { color: needingAttention.length > 0 ? '#F39C12' : '#27AE60' }]}>
-                {needingAttention.length === 0 ? 'All good!' : 'Check inventory'}
-              </Text>
-            </Card.Content>
-          </Card>
-        </View>
+  const renderFreshnessAnalysisSection = () => {
+    const thresholds = settingsManager.getActivityThresholds();
+    const staleItems = inventoryManager.getStaleItemsByThreshold(thresholds);
+    
+    const staleByCategory: Record<string, InventoryItem[]> = {};
+    staleItems.forEach(item => {
+      const config = inventoryManager.getSubcategoryConfig(item.subcategory);
+      if (config) {
+        if (!staleByCategory[config.category]) {
+          staleByCategory[config.category] = [];
+        }
+        staleByCategory[config.category].push(item);
+      }
+    });
+
+    return (
+      <View style={styles.freshnessContainer}>
+        {Object.values(InventoryCategory).map(category => {
+          const items = staleByCategory[category] || [];
+          const config = CATEGORY_CONFIG[category];
+          const threshold = thresholds[category];
+          
+          return (
+            <Card key={category} style={styles.freshnessCard} mode="contained">
+              <Card.Content style={styles.freshnessContent}>
+                <View style={[styles.freshnessIconContainer, { backgroundColor: config.color + '15' }]}>
+                  <Icon name={config.icon as any} size={24} color={config.color} />
+                </View>
+                <View style={styles.freshnessInfo}>
+                  <Text style={[styles.freshnessTitle, { color: theme.colors.onSurface }]}>{category}</Text>
+                  <Text style={[styles.freshnessSubtitle, { color: theme.colors.onSurfaceVariant }]}>
+                    Check every {threshold} days
+                  </Text>
+                </View>
+                <View style={styles.freshnessStatus}>
+                  {items.length > 0 ? (
+                    <View style={[styles.staleBadge, { backgroundColor: theme.dark ? 'rgba(239, 68, 68, 0.2)' : '#FEE2E2' }]}>
+                      <Text style={[styles.staleBadgeText, { color: theme.dark ? '#FCA5A5' : '#EF4444' }]}>{items.length} stale</Text>
+                    </View>
+                  ) : (
+                    <Icon name="check-circle" size={24} color={theme.dark ? '#81C784' : theme.colors.secondary} />
+                  )}
+                </View>
+              </Card.Content>
+              {items.length > 0 && (
+                <Card.Actions style={styles.freshnessActions}>
+                  <View style={[styles.staleItemsList, { backgroundColor: theme.dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}>
+                    <Text style={[styles.staleItemsText, { color: theme.colors.onSurfaceVariant }]} numberOfLines={1}>
+                      Needs update: {items.map(it => it.name).join(', ')}
+                    </Text>
+                  </View>
+                </Card.Actions>
+              )}
+            </Card>
+          );
+        })}
       </View>
     );
   };
 
   const renderCategoryAnalysisSection = () => (
-    <View style={styles.section}>
-      <Title style={[styles.sectionTitle, { color: theme.colors.onBackground }]}>
-        Category Analysis
-      </Title>
-      <View style={styles.categoryList}>
-        {getAllCategories().map((category) => {
-          const items = getItemsForCategory(category);
-          if (items.length === 0) return null;
+    <View style={styles.categoryList}>
+      {getAllCategories().map((category) => {
+        const items = getItemsForCategory(category);
+        if (items.length === 0) return null;
 
-          const lowStockCount = items.filter(item => item.quantity <= 0.25).length;
-          const averageStock = items.reduce((sum, item) => sum + item.quantity, 0) / items.length;
-          const config = CATEGORY_CONFIG[category];
+        const lowStockCount = items.filter(item => item.quantity <= 0.25).length;
+        const averageStock = items.reduce((sum, item) => sum + item.quantity, 0) / items.length;
+        const config = CATEGORY_CONFIG[category];
 
-          return (
-            <Card key={category} style={styles.categoryCard}>
-              <Card.Content style={styles.categoryContent}>
-                <Icon 
-                  name={config.icon as any} 
-                  size={24} 
-                  color={getCategoryColor(category, theme.dark)} 
-                  style={styles.categoryIcon} 
-                />
-                <View style={styles.categoryInfo}>
-                  <Text style={[styles.categoryTitle, { color: theme.colors.onSurface }]}>
-                    {category}
-                  </Text>
-                  <Text style={[styles.categoryStats, { color: theme.colors.onSurfaceVariant }]}>
-                    {items.length} items • {Math.round(averageStock * 100)}% avg stock
-                  </Text>
+        return (
+          <Card key={category} style={styles.categoryCard} mode="outlined">
+            <Card.Content style={styles.categoryContent}>
+              <View style={[styles.categoryIconBox, { backgroundColor: config.color + '15' }]}>
+                <Icon name={config.icon as any} size={24} color={config.color} />
+              </View>
+              <View style={styles.categoryInfo}>
+                <View style={styles.categoryHeaderRow}>
+                  <Text variant="titleMedium" style={{ fontWeight: '700', color: theme.colors.onSurface }}>{category}</Text>
+                  <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>{items.length} items</Text>
                 </View>
-                <View style={styles.categoryStatus}>
-                  {lowStockCount > 0 ? (
-                    <>
-                      <Text style={[styles.categoryStatusValue, { color: theme.colors.error }]}>
-                        {lowStockCount}
-                      </Text>
-                      <Text style={[styles.categoryStatusLabel, { color: theme.colors.error }]}>
-                        low stock
-                      </Text>
-                    </>
-                  ) : (
-                    <>
-                      <Icon name="check-circle" size={24} color="#27AE60" />
-                      <Text style={[styles.categoryStatusLabel, { color: '#27AE60' }]}>
-                        all good
-                      </Text>
-                    </>
+                <ProgressBar 
+                  progress={averageStock} 
+                  color={config.color} 
+                  style={styles.categoryProgress} 
+                />
+                <View style={styles.categoryFooterRow}>
+                  <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>Avg Stock: {Math.round(averageStock * 100)}%</Text>
+                  {lowStockCount > 0 && (
+                    <Text variant="labelSmall" style={{ color: theme.colors.error, fontWeight: '700' }}>
+                      {lowStockCount} Low
+                    </Text>
                   )}
                 </View>
-              </Card.Content>
-            </Card>
-          );
-        })}
-      </View>
+              </View>
+            </Card.Content>
+          </Card>
+        );
+      })}
     </View>
   );
 
   const renderShoppingInsightsSection = () => (
-    <View style={styles.section}>
-      <Title style={[styles.sectionTitle, { color: theme.colors.onBackground }]}>
-        Shopping Insights
-      </Title>
-      <View style={styles.shoppingList}>
-        <Card style={styles.shoppingCard}>
-          <Card.Content style={styles.shoppingContent}>
-            <Icon name="cart" size={24} color="#3498DB" style={styles.shoppingIcon} />
-            <View style={styles.shoppingInfo}>
-              <Text style={[styles.shoppingTitle, { color: theme.colors.onSurface }]}>
-                Shopping Frequency
-              </Text>
-              <Text style={[styles.shoppingSubtitle, { color: theme.colors.onSurfaceVariant }]}>
-                Based on restock patterns
-              </Text>
-            </View>
-            <Text style={[styles.shoppingValue, { color: '#3498DB' }]}>
-              Weekly
+    <View style={styles.shoppingList}>
+      <Card style={styles.shoppingCard} mode="contained">
+        <Card.Content style={styles.shoppingContent}>
+          <Icon name="cart" size={24} color={theme.dark ? '#64B5F6' : '#3498DB'} style={styles.shoppingIcon} />
+          <View style={styles.shoppingInfo}>
+            <Text style={[styles.shoppingTitle, { color: theme.colors.onSurface }]}>
+              Shopping Frequency
             </Text>
-          </Card.Content>
-        </Card>
+            <Text style={[styles.shoppingSubtitle, { color: theme.colors.onSurfaceVariant }]}>
+              Based on restock patterns
+            </Text>
+          </View>
+          <Text style={[styles.shoppingValue, { color: theme.dark ? '#64B5F6' : '#3498DB' }]}>
+            Weekly
+          </Text>
+        </Card.Content>
+      </Card>
 
-        <Card style={styles.shoppingCard}>
-          <Card.Content style={styles.shoppingContent}>
-            <Icon name="calendar-clock" size={24} color="#9B59B6" style={styles.shoppingIcon} />
-            <View style={styles.shoppingInfo}>
-              <Text style={[styles.shoppingTitle, { color: theme.colors.onSurface }]}>
-                Next Shopping Trip
-              </Text>
-              <Text style={[styles.shoppingSubtitle, { color: theme.colors.onSurfaceVariant }]}>
-                Estimated based on current stock levels
-              </Text>
-            </View>
-            <Text style={[styles.shoppingValue, { color: '#9B59B6' }]}>
-              3-5 days
+      <Card style={styles.shoppingCard} mode="contained">
+        <Card.Content style={styles.shoppingContent}>
+          <Icon name="calendar-clock" size={24} color={theme.dark ? '#CE93D8' : '#9B59B6'} style={styles.shoppingIcon} />
+          <View style={styles.shoppingInfo}>
+            <Text style={[styles.shoppingTitle, { color: theme.colors.onSurface }]}>
+              Next Shopping Trip
             </Text>
-          </Card.Content>
-        </Card>
+            <Text style={[styles.shoppingSubtitle, { color: theme.colors.onSurfaceVariant }]}>
+              Estimated based on current stock levels
+            </Text>
+          </View>
+          <Text style={[styles.shoppingValue, { color: theme.dark ? '#CE93D8' : '#9B59B6' }]}>
+            3-5 days
+          </Text>
+        </Card.Content>
+      </Card>
 
-        <Card style={styles.shoppingCard}>
-          <Card.Content style={styles.shoppingContent}>
-            <Icon name="lightbulb" size={24} color="#F1C40F" style={styles.shoppingIcon} />
-            <View style={styles.shoppingInfo}>
-              <Text style={[styles.shoppingTitle, { color: theme.colors.onSurface }]}>
-                Shopping Efficiency
-              </Text>
-              <Text style={[styles.shoppingSubtitle, { color: theme.colors.onSurfaceVariant }]}>
-                Items typically bought together
-              </Text>
-            </View>
-            <Text style={[styles.shoppingValue, { color: '#F1C40F' }]}>
-              Group by category
+      <Card style={styles.shoppingCard} mode="contained">
+        <Card.Content style={styles.shoppingContent}>
+          <Icon name="lightbulb" size={24} color={theme.dark ? '#FFF176' : '#F1C40F'} style={styles.shoppingIcon} />
+          <View style={styles.shoppingInfo}>
+            <Text style={[styles.shoppingTitle, { color: theme.colors.onSurface }]}>
+              Shopping Efficiency
             </Text>
-          </Card.Content>
-        </Card>
-      </View>
+            <Text style={[styles.shoppingSubtitle, { color: theme.colors.onSurfaceVariant }]}>
+              Items typically bought together
+            </Text>
+          </View>
+          <Text style={[styles.shoppingValue, { color: theme.dark ? '#FFF176' : '#F1C40F' }]}>
+            Group by category
+          </Text>
+        </Card.Content>
+      </Card>
     </View>
   );
 
@@ -326,9 +449,48 @@ const InsightsScreen: React.FC = () => {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         {renderOverviewSection()}
-        {renderUsagePatternsSection()}
-        {renderCategoryAnalysisSection()}
-        {renderShoppingInsightsSection()}
+        
+        <List.AccordionGroup>
+          <List.Accordion
+            title="Health Analysis"
+            left={props => <List.Icon {...props} icon="heart-pulse" color={theme.colors.primary} />}
+            id="1"
+            style={styles.accordionHeader}
+            titleStyle={styles.accordionTitle}
+          >
+            {renderFreshnessAnalysisSection()}
+          </List.Accordion>
+
+          <List.Accordion
+            title="Usage Patterns"
+            left={props => <List.Icon {...props} icon="trending-up" color={theme.colors.primary} />}
+            id="2"
+            style={styles.accordionHeader}
+            titleStyle={styles.accordionTitle}
+          >
+            {renderUsagePatternsSection()}
+          </List.Accordion>
+
+          <List.Accordion
+            title="Category Deep Dive"
+            left={props => <List.Icon {...props} icon="chart-donut" color={theme.colors.primary} />}
+            id="3"
+            style={styles.accordionHeader}
+            titleStyle={styles.accordionTitle}
+          >
+            {renderCategoryAnalysisSection()}
+          </List.Accordion>
+
+          <List.Accordion
+            title="Smart Tips"
+            left={props => <List.Icon {...props} icon="lightbulb-on" color={theme.colors.primary} />}
+            id="4"
+            style={styles.accordionHeader}
+            titleStyle={styles.accordionTitle}
+          >
+            {renderShoppingInsightsSection()}
+          </List.Accordion>
+        </List.AccordionGroup>
       </ScrollView>
     </View>
   );
@@ -343,128 +505,139 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   section: {
-    padding: 16,
-    marginBottom: 8,
+    paddingVertical: 8,
   },
   sectionTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    marginBottom: 20,
+    fontWeight: '900',
+    marginBottom: 16,
     letterSpacing: -0.5,
   },
-  overviewGrid: {
-    gap: 16,
+  summaryCard: {
+    padding: 24,
+    borderRadius: 32,
+    ...commonStyles.shadow,
   },
-  overviewRow: {
+  summaryHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 16,
+    alignItems: 'flex-start',
+    marginBottom: 20,
   },
-  insightCard: {
-    borderRadius: 24,
-    ...commonStyles.shadow,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
-  },
-  insightCardContent: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-    minHeight: 120,
-  },
-  insightIcon: {
-    marginBottom: 12,
-  },
-  insightValue: {
-    fontSize: 24,
-    fontWeight: '800',
-    marginBottom: 4,
-  },
-  insightTitle: {
-    fontSize: 13,
+  summaryLabel: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 14,
     fontWeight: '600',
-    textAlign: 'center',
-    opacity: 0.8,
+  },
+  summaryValue: {
+    color: '#FFFFFF',
+    fontSize: 42,
+    fontWeight: '900',
+  },
+  summaryProgress: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    marginBottom: 24,
+  },
+  summaryStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+  },
+  summaryStatItem: {
+    alignItems: 'center',
+  },
+  summaryStatValue: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  summaryStatLabel: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    marginTop: 2,
+  },
+  summaryStatDivider: {
+    width: 1,
+    height: 30,
+    backgroundColor: 'rgba(255,255,255,0.2)',
   },
   patternsList: {
-    gap: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
   },
   patternCard: {
-    borderRadius: 24,
+    borderRadius: 20,
     ...commonStyles.shadow,
   },
   patternContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 20,
+    paddingVertical: 8,
   },
-  patternIcon: {
+  patternIconContainer: {
+    padding: 12,
+    borderRadius: 16,
     marginRight: 16,
-    padding: 8,
-    borderRadius: 12,
-    backgroundColor: 'rgba(0,0,0,0.03)',
   },
   patternInfo: {
     flex: 1,
   },
-  patternTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 2,
+  patternBadge: {
+    backgroundColor: '#E8F5E9',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
   },
-  patternSubtitle: {
+  patternBadgeText: {
+    color: '#2E7D32',
+    fontWeight: '800',
     fontSize: 14,
-    fontWeight: '500',
-    opacity: 0.8,
-  },
-  patternValue: {
-    fontSize: 13,
-    fontWeight: '700',
-    textAlign: 'right',
   },
   categoryList: {
-    gap: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
   },
   categoryCard: {
-    borderRadius: 24,
-    ...commonStyles.shadow,
+    borderRadius: 20,
+    borderColor: 'rgba(0,0,0,0.05)',
   },
   categoryContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 20,
+    padding: 12,
   },
-  categoryIcon: {
-    marginRight: 16,
-    padding: 10,
+  categoryIconBox: {
+    padding: 12,
     borderRadius: 16,
+    marginRight: 16,
   },
   categoryInfo: {
     flex: 1,
   },
-  categoryTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  categoryStats: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  categoryStatus: {
+  categoryHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    justifyContent: 'center',
+    marginBottom: 8,
   },
-  categoryStatusValue: {
-    fontSize: 20,
-    fontWeight: '800',
+  categoryProgress: {
+    height: 6,
+    borderRadius: 3,
+    marginBottom: 8,
   },
-  categoryStatusLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
+  categoryFooterRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   shoppingList: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     gap: 16,
   },
   shoppingCard: {
@@ -496,6 +669,77 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     textAlign: 'right',
+  },
+  freshnessContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+  },
+  freshnessCard: {
+    borderRadius: 24,
+    ...commonStyles.shadow,
+    marginBottom: 8,
+  },
+  freshnessContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+  },
+  freshnessIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  freshnessInfo: {
+    flex: 1,
+  },
+  freshnessTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  freshnessSubtitle: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  freshnessStatus: {
+    marginLeft: 8,
+  },
+  staleBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  staleBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  freshnessActions: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    paddingTop: 0,
+  },
+  staleItemsList: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    width: '100%',
+  },
+  staleItemsText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  accordionHeader: {
+    backgroundColor: 'transparent',
+    paddingVertical: 4,
+    paddingHorizontal: 16,
+  },
+  accordionTitle: {
+    fontWeight: '800',
+    fontSize: 18,
   },
 });
 

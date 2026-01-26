@@ -106,9 +106,12 @@ export interface SmartRecommendation {
   priority: RecommendationPriority;
 }
 
+// MARK: - Theme Mode
+export type ThemeMode = 'light' | 'dark' | 'system';
+
 // MARK: - Settings Interface
 export interface AppSettings {
-  isDarkMode: boolean;
+  themeMode: ThemeMode;
   isSecurityEnabled: boolean;
   isAuthenticated: boolean;
   isInventoryReminderEnabled: boolean;
@@ -116,6 +119,8 @@ export interface AppSettings {
   reminderTime1: Date;
   reminderTime2: Date;
   miscItemHistory: string[];
+  activityThresholds: Record<InventoryCategory, number>;
+  isHealthAlertsEnabled: boolean;
 }
 
 // MARK: - Category Configuration
