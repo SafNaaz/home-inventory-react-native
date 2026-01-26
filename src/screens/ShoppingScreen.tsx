@@ -42,6 +42,7 @@ const ShoppingScreen: React.FC = () => {
   const [cancelConfirmVisible, setCancelConfirmVisible] = useState(false);
   const [emptyListAlertVisible, setEmptyListAlertVisible] = useState(false);
   const [invalidInputAlertVisible, setInvalidInputAlertVisible] = useState(false);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
 
   useEffect(() => {
     // Load initial data
@@ -94,8 +95,7 @@ const ShoppingScreen: React.FC = () => {
   const onConfirmComplete = async () => {
     setCompleteConfirmVisible(false);
     await inventoryManager.completeAndRestoreShopping();
-    setSnackbarMessage('Your inventory has been updated with purchased items.');
-    setSnackbarVisible(true);
+    setShowSuccessDialog(true);
   };
 
   const handleCancelShopping = async () => {
@@ -160,12 +160,13 @@ const ShoppingScreen: React.FC = () => {
         key={item.id}
         title={item.name}
         description={item.isTemporary ? 'Misc Item' : 'Inventory Item'}
-        left={() => (
+        left={() => canToggle ? (
           <Checkbox
             status={item.isChecked ? 'checked' : 'unchecked'}
             onPress={() => canToggle && handleToggleItem(item)}
-            disabled={!canToggle}
           />
+        ) : (
+          <List.Icon icon={item.isTemporary ? "tag-outline" : "package-variant-closed"} />
         )}
         right={() => (
           canRemove ? (
@@ -455,6 +456,17 @@ const ShoppingScreen: React.FC = () => {
         </Dialog.Content>
         <Dialog.Actions>
           <Button onPress={() => setInvalidInputAlertVisible(false)}>OK</Button>
+        </Dialog.Actions>
+      </Dialog>
+
+      {/* Inventory Updated Success Dialog */}
+      <Dialog visible={showSuccessDialog} onDismiss={() => setShowSuccessDialog(false)}>
+        <Dialog.Title>Inventory Updated</Dialog.Title>
+        <Dialog.Content>
+          <Text style={{ color: theme.colors.onSurface }}>Your inventory has been successfully updated with the purchased items.</Text>
+        </Dialog.Content>
+        <Dialog.Actions>
+          <Button onPress={() => setShowSuccessDialog(false)}>Great!</Button>
         </Dialog.Actions>
       </Dialog>
     </Portal>
