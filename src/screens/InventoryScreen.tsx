@@ -437,25 +437,35 @@ const InventoryScreen: React.FC = () => {
   };
 
   const handleAddSubcategory = async () => {
-    if (!newSubName.trim() || !newSubIcon || !navigation.category) return;
+    try {
+      if (!newSubName.trim() || !newSubIcon || !navigation.category) return;
 
-    if (editingSubId) {
-      if (editingSubId.startsWith('builtin:')) {
-        const builtinName = editingSubId.replace('builtin:', '');
-        // Hide builtin and add as custom
-        await inventoryManager.removeSubcategory(builtinName);
-        await inventoryManager.addCustomSubcategory(newSubName, newSubIcon, theme.colors.primary, navigation.category);
+      if (editingSubId) {
+        if (editingSubId.startsWith('builtin:')) {
+          const builtinName = editingSubId.replace('builtin:', '');
+          // Promote builtin to custom (migrates items)
+          await inventoryManager.promoteBuiltinToCustom(
+            builtinName,
+            newSubName,
+            newSubIcon,
+            theme.colors.primary,
+            navigation.category
+          );
+        } else {
+          await inventoryManager.updateSubcategory(editingSubId, newSubName, newSubIcon, theme.colors.primary);
+        }
       } else {
-        await inventoryManager.updateSubcategory(editingSubId, newSubName, newSubIcon, theme.colors.primary);
+        await inventoryManager.addCustomSubcategory(newSubName, newSubIcon, theme.colors.primary, navigation.category);
       }
-    } else {
-      await inventoryManager.addCustomSubcategory(newSubName, newSubIcon, theme.colors.primary, navigation.category);
-    }
 
-    setShowingSubAddDialog(false);
-    setNewSubName('');
-    setNewSubIcon('');
-    setEditingSubId(null);
+      setShowingSubAddDialog(false);
+      setNewSubName('');
+      setNewSubIcon('');
+      setEditingSubId(null);
+    } catch (err: any) {
+      setSnackbarMessage(err.message);
+      setSnackbarVisible(true);
+    }
   };
 
   const handleConfirmSubDelete = async () => {
@@ -512,19 +522,29 @@ const InventoryScreen: React.FC = () => {
 
 
   const handleAddItem = async () => {
-    if (!newItemName.trim() || !navigation.subcategory) return;
-    
-    await inventoryManager.addCustomItem(newItemName.trim(), navigation.subcategory);
-    setNewItemName('');
-    setShowingAddDialog(false);
+    try {
+      if (!newItemName.trim() || !navigation.subcategory) return;
+      
+      await inventoryManager.addCustomItem(newItemName.trim(), navigation.subcategory);
+      setNewItemName('');
+      setShowingAddDialog(false);
+    } catch (err: any) {
+      setSnackbarMessage(err.message);
+      setSnackbarVisible(true);
+    }
   };
 
   const handleEditItem = async () => {
-    if (!editingItem || !editedName.trim()) return;
-    
-    await inventoryManager.updateItemName(editingItem.id, editedName.trim());
-    setEditingItem(null);
-    setEditedName('');
+    try {
+      if (!editingItem || !editedName.trim()) return;
+      
+      await inventoryManager.updateItemName(editingItem.id, editedName.trim());
+      setEditingItem(null);
+      setEditedName('');
+    } catch (err: any) {
+      setSnackbarMessage(err.message);
+      setSnackbarVisible(true);
+    }
   };
 
   const handleStartShopping = async () => {
@@ -1017,17 +1037,20 @@ const InventoryScreen: React.FC = () => {
       {renderSuccessDialog()}
       {renderSubAddDialog()}
       {renderSubDeleteConfirmDialog()}
-      <Snackbar
-        visible={snackbarVisible}
-        onDismiss={() => setSnackbarVisible(false)}
-        duration={3000}
-        action={{
-          label: 'OK',
-          onPress: () => setSnackbarVisible(false),
-        }}
-      >
-        {snackbarMessage}
-      </Snackbar>
+      <Portal>
+        <Snackbar
+          visible={snackbarVisible}
+          onDismiss={() => setSnackbarVisible(false)}
+          duration={3000}
+          action={{
+            label: 'OK',
+            onPress: () => setSnackbarVisible(false),
+          }}
+          style={{ zIndex: 10000, elevation: 100, marginBottom: 120 }}
+        >
+          {snackbarMessage}
+        </Snackbar>
+      </Portal>
     </View>
   );
 };

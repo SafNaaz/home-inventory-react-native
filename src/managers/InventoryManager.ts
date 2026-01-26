@@ -72,8 +72,9 @@ export class InventoryManager {
   }
 
   private getSubcategoryConfigInternal(subcategory: InventorySubcategory): SubcategoryConfig | null {
-    // Check built-in first
-    if (SUBCATEGORY_CONFIG[subcategory]) {
+    // Check built-in first, but only if not hidden
+    // Note: If a built-in is hidden, we might have a custom one with the same name acting as an override
+    if (SUBCATEGORY_CONFIG[subcategory] && !this.hiddenBuiltinSubs.includes(subcategory)) {
       return SUBCATEGORY_CONFIG[subcategory];
     }
     // Check custom
@@ -86,12 +87,86 @@ export class InventoryManager {
         sampleItems: []
       };
     }
+    // Fallback: if it's a hidden built-in but no custom override found (shouldn't happen in normal flow but possible)
+    // we return the built-in config so at least it renders
+    if (SUBCATEGORY_CONFIG[subcategory]) {
+        return SUBCATEGORY_CONFIG[subcategory];
+    }
     return null;
+  }
+
+  async promoteBuiltinToCustom(builtinName: string, newName: string, newIcon: string, color: string, category: InventoryCategory): Promise<void> {
+    console.log(`✨ Promoting builtin ${builtinName} to custom ${newName}`);
+    
+    if (this.isSubcategoryNameTaken(newName, undefined, builtinName)) {
+         throw new Error(`Category "${newName}" already exists.`);
+    }
+
+    // 1. Hide the builtin
+    if (!this.hiddenBuiltinSubs.includes(builtinName)) {
+        this.hiddenBuiltinSubs.push(builtinName);
+        await StorageService.saveHiddenBuiltinSubs(this.hiddenBuiltinSubs);
+    }
+
+    // 2. Create the custom subcategory
+    const newSub: CustomSubcategory = {
+        id: uuidv4(),
+        name: newName,
+        icon: newIcon,
+        color: color,
+        category: category,
+    };
+
+    this.customSubcategories.push(newSub);
+    await StorageService.saveCustomSubcategories(this.customSubcategories);
+
+    // 3. Migrate items if the name changed
+    if (builtinName !== newName) {
+        let updatedCount = 0;
+        this.inventoryItems.forEach(item => {
+            if (item.subcategory === builtinName) {
+                item.subcategory = newName;
+                updatedCount++;
+            }
+        });
+        
+        if (updatedCount > 0) {
+            await StorageService.saveInventoryItems(this.inventoryItems);
+            console.log(`📦 Migrated ${updatedCount} items from ${builtinName} to ${newName}`);
+        }
+    } else {
+        console.log(`📦 No item migration needed (name preserved)`);
+    }
+
+    this.notifyListeners();
+  }
+
+  private isSubcategoryNameTaken(name: string, excludeCustomId?: string, excludeBuiltinName?: string): boolean {
+    const target = name.trim().toLowerCase();
+    
+    // Check Custom
+    const customConflict = this.customSubcategories.some(c => 
+        c.id !== excludeCustomId && c.name.trim().toLowerCase() === target
+    );
+    if (customConflict) return true;
+
+    // Check Builtin
+    const builtinConflict = Object.keys(SUBCATEGORY_CONFIG).some(b => {
+        if (b === excludeBuiltinName) return false;
+        if (this.hiddenBuiltinSubs.includes(b)) return false;
+        return b.trim().toLowerCase() === target;
+    });
+
+    return builtinConflict;
   }
 
   async addCustomItem(name: string, subcategory: InventorySubcategory): Promise<void> {
     console.log(`➕ Adding custom item: ${name} to ${subcategory}`);
     
+    if (this.inventoryItems.some(i => i.name.toLowerCase() === name.trim().toLowerCase())) {
+        throw new Error(`Item "${name}" already exists.`);
+    }
+
     const newItem: InventoryItem = {
       id: uuidv4(),
       name: name.trim(),
@@ -167,8 +242,11 @@ export class InventoryManager {
 
     const trimmedName = newName.trim();
     if (!trimmedName) {
-      console.error('❌ Item name cannot be empty');
-      return;
+      throw new Error('Item name cannot be empty');
+    }
+    
+    if (this.inventoryItems.some(i => i.id !== itemId && i.name.toLowerCase() === trimmedName.toLowerCase())) {
+        throw new Error(`Item "${trimmedName}" already exists.`);
     }
 
     const oldName = item.name;
@@ -230,6 +308,10 @@ export class InventoryManager {
   }
 
   async addCustomSubcategory(name: string, icon: string, color: string, category: InventoryCategory): Promise<void> {
+    if (this.isSubcategoryNameTaken(name)) {
+        throw new Error(`Category "${name}" already exists.`);
+    }
+
     const newSub: CustomSubcategory = {
       id: uuidv4(),
       name: name.trim(),
@@ -244,6 +326,10 @@ export class InventoryManager {
   }
 
   async updateSubcategory(id: string, name: string, icon: string, color: string): Promise<void> {
+    if (this.isSubcategoryNameTaken(name, id)) {
+         throw new Error(`Category "${name}" already exists.`);
+    }
+  
     const subIndex = this.customSubcategories.findIndex(s => s.id === id);
     if (subIndex === -1) return;
 
