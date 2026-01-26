@@ -458,6 +458,7 @@ const SettingsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    paddingBottom: 85, // Space for floating tab bar
   },
   loadingContainer: {
     flex: 1,
@@ -468,13 +469,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   sectionCard: {
-    margin: commonStyles.spacing.md,
-    borderRadius: commonStyles.borderRadius,
+    margin: 16,
+    borderRadius: 24,
     ...commonStyles.shadow,
   },
   sectionTitle: {
-    fontSize: 18,
-    marginBottom: commonStyles.spacing.sm,
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 8,
+    letterSpacing: -0.5,
   },
   divider: {
     marginVertical: commonStyles.spacing.sm,

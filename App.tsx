@@ -21,7 +21,7 @@ import { settingsManager } from './src/managers/SettingsManager';
 import { notesManager } from './src/managers/NotesManager';
 
 // Themes
-import { lightTheme, darkTheme } from './src/themes/AppTheme';
+import { lightTheme, darkTheme, commonStyles } from './src/themes/AppTheme';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -169,19 +169,40 @@ const App: React.FC = () => {
             },
             tabBarActiveTintColor: theme.colors.primary,
             tabBarInactiveTintColor: theme.colors.onSurfaceVariant,
+            tabBarShowLabel: true,
+            tabBarLabelStyle: {
+              fontSize: 12,
+              fontWeight: '600',
+              marginBottom: 4,
+            },
             tabBarStyle: {
               backgroundColor: theme.colors.surface,
-              borderTopColor: theme.colors.outline,
+              borderTopWidth: 0,
+              height: 65,
+              paddingBottom: 10,
+              paddingTop: 10,
+              position: 'absolute',
+              bottom: 20,
+              left: 20,
+              right: 20,
+              borderRadius: 32,
+              ...commonStyles.shadow,
+              elevation: 8,
             },
             headerStyle: {
-              backgroundColor: theme.colors.surface,
+              backgroundColor: theme.colors.background,
+              elevation: 0,
+              shadowOpacity: 0,
+              borderBottomWidth: 0,
             },
-            headerTintColor: theme.colors.onSurface,
+            headerTitleAlign: 'center',
             headerTitleStyle: {
-              fontWeight: '600',
-              textAlign: 'left',
+              fontWeight: '800',
+              fontSize: 22,
+              color: theme.colors.onBackground,
+              letterSpacing: -0.5,
             },
-            headerTitleAlign: 'left',
+            headerLeft: () => null,
           })}
         >
           <Tab.Screen 
@@ -193,29 +214,29 @@ const App: React.FC = () => {
                 <View style={{ 
                   flexDirection: 'row', 
                   alignItems: 'center', 
-                  marginRight: 8,
-                  paddingHorizontal: 4,
+                  marginRight: 12,
+                  gap: 4,
                 }}>
                   <IconButton
                     icon={settingsManager.isInventoryReminderEnabled() ? "bell" : "bell-outline"}
-                    size={24}
-                    iconColor={settingsManager.isInventoryReminderEnabled() ? currentTheme.colors.primary : currentTheme.colors.onSurfaceVariant}
-                    style={{ marginHorizontal: 2 }}
+                    size={22}
+                    iconColor={settingsManager.isInventoryReminderEnabled() ? theme.colors.primary : theme.colors.onSurfaceVariant}
                     onPress={() => navigation.navigate('NotificationSettings')}
+                    style={{ margin: 0, backgroundColor: theme.colors.surfaceVariant }}
                   />
                   <IconButton
                     icon="cog"
-                    size={24}
-                    iconColor={currentTheme.colors.onSurfaceVariant}
-                    style={{ marginHorizontal: 2 }}
+                    size={22}
+                    iconColor={theme.colors.onSurfaceVariant}
                     onPress={() => navigation.navigate('Settings')}
+                    style={{ margin: 0, backgroundColor: theme.colors.surfaceVariant }}
                   />
                   <IconButton
                     icon={settingsManager.isDarkModeEnabled() ? "white-balance-sunny" : "moon-waning-crescent"}
-                    size={24}
-                    iconColor={settingsManager.isDarkModeEnabled() ? '#FF9500' : '#8E44AD'}
-                    style={{ marginHorizontal: 2 }}
+                    size={22}
+                    iconColor={theme.colors.primary}
                     onPress={async () => await settingsManager.toggleDarkMode()}
+                    style={{ margin: 0, backgroundColor: theme.colors.surfaceVariant }}
                   />
                 </View>
               ),
@@ -227,32 +248,13 @@ const App: React.FC = () => {
             options={({ navigation }) => ({
               title: 'Shopping List',
               headerRight: () => (
-                <View style={{ 
-                  flexDirection: 'row', 
-                  alignItems: 'center', 
-                  marginRight: 8,
-                  paddingHorizontal: 4,
-                }}>
-                  <IconButton
-                    icon={settingsManager.isInventoryReminderEnabled() ? "bell" : "bell-outline"}
-                    size={24}
-                    iconColor={settingsManager.isInventoryReminderEnabled() ? currentTheme.colors.primary : currentTheme.colors.onSurfaceVariant}
-                    style={{ marginHorizontal: 2 }}
-                    onPress={() => navigation.navigate('NotificationSettings')}
-                  />
-                  <IconButton
-                    icon="cog"
-                    size={24}
-                    iconColor={currentTheme.colors.onSurfaceVariant}
-                    style={{ marginHorizontal: 2 }}
-                    onPress={() => navigation.navigate('Settings')}
-                  />
+                <View style={{ marginRight: 16 }}>
                   <IconButton
                     icon={settingsManager.isDarkModeEnabled() ? "white-balance-sunny" : "moon-waning-crescent"}
                     size={24}
-                    iconColor={settingsManager.isDarkModeEnabled() ? '#FF9500' : '#8E44AD'}
-                    style={{ marginHorizontal: 2 }}
+                    iconColor={theme.colors.primary}
                     onPress={async () => await settingsManager.toggleDarkMode()}
+                    style={{ margin: 0, backgroundColor: theme.colors.surfaceVariant }}
                   />
                 </View>
               ),
@@ -264,32 +266,13 @@ const App: React.FC = () => {
             options={({ navigation }) => ({
               title: 'Insights',
               headerRight: () => (
-                <View style={{ 
-                  flexDirection: 'row', 
-                  alignItems: 'center', 
-                  marginRight: 8,
-                  paddingHorizontal: 4,
-                }}>
-                  <IconButton
-                    icon={settingsManager.isInventoryReminderEnabled() ? "bell" : "bell-outline"}
-                    size={24}
-                    iconColor={settingsManager.isInventoryReminderEnabled() ? currentTheme.colors.primary : currentTheme.colors.onSurfaceVariant}
-                    style={{ marginHorizontal: 2 }}
-                    onPress={() => navigation.navigate('NotificationSettings')}
-                  />
-                  <IconButton
-                    icon="cog"
-                    size={24}
-                    iconColor={currentTheme.colors.onSurfaceVariant}
-                    style={{ marginHorizontal: 2 }}
-                    onPress={() => navigation.navigate('Settings')}
-                  />
+                <View style={{ marginRight: 16 }}>
                   <IconButton
                     icon={settingsManager.isDarkModeEnabled() ? "white-balance-sunny" : "moon-waning-crescent"}
                     size={24}
-                    iconColor={settingsManager.isDarkModeEnabled() ? '#FF9500' : '#8E44AD'}
-                    style={{ marginHorizontal: 2 }}
+                    iconColor={theme.colors.primary}
                     onPress={async () => await settingsManager.toggleDarkMode()}
+                    style={{ margin: 0, backgroundColor: theme.colors.surfaceVariant }}
                   />
                 </View>
               ),
@@ -301,32 +284,13 @@ const App: React.FC = () => {
             options={({ navigation }) => ({
               title: 'Notes',
               headerRight: () => (
-                <View style={{ 
-                  flexDirection: 'row', 
-                  alignItems: 'center', 
-                  marginRight: 8,
-                  paddingHorizontal: 4,
-                }}>
-                  <IconButton
-                    icon={settingsManager.isInventoryReminderEnabled() ? "bell" : "bell-outline"}
-                    size={24}
-                    iconColor={settingsManager.isInventoryReminderEnabled() ? currentTheme.colors.primary : currentTheme.colors.onSurfaceVariant}
-                    style={{ marginHorizontal: 2 }}
-                    onPress={() => navigation.navigate('NotificationSettings')}
-                  />
-                  <IconButton
-                    icon="cog"
-                    size={24}
-                    iconColor={currentTheme.colors.onSurfaceVariant}
-                    style={{ marginHorizontal: 2 }}
-                    onPress={() => navigation.navigate('Settings')}
-                  />
+                <View style={{ marginRight: 16 }}>
                   <IconButton
                     icon={settingsManager.isDarkModeEnabled() ? "white-balance-sunny" : "moon-waning-crescent"}
                     size={24}
-                    iconColor={settingsManager.isDarkModeEnabled() ? '#FF9500' : '#8E44AD'}
-                    style={{ marginHorizontal: 2 }}
+                    iconColor={theme.colors.primary}
                     onPress={async () => await settingsManager.toggleDarkMode()}
+                    style={{ margin: 0, backgroundColor: theme.colors.surfaceVariant }}
                   />
                 </View>
               ),

@@ -5,45 +5,45 @@ export const lightTheme = {
   ...MD3LightTheme,
   colors: {
     ...MD3LightTheme.colors,
-    primary: '#007AFF',
-    primaryContainer: '#E3F2FD',
-    secondary: '#34C759',
-    secondaryContainer: '#E8F5E8',
-    tertiary: '#FF2D92',
-    tertiaryContainer: '#FCE4EC',
+    primary: '#6366F1', // Modern Indigo
+    primaryContainer: '#EEF2FF',
+    secondary: '#10B981', // Emerald
+    secondaryContainer: '#ECFDF5',
+    tertiary: '#F43F5E', // Rose
+    tertiaryContainer: '#FFF1F2',
     surface: '#FFFFFF',
-    surfaceVariant: '#F5F5F5',
-    background: '#FAFAFA',
-    error: '#FF3B30',
-    errorContainer: '#FFEBEE',
+    surfaceVariant: '#F8FAFC',
+    background: '#F1F5F9',
+    error: '#EF4444',
+    errorContainer: '#FEF2F2',
     onPrimary: '#FFFFFF',
-    onPrimaryContainer: '#001F2A',
+    onPrimaryContainer: '#1E1B4B',
     onSecondary: '#FFFFFF',
-    onSecondaryContainer: '#002106',
+    onSecondaryContainer: '#064E3B',
     onTertiary: '#FFFFFF',
-    onTertiaryContainer: '#3B0A1C',
-    onSurface: '#1C1B1F',
-    onSurfaceVariant: '#49454F',
-    onBackground: '#1C1B1F',
+    onTertiaryContainer: '#4C0519',
+    onSurface: '#0F172A',
+    onSurfaceVariant: '#64748B',
+    onBackground: '#0F172A',
     onError: '#FFFFFF',
-    onErrorContainer: '#410E0B',
-    outline: '#79747E',
-    outlineVariant: '#CAC4D0',
+    onErrorContainer: '#450A0A',
+    outline: '#E2E8F0',
+    outlineVariant: '#CBD5E1',
     shadow: '#000000',
     scrim: '#000000',
-    inverseSurface: '#313033',
-    inverseOnSurface: '#F4EFF4',
-    inversePrimary: '#9ECAFF',
+    inverseSurface: '#1E293B',
+    inverseOnSurface: '#F8FAFC',
+    inversePrimary: '#C7D2FE',
     // Custom colors for categories
-    fridge: '#007AFF',
-    grocery: '#34C759',
-    hygiene: '#32D74B',
-    personalCare: '#FF2D92',
+    fridge: '#3B82F6', // Blue
+    grocery: '#10B981', // Green
+    hygiene: '#06B6D4', // Cyan
+    personalCare: '#EC4899', // Pink
     // Status colors
-    lowStock: '#FF9500',
-    mediumStock: '#FFD60A',
-    highStock: '#34C759',
-    outOfStock: '#FF3B30',
+    lowStock: '#F59E0B', // Amber
+    mediumStock: '#FBBF24', // Yellow
+    highStock: '#10B981', // Emerald
+    outOfStock: '#EF4444', // Red
   },
 };
 
@@ -52,45 +52,45 @@ export const darkTheme = {
   ...MD3DarkTheme,
   colors: {
     ...MD3DarkTheme.colors,
-    primary: '#9ECAFF',
-    primaryContainer: '#004A77',
-    secondary: '#74DD87',
-    secondaryContainer: '#00390C',
-    tertiary: '#FFB3DA',
-    tertiaryContainer: '#5D1049',
-    surface: '#121212',
-    surfaceVariant: '#1E1E1E',
-    background: '#0F0F0F',
-    error: '#FFB4AB',
-    errorContainer: '#93000A',
-    onPrimary: '#003258',
-    onPrimaryContainer: '#CFE5FF',
-    onSecondary: '#003A00',
-    onSecondaryContainer: '#90F59F',
-    onTertiary: '#5D1049',
-    onTertiaryContainer: '#FFD8E4',
-    onSurface: '#E6E1E5',
-    onSurfaceVariant: '#CAC4D0',
-    onBackground: '#E6E1E5',
-    onError: '#690005',
-    onErrorContainer: '#FFDAD6',
-    outline: '#938F99',
-    outlineVariant: '#49454F',
+    primary: '#818CF8', // Soft Indigo
+    primaryContainer: '#312E81',
+    secondary: '#34D399', // Soft Emerald
+    secondaryContainer: '#064E3B',
+    tertiary: '#FB7185', // Soft Rose
+    tertiaryContainer: '#4C0519',
+    surface: '#1E293B', // Slate 800
+    surfaceVariant: '#0F172A', // Slate 900
+    background: '#020617', // Slate 950
+    error: '#F87171',
+    errorContainer: '#450A0A',
+    onPrimary: '#FFFFFF',
+    onPrimaryContainer: '#E0E7FF',
+    onSecondary: '#FFFFFF',
+    onSecondaryContainer: '#D1FAE5',
+    onTertiary: '#FFFFFF',
+    onTertiaryContainer: '#FFE4E6',
+    onSurface: '#F1F5F9',
+    onSurfaceVariant: '#94A3B8',
+    onBackground: '#F1F5F9',
+    onError: '#450A0A',
+    onErrorContainer: '#FECACA',
+    outline: '#334155',
+    outlineVariant: '#1E293B',
     shadow: '#000000',
     scrim: '#000000',
-    inverseSurface: '#E6E1E5',
-    inverseOnSurface: '#313033',
-    inversePrimary: '#0061A4',
-    // Custom colors for categories (adjusted for dark mode)
-    fridge: '#9ECAFF',
-    grocery: '#74DD87',
-    hygiene: '#64D2FF',
-    personalCare: '#FFB3DA',
-    // Status colors (adjusted for dark mode)
-    lowStock: '#FFB86C',
-    mediumStock: '#F1FA8C',
-    highStock: '#50FA7B',
-    outOfStock: '#FF5555',
+    inverseSurface: '#F1F5F9',
+    inverseOnSurface: '#0F172A',
+    inversePrimary: '#4F46E5',
+    // Custom colors for categories
+    fridge: '#60A5FA',
+    grocery: '#34D399',
+    hygiene: '#22D3EE',
+    personalCare: '#F472B6',
+    // Status colors
+    lowStock: '#FBBF24',
+    mediumStock: '#FDE047',
+    highStock: '#34D399',
+    outOfStock: '#F87171',
   },
 };
 
@@ -150,7 +150,7 @@ export const getContrastColor = (backgroundColor: string) => {
   const g = parseInt(hex.substr(2, 2), 16);
   const b = parseInt(hex.substr(4, 2), 16);
   const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-  return brightness > 128 ? '#000000' : '#FFFFFF';
+  return brightness > 128 ? '#0F172A' : '#FFFFFF';
 };
 
 // MARK: - Common Styles
@@ -159,14 +159,26 @@ export const commonStyles = {
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 4,
     },
     shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowRadius: 12,
+    elevation: 8,
   },
-  cardPadding: 16,
-  borderRadius: 12,
+  glass: {
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  glassDark: {
+    backgroundColor: 'rgba(30, 41, 59, 0.7)',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  cardPadding: 20,
+  borderRadius: 24, // Smoother, larger radius
   spacing: {
     xs: 4,
     sm: 8,

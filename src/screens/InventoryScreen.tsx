@@ -9,7 +9,14 @@ import {
   PanResponder,
   BackHandler,
   Animated,
+  LayoutAnimation,
+  Platform,
+  UIManager,
 } from 'react-native';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 import { Swipeable } from 'react-native-gesture-handler';
 import {
   Card,
@@ -116,11 +123,16 @@ const InventoryScreen: React.FC = () => {
     };
   }, [navigation]);
 
+  const setNavigationFluid = (newNav: NavigationContext | ((prev: NavigationContext) => NavigationContext)) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setNavigation(newNav);
+  };
+
   // Reset to home view when Inventory tab is pressed
   useEffect(() => {
     const unsubscribe = (navigationObj as any).addListener('tabPress', (e: any) => {
       // Reset to home if not already there
-      setNavigation(prevNav => {
+      setNavigationFluid(prevNav => {
         if (prevNav.state !== 'home') {
           return { state: 'home' };
         }
@@ -143,8 +155,9 @@ const InventoryScreen: React.FC = () => {
   };
 
   const onRefresh = async () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setRefreshing(true);
-    loadInventoryData();
+    await loadInventoryData();
     setRefreshing(false);
   };
 
@@ -262,7 +275,7 @@ const InventoryScreen: React.FC = () => {
       const w = trackWidth.current || 200;
 
       // Prefer pageX + measure for reliable global coords
-      const pageX = nativeEvent.pageX ?? nativeEvent.moveX;
+      const pageX = nativeEvent.pageX ?? gestureState?.moveX;
 
       if (pageX != null && trackRef.current && trackRef.current.measure) {
         trackRef.current.measure((fx: number, fy: number, width: number, height: number, px: number, py: number) => {
@@ -291,7 +304,7 @@ const InventoryScreen: React.FC = () => {
           // compute final percentage from event and track position to avoid stale coords
           const computeFinalPct = (): Promise<number> => {
             return new Promise((resolve) => {
-              const pageX = e.nativeEvent.pageX ?? e.nativeEvent.moveX;
+              const pageX = e.nativeEvent.pageX ?? gs?.moveX;
               if (pageX != null && trackRef.current && trackRef.current.measure) {
                 trackRef.current.measure((fx: number, fy: number, width: number, height: number, px: number, py: number) => {
                   const pct = clamp((pageX - px) / (width || trackWidth.current));
@@ -306,9 +319,9 @@ const InventoryScreen: React.FC = () => {
 
           computeFinalPct().then((finalPct) => {
             setValue(finalPct);
-            const result = onComplete(finalPct);
-            if (result && typeof (result as any).then === 'function') {
-              (result as Promise<any>).then(() => setDragging(false)).catch(() => setDragging(false));
+            const result: any = onComplete(finalPct);
+            if (result && typeof result.then === 'function') {
+              result.then(() => setDragging(false)).catch(() => setDragging(false));
             } else {
               setDragging(false);
             }
@@ -317,7 +330,7 @@ const InventoryScreen: React.FC = () => {
         onPanResponderTerminate: (e, gs) => {
           const computeFinalPct = (): Promise<number> => {
             return new Promise((resolve) => {
-              const pageX = e.nativeEvent.pageX ?? e.nativeEvent.moveX;
+              const pageX = e.nativeEvent.pageX ?? gs?.moveX;
               if (pageX != null && trackRef.current && trackRef.current.measure) {
                 trackRef.current.measure((fx: number, fy: number, width: number, height: number, px: number, py: number) => {
                   const pct = clamp((pageX - px) / (width || trackWidth.current));
@@ -332,9 +345,9 @@ const InventoryScreen: React.FC = () => {
 
           computeFinalPct().then((finalPct) => {
             setValue(finalPct);
-            const result = onComplete(finalPct);
-            if (result && typeof (result as any).then === 'function') {
-              (result as Promise<any>).then(() => setDragging(false)).catch(() => setDragging(false));
+            const result: any = onComplete(finalPct);
+            if (result && typeof result.then === 'function') {
+              result.then(() => setDragging(false)).catch(() => setDragging(false));
             } else {
               setDragging(false);
             }
@@ -449,20 +462,20 @@ const InventoryScreen: React.FC = () => {
 
   const renderCategoryCard = (category: InventoryCategory) => {
     const config = CATEGORY_CONFIG[category];
-    const items = getItemsForCategory(category);
-    const lowStockCount = items.filter(item => item.quantity <= 0.25).length;
+    const subcategories = inventoryManager.getSubcategoriesForCategory(category);
+    const itemsCount = inventoryManager.getItemsForCategory(category).length;
 
     return (
       <Card
         key={category}
         style={[styles.categoryCard, { width: cardWidth }]}
-        onPress={() => setNavigation({ state: 'category', category })}
+        onPress={() => setNavigationFluid({ state: 'category', category })}
       >
         <Card.Content style={styles.categoryCardContent}>
           <Icon
             name={config.icon as any}
-            size={50}
-            color={getCategoryColor(category, theme.dark)}
+            size={48}
+            color={config.color}
             style={styles.categoryIcon}
           />
           <Title style={[styles.categoryTitle, { color: theme.colors.onSurface }]}>
@@ -470,13 +483,11 @@ const InventoryScreen: React.FC = () => {
           </Title>
           <View style={styles.categoryStats}>
             <Text style={[styles.categoryStatsText, { color: theme.colors.onSurfaceVariant }]}>
-              {items.length} items
+              {subcategories.length} sections
             </Text>
-            {lowStockCount > 0 && (
-              <Text style={[styles.categoryStatsText, { color: theme.colors.error }]}>
-                {lowStockCount} need restocking
-              </Text>
-            )}
+            <Text style={[styles.categoryStatsText, { color: theme.colors.onSurfaceVariant }]}>
+              {itemsCount} items total
+            </Text>
           </View>
         </Card.Content>
       </Card>
@@ -534,10 +545,10 @@ const InventoryScreen: React.FC = () => {
       >
         <Card
           style={styles.subcategoryCard}
-          onPress={() => setNavigation({ state: 'subcategory', category: navigation.category, subcategory: subName as InventorySubcategory })}
+          onPress={() => setNavigationFluid({ state: 'subcategory', category: navigation.category, subcategory: subName as InventorySubcategory })}
         >
           <Card.Content style={styles.subcategoryContent}>
-            <View style={[styles.iconContainer, { backgroundColor: (config?.color || theme.colors.primary) + '20' }]}>
+            <View style={[styles.iconContainer, { backgroundColor: (config?.color || theme.colors.primary) + '15' }]}>
               <Icon name={(config?.icon || 'help-circle') as any} size={24} color={config?.color || theme.colors.primary} />
             </View>
             <View style={styles.subcategoryInfo}>
@@ -548,12 +559,12 @@ const InventoryScreen: React.FC = () => {
                 {items.length} items
               </Text>
               {lowStockCount > 0 && (
-                <Text style={[styles.subcategoryStats, { color: theme.colors.error }]}>
+                <Text style={[styles.subcategoryStats, { color: theme.colors.error, fontWeight: '600' }]}>
                   {lowStockCount} need restocking
                 </Text>
               )}
             </View>
-            <Icon name="chevron-right" size={24} color={theme.colors.onSurfaceVariant} />
+            <Icon name="chevron-right" size={24} color={theme.colors.outline} />
           </Card.Content>
         </Card>
       </Swipeable>
@@ -996,10 +1007,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   headerTitle: {
     fontSize: 18,
@@ -1019,8 +1028,9 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   statValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: -0.5,
   },
   scrollView: {
     flex: 1,
@@ -1034,13 +1044,9 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   categoryCard: {
-    minHeight: 160,
-    borderRadius: 16,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    minHeight: 180,
+    borderRadius: 32,
+    ...commonStyles.shadow,
   },
   categoryCardContent: {
     flex: 1,
@@ -1068,8 +1074,9 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   subcategoryCard: {
-    marginBottom: 12,
-    borderRadius: 12,
+    marginBottom: 16,
+    borderRadius: 24,
+    ...commonStyles.shadow,
   },
   addSubCard: {
     borderStyle: 'dashed',
@@ -1106,8 +1113,9 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   itemCard: {
-    marginBottom: 12,
-    borderRadius: 12,
+    marginBottom: 16,
+    borderRadius: 24,
+    ...commonStyles.shadow,
   },
   itemHeader: {
     flexDirection: 'row',
@@ -1152,29 +1160,27 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   sliderTrack: {
-    height: 6,
-    borderRadius: 3,
+    height: 10,
+    borderRadius: 5,
     position: 'relative',
   },
   sliderProgress: {
-    height: 6,
-    borderRadius: 3,
+    height: 10,
+    borderRadius: 5,
     position: 'absolute',
     left: 0,
     top: 0,
   },
   sliderThumb: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     position: 'absolute',
     top: -7,
-    marginLeft: -10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    marginLeft: -12,
+    ...commonStyles.shadow,
+    borderWidth: 2,
+    borderColor: '#fff',
   },
   progressContainer: {
     flex: 1,
@@ -1195,8 +1201,8 @@ const styles = StyleSheet.create({
   },
   // New compact styles
   compactItemContent: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
   },
   itemHeaderCompact: {
     flexDirection: 'row',
@@ -1211,8 +1217,9 @@ const styles = StyleSheet.create({
   },
   quantityButton: {
     margin: 0,
-    width: 36,
-    height: 36,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
   sliderWrapper: {
     flex: 1,
@@ -1260,7 +1267,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     margin: 20,
     right: 0,
-    bottom: 0,
+    bottom: 100,
     borderRadius: 28,
   },
 });

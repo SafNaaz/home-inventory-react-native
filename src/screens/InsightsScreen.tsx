@@ -337,17 +337,20 @@ const InsightsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    paddingBottom: 85, // Space for floating tab bar
   },
   scrollView: {
     flex: 1,
   },
   section: {
     padding: 16,
+    marginBottom: 8,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 16,
+    fontSize: 22,
+    fontWeight: '800',
+    marginBottom: 20,
+    letterSpacing: -0.5,
   },
   overviewGrid: {
     gap: 16,
@@ -355,124 +358,123 @@ const styles = StyleSheet.create({
   overviewRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    gap: 16,
   },
   insightCard: {
-    borderRadius: 12,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    borderRadius: 24,
+    ...commonStyles.shadow,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
   },
   insightCardContent: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 16,
-    minHeight: 100,
+    padding: 20,
+    minHeight: 120,
   },
   insightIcon: {
-    marginBottom: 8,
+    marginBottom: 12,
   },
   insightValue: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontWeight: '800',
     marginBottom: 4,
   },
   insightTitle: {
-    fontSize: 12,
+    fontSize: 13,
+    fontWeight: '600',
     textAlign: 'center',
+    opacity: 0.8,
   },
   patternsList: {
-    gap: 12,
+    gap: 16,
   },
   patternCard: {
-    borderRadius: 12,
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 1,
+    borderRadius: 24,
+    ...commonStyles.shadow,
   },
   patternContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    padding: 20,
   },
   patternIcon: {
     marginRight: 16,
+    padding: 8,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.03)',
   },
   patternInfo: {
     flex: 1,
   },
   patternTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     marginBottom: 2,
   },
   patternSubtitle: {
     fontSize: 14,
+    fontWeight: '500',
+    opacity: 0.8,
   },
   patternValue: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '700',
     textAlign: 'right',
   },
   categoryList: {
-    gap: 12,
+    gap: 16,
   },
   categoryCard: {
-    borderRadius: 12,
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 1,
+    borderRadius: 24,
+    ...commonStyles.shadow,
   },
   categoryContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    padding: 20,
   },
   categoryIcon: {
     marginRight: 16,
+    padding: 10,
+    borderRadius: 16,
   },
   categoryInfo: {
     flex: 1,
   },
   categoryTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 2,
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 4,
   },
   categoryStats: {
     fontSize: 14,
+    fontWeight: '500',
   },
   categoryStatus: {
     alignItems: 'center',
+    justifyContent: 'center',
   },
   categoryStatusValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontWeight: '800',
   },
   categoryStatusLabel: {
-    fontSize: 12,
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
   },
   shoppingList: {
-    gap: 12,
+    gap: 16,
   },
   shoppingCard: {
-    borderRadius: 12,
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 1,
+    borderRadius: 24,
+    ...commonStyles.shadow,
   },
   shoppingContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    padding: 20,
   },
   shoppingIcon: {
     marginRight: 16,
@@ -482,15 +484,17 @@ const styles = StyleSheet.create({
   },
   shoppingTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     marginBottom: 2,
   },
   shoppingSubtitle: {
     fontSize: 14,
+    fontWeight: '500',
+    opacity: 0.8,
   },
   shoppingValue: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '700',
     textAlign: 'right',
   },
 });

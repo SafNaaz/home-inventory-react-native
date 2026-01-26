@@ -4,7 +4,14 @@ import {
   ScrollView,
   StyleSheet,
   RefreshControl,
+  LayoutAnimation,
+  Platform,
+  UIManager,
 } from 'react-native';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 import {
   Card,
   Title,
@@ -61,6 +68,7 @@ const ShoppingScreen: React.FC = () => {
     const state = inventoryManager.getShoppingState();
     const suggestions = settingsManager.getMiscItemSuggestions();
     
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setShoppingList(items);
     setShoppingState(state);
     setMiscSuggestions(suggestions);
@@ -538,89 +546,114 @@ const ShoppingScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    paddingBottom: 85, // Space for floating tab bar
   },
   statusCard: {
-    margin: commonStyles.spacing.md,
-    borderRadius: commonStyles.borderRadius,
-    ...commonStyles.shadow,
+    margin: 16,
+    borderRadius: 24,
+    backgroundColor: 'transparent',
+    elevation: 0,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
   statusHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: commonStyles.spacing.sm,
+    marginBottom: 8,
   },
   statusTitle: {
-    marginLeft: commonStyles.spacing.sm,
-    fontSize: 18,
+    marginLeft: 12,
+    fontSize: 20,
+    fontWeight: '800',
   },
   progressInfo: {
-    marginTop: commonStyles.spacing.sm,
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+    borderRadius: 12,
   },
   scrollView: {
     flex: 1,
   },
   listCard: {
-    margin: commonStyles.spacing.md,
+    margin: 16,
     marginTop: 0,
-    borderRadius: commonStyles.borderRadius,
+    borderRadius: 24,
     ...commonStyles.shadow,
   },
   listItem: {
-    paddingVertical: commonStyles.spacing.xs,
+    paddingVertical: 8,
+    borderRadius: 16,
+    marginVertical: 2,
   },
   checkedItem: {
-    opacity: 0.6,
+    opacity: 0.5,
+    backgroundColor: '#f1f5f9',
   },
   checkedText: {
     textDecorationLine: 'line-through',
+    color: '#94a3b8',
   },
   actionButtons: {
     flexDirection: 'row',
-    padding: commonStyles.spacing.md,
-    gap: commonStyles.spacing.sm,
+    padding: 16,
+    gap: 12,
+    backgroundColor: 'transparent',
   },
   actionButton: {
     flex: 1,
+    borderRadius: 16,
+    paddingVertical: 4,
   },
   fab: {
     position: 'absolute',
-    margin: commonStyles.spacing.md,
+    margin: 20,
     right: 0,
-    bottom: 80, // Above action buttons
+    bottom: 150, // Above tab bar and action buttons
+    borderRadius: 28,
   },
   emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: commonStyles.spacing.xl,
+    padding: 32,
+    paddingBottom: 120,
   },
   emptyTitle: {
-    marginTop: commonStyles.spacing.md,
+    marginTop: 16,
     textAlign: 'center',
+    fontWeight: '800',
+    fontSize: 24,
   },
   emptyText: {
     textAlign: 'center',
     opacity: 0.7,
-    marginTop: commonStyles.spacing.sm,
-    marginBottom: commonStyles.spacing.lg,
+    marginTop: 8,
+    marginBottom: 24,
+    fontSize: 16,
+    lineHeight: 24,
   },
   generateButton: {
-    marginTop: commonStyles.spacing.md,
+    marginTop: 16,
+    borderRadius: 16,
+    paddingHorizontal: 24,
   },
   emptyListState: {
-    padding: commonStyles.spacing.xl,
+    padding: 32,
     alignItems: 'center',
   },
   suggestions: {
-    marginTop: commonStyles.spacing.md,
+    marginTop: 16,
   },
   suggestionsTitle: {
     fontSize: 14,
-    marginBottom: commonStyles.spacing.sm,
+    marginBottom: 8,
     opacity: 0.7,
+    fontWeight: '600',
   },
   suggestionChip: {
-    marginRight: commonStyles.spacing.sm,
+    marginRight: 8,
+    borderRadius: 12,
   },
 });
 

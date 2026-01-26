@@ -197,43 +197,49 @@ const NotificationSettingsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    paddingBottom: 85, // Space for floating tab bar
   },
   scrollView: {
     flex: 1,
   },
   section: {
     padding: 16,
+    marginBottom: 8,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 22,
+    fontWeight: '800',
     marginBottom: 8,
+    letterSpacing: -0.5,
   },
   sectionDescription: {
     fontSize: 14,
-    lineHeight: 20,
+    lineHeight: 22,
+    opacity: 0.8,
   },
   infoCard: {
     flexDirection: 'row',
-    padding: 16,
-    borderRadius: 12,
+    padding: 20,
+    borderRadius: 24,
     alignItems: 'flex-start',
   },
   infoContent: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: 16,
   },
   infoTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 6,
   },
   infoDescription: {
     fontSize: 14,
-    lineHeight: 20,
+    lineHeight: 22,
+    opacity: 0.8,
   },
   testButton: {
-    marginTop: 8,
+    marginTop: 12,
+    borderRadius: 16,
   },
 });
 
