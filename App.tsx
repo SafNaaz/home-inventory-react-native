@@ -13,6 +13,8 @@ import ShoppingScreen from './src/screens/ShoppingScreen';
 import InsightsScreen from './src/screens/InsightsScreen';
 import NotesScreen from './src/screens/NotesScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
+import NoteDetailScreen from './src/screens/NoteDetailScreen';
+
 import NotificationSettingsScreen from './src/screens/NotificationSettingsScreen';
 import { useColorScheme } from 'react-native';
 
@@ -356,6 +358,14 @@ const App: React.FC = () => {
               component={NotificationSettingsScreen}
               options={{ 
                 title: 'Notification Settings',
+                headerBackTitleVisible: false,
+              }}
+            />
+            <Stack.Screen 
+              name="NoteDetail" 
+              component={NoteDetailScreen}
+              options={{ 
+                title: 'Note',
                 headerBackTitleVisible: false,
               }}
             />
