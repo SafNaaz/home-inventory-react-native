@@ -22,6 +22,7 @@ import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { settingsManager } from '../managers/SettingsManager';
 import { InventoryCategory } from '../models/Types';
 import { CATEGORY_CONFIG } from '../constants/CategoryConfig';
+import DoodleBackground from '../components/DoodleBackground';
 
 const NotificationSettingsScreen: React.FC = () => {
   const theme = useTheme();
@@ -90,6 +91,7 @@ const NotificationSettingsScreen: React.FC = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <DoodleBackground />
       <ScrollView style={styles.scrollView}>
         {/* Inventory Reminders Section */}
         <View style={styles.section}>

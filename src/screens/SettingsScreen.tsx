@@ -28,6 +28,7 @@ import { inventoryManager } from '../managers/InventoryManager';
 import { notesManager } from '../managers/NotesManager';
 import { AppSettings } from '../models/Types';
 import { commonStyles } from '../themes/AppTheme';
+import DoodleBackground from '../components/DoodleBackground';
 import { useNavigation } from '@react-navigation/native';
 
 const SettingsScreen: React.FC = () => {
@@ -417,6 +418,7 @@ const SettingsScreen: React.FC = () => {
   if (!settings) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
+        <DoodleBackground />
         <Text style={{ color: theme.colors.onBackground }}>Loading settings...</Text>
       </View>
     );
@@ -424,6 +426,7 @@ const SettingsScreen: React.FC = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <DoodleBackground />
       <ScrollView
         style={styles.scrollView}
         refreshControl={

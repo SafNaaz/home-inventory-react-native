@@ -34,6 +34,7 @@ import { inventoryManager } from '../managers/InventoryManager';
 import { settingsManager } from '../managers/SettingsManager';
 import { ShoppingListItem, ShoppingState } from '../models/Types';
 import { commonStyles } from '../themes/AppTheme';
+import DoodleBackground from '../components/DoodleBackground';
 
 const ShoppingScreen: React.FC = () => {
   const theme = useTheme();
@@ -217,6 +218,7 @@ const ShoppingScreen: React.FC = () => {
 
   const renderGeneratingState = () => (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <DoodleBackground />
       <Card style={[styles.statusCard, { backgroundColor: theme.colors.surface }]} mode="elevated">
         <Card.Content>
           <View style={styles.statusHeader}>
@@ -265,7 +267,7 @@ const ShoppingScreen: React.FC = () => {
 
       <FAB
         icon="plus"
-        style={styles.fab}
+        style={[styles.fab, { backgroundColor: theme.colors.primary }]}
         color={theme.dark ? '#000' : '#fff'}
         onPress={() => setAddItemDialogVisible(true)}
       />
@@ -274,6 +276,7 @@ const ShoppingScreen: React.FC = () => {
 
   const renderListReadyState = () => (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <DoodleBackground />
       <Card style={[styles.statusCard, { backgroundColor: theme.colors.surface }]} mode="elevated">
         <Card.Content>
           <View style={styles.statusHeader}>
@@ -321,6 +324,7 @@ const ShoppingScreen: React.FC = () => {
 
     return (
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <DoodleBackground />
         <Card style={[styles.statusCard, { backgroundColor: theme.colors.surface }]} mode="elevated">
           <Card.Content>
             <View style={styles.statusHeader}>
@@ -405,7 +409,13 @@ const ShoppingScreen: React.FC = () => {
                     mode="outlined"
                     compact
                     onPress={() => handleSuggestionPress(suggestion)}
-                    style={styles.suggestionChip}
+                    style={[
+                      styles.suggestionChip, 
+                      { 
+                        backgroundColor: theme.colors.primary + '15',
+                        borderColor: theme.colors.primary + '30'
+                      }
+                    ]}
                   >
                     {suggestion}
                   </Button>
@@ -416,7 +426,13 @@ const ShoppingScreen: React.FC = () => {
         </Dialog.Content>
         <Dialog.Actions>
           <Button onPress={() => setAddItemDialogVisible(false)}>Cancel</Button>
-          <Button onPress={handleAddMiscItem}>Add Item</Button>
+          <Button 
+            mode="contained" 
+            onPress={handleAddMiscItem}
+            style={{ borderRadius: 12 }}
+          >
+            Add Item
+          </Button>
         </Dialog.Actions>
       </Dialog>
     </Portal>
@@ -655,6 +671,7 @@ const styles = StyleSheet.create({
   suggestionChip: {
     marginRight: 8,
     borderRadius: 12,
+    borderWidth: 1,
   },
 });
 

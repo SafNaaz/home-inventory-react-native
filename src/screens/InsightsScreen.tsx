@@ -22,6 +22,7 @@ import { settingsManager } from '../managers/SettingsManager';
 import { InventoryItem, InventoryCategory } from '../models/Types';
 import { CATEGORY_CONFIG, getAllCategories } from '../constants/CategoryConfig';
 import { getCategoryColor, commonStyles } from '../themes/AppTheme';
+import DoodleBackground from '../components/DoodleBackground';
 
 const { width } = Dimensions.get('window');
 const cardWidth = (width - 48) / 2; // 2 columns with padding
@@ -444,6 +445,7 @@ const InsightsScreen: React.FC = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <DoodleBackground />
       <ScrollView
         style={styles.scrollView}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}

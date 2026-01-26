@@ -24,6 +24,7 @@ import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { notesManager } from '../managers/NotesManager';
 import { Note } from '../models/Types';
 import { commonStyles } from '../themes/AppTheme';
+import DoodleBackground from '../components/DoodleBackground';
 
 const { width } = Dimensions.get('window');
 const cardWidth = (width - 48) / 2; // 2 columns with padding
@@ -493,6 +494,7 @@ const NotesScreen: React.FC = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <DoodleBackground />
       <ScrollView
         style={styles.scrollView}
         refreshControl={

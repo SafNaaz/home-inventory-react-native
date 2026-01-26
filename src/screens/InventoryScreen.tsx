@@ -40,6 +40,7 @@ import { inventoryManager } from '../managers/InventoryManager';
 import { InventoryItem, InventoryCategory, InventorySubcategory, ShoppingState } from '../models/Types';
 import { CATEGORY_CONFIG, SUBCATEGORY_CONFIG, getAllCategories, getCategoryConfig, getSubcategoryConfig } from '../constants/CategoryConfig';
 import { getStockColor, getCategoryColor, commonStyles } from '../themes/AppTheme';
+import DoodleBackground from '../components/DoodleBackground';
 
 const { width } = Dimensions.get('window');
 const cardWidth = (width - 48) / 2; // 2 columns with padding
@@ -771,11 +772,12 @@ const InventoryScreen: React.FC = () => {
 
   const renderSubcategoryScreen = () => {
     if (!navigation.subcategory) return null;
-    
+
     const items = getItemsForSubcategory(navigation.subcategory);
-    
+
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <DoodleBackground />
         <View style={styles.header}>
           <IconButton
             icon="arrow-left"
@@ -894,7 +896,7 @@ const InventoryScreen: React.FC = () => {
         </Dialog.Content>
         <Dialog.Actions>
           <Button onPress={() => setShowingSuccessDialog(false)}>Later</Button>
-          <Button 
+          <Button
             onPress={() => {
               setShowingSuccessDialog(false);
               (navigationObj as any).navigate('Shopping');
@@ -976,10 +978,11 @@ const InventoryScreen: React.FC = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <DoodleBackground />
       {navigation.state === 'home' && renderHomeScreen()}
       {navigation.state === 'category' && renderCategoryScreen()}
       {navigation.state === 'subcategory' && renderSubcategoryScreen()}
-      
+
       {renderFloatingActionButton()}
       {renderAddItemDialog()}
       {renderEditItemDialog()}
