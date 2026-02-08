@@ -10,6 +10,7 @@ const STORAGE_KEYS = {
   SETTINGS: 'app_settings',
   CUSTOM_SUBCATEGORIES: 'custom_subcategories',
   HIDDEN_BUILTIN_SUBS: 'hidden_builtin_subs',
+  SUBCATEGORY_ORDER: 'subcategory_order',
 } as const;
 
 // MARK: - Storage Service Class
@@ -261,6 +262,28 @@ export class StorageService {
     }
   }
 
+  // MARK: - Subcategory Order
+  static async saveSubcategoryOrder(order: Record<string, string[]>): Promise<void> {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.SUBCATEGORY_ORDER, JSON.stringify(order));
+      console.log('✅ Subcategory order saved to storage');
+    } catch (error) {
+      console.error('❌ Error saving subcategory order:', error);
+      throw error;
+    }
+  }
+
+  static async loadSubcategoryOrder(): Promise<Record<string, string[]>> {
+    try {
+      const serialized = await AsyncStorage.getItem(STORAGE_KEYS.SUBCATEGORY_ORDER);
+      if (!serialized) return {};
+      return JSON.parse(serialized);
+    } catch (error) {
+      console.error('❌ Error loading subcategory order:', error);
+      return {};
+    }
+  }
+
   // MARK: - Clear All Data
   static async clearAllData(): Promise<void> {
     try {
@@ -272,6 +295,7 @@ export class StorageService {
         STORAGE_KEYS.SETTINGS,
         STORAGE_KEYS.CUSTOM_SUBCATEGORIES,
         STORAGE_KEYS.HIDDEN_BUILTIN_SUBS,
+        STORAGE_KEYS.SUBCATEGORY_ORDER,
       ]);
       console.log('🗑️ All data cleared from storage');
     } catch (error) {

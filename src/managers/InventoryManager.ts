@@ -10,6 +10,7 @@ export class InventoryManager {
   private hiddenBuiltinSubs: string[] = [];
   private shoppingList: ShoppingListItem[] = [];
   private shoppingState: ShoppingState = ShoppingState.EMPTY;
+  private subcategoryOrder: Record<string, string[]> = {};
   private listeners: Set<() => void> = new Set();
 
   constructor() {
@@ -31,12 +32,13 @@ export class InventoryManager {
     try {
       console.log('📂 Loading data from storage...');
       
-      const [items, shoppingItems, state, customSubs, hiddenSubs] = await Promise.all([
+      const [items, shoppingItems, state, customSubs, hiddenSubs, subOrder] = await Promise.all([
         StorageService.loadInventoryItems(),
         StorageService.loadShoppingList(),
         StorageService.loadShoppingState(),
         StorageService.loadCustomSubcategories(),
         StorageService.loadHiddenBuiltinSubs(),
+        StorageService.loadSubcategoryOrder(),
       ]);
 
       this.inventoryItems = items;
@@ -44,6 +46,32 @@ export class InventoryManager {
       this.hiddenBuiltinSubs = hiddenSubs || [];
       this.shoppingList = shoppingItems;
       this.shoppingState = state;
+      this.subcategoryOrder = subOrder || {};
+
+      // Initialize order for legacy items
+      // We group by subcategory and assign order to ensure stable sorting
+      const itemsBySub: Record<string, InventoryItem[]> = {};
+      this.inventoryItems.forEach(item => {
+        if (!itemsBySub[item.subcategory as string]) itemsBySub[item.subcategory as string] = [];
+        itemsBySub[item.subcategory as string].push(item);
+      });
+
+      Object.values(itemsBySub).forEach(subItems => {
+        // Sort by name initially if no order exists to have a deterministic default
+        subItems.sort((a, b) => {
+            if (a.order !== undefined && b.order !== undefined) return a.order - b.order;
+            if (a.order !== undefined) return -1;
+            if (b.order !== undefined) return 1;
+            return a.name.localeCompare(b.name);
+        });
+        
+        // Assign order if missing or normalized
+        subItems.forEach((item, index) => {
+             if (item.order === undefined) {
+                 item.order = index;
+             }
+        });
+      });
 
       console.log(`📦 Loaded ${items.length} inventory items`);
       console.log(`🛒 Loaded ${shoppingItems.length} shopping items`);
@@ -68,7 +96,9 @@ export class InventoryManager {
   }
 
   getItemsForSubcategory(subcategory: InventorySubcategory): InventoryItem[] {
-    return this.inventoryItems.filter(item => item.subcategory === subcategory);
+    return this.inventoryItems
+      .filter(item => item.subcategory === subcategory)
+      .sort((a, b) => (a.order ?? 999999) - (b.order ?? 999999));
   }
 
   private getSubcategoryConfigInternal(subcategory: InventorySubcategory): SubcategoryConfig | null {
@@ -315,7 +345,36 @@ export class InventoryManager {
       .filter(cs => cs.category === category)
       .map(cs => cs.name);
       
-    return [...builtin, ...custom];
+    const all = [...builtin, ...custom];
+    const order = this.subcategoryOrder[category] || [];
+    
+    // Sort based on saved order
+    const ordered = all.filter(s => order.includes(s)).sort((a, b) => order.indexOf(a) - order.indexOf(b));
+    const unordered = all.filter(s => !order.includes(s));
+    
+    return [...ordered, ...unordered];
+  }
+
+  async updateItemOrder(updates: {id: string, order: number}[]): Promise<void> {
+    let hasChanges = false;
+    updates.forEach(u => {
+      const item = this.inventoryItems.find(i => i.id === u.id);
+      if (item && item.order !== u.order) {
+        item.order = u.order;
+        hasChanges = true;
+      }
+    });
+    
+    if (hasChanges) {
+      this.notifyListeners(); // Notify UI immediately for optimistic update
+      await StorageService.saveInventoryItems(this.inventoryItems);
+    }
+  }
+
+  async updateSubcategoryOrder(category: InventoryCategory, newOrder: string[]): Promise<void> {
+    this.subcategoryOrder[category] = newOrder;
+    this.notifyListeners(); // Notify UI immediately
+    await StorageService.saveSubcategoryOrder(this.subcategoryOrder);
   }
 
   getSubcategoryConfig(subcategory: InventorySubcategory): SubcategoryConfig | null {
@@ -691,6 +750,8 @@ export class InventoryManager {
     this.inventoryItems = [];
     this.shoppingList = [];
     this.shoppingState = ShoppingState.EMPTY;
+    
+    this.subcategoryOrder = {};
     
     await StorageService.clearAllData();
     console.log('🗑️ All inventory data cleared');

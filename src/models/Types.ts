@@ -72,6 +72,7 @@ export interface InventoryItem {
   purchaseHistory: Date[];
   lastUpdated: Date;
   isIgnored?: boolean;
+  order?: number;
 }
 
 // MARK: - Shopping List Item Interface

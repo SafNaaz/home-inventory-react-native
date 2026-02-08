@@ -17,7 +17,8 @@ import {
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
-import { Swipeable } from 'react-native-gesture-handler';
+import { Swipeable, GestureHandlerRootView } from 'react-native-gesture-handler';
+import DraggableFlatList, { ScaleDecorator, RenderItemParams } from 'react-native-draggable-flatlist';
 import {
   Card,
   Title,
@@ -386,6 +387,7 @@ const InventoryScreen: React.FC = () => {
   const [newSubName, setNewSubName] = useState('');
   const [newSubIcon, setNewSubIcon] = useState('');
   const [subToDeleteId, setSubToDeleteId] = useState<string | null>(null);
+  const [isReordering, setIsReordering] = useState(false);
 
   useEffect(() => {
     loadInventoryData();
@@ -400,13 +402,19 @@ const InventoryScreen: React.FC = () => {
 
     // Handle Android back button
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (isReordering) {
+        setIsReordering(false);
+        return true;
+      }
       if (navigation.state === 'subcategory') {
         // Go back to category view
         setNavigation({ state: 'category', category: navigation.category });
+        setIsReordering(false);
         return true; // Prevent default behavior (closing app)
       } else if (navigation.state === 'category') {
         // Go back to home view
         setNavigation({ state: 'home' });
+        setIsReordering(false);
         return true; // Prevent default behavior (closing app)
       }
       // If we're on home, let the default behavior happen (close app or go to previous screen)
@@ -422,6 +430,7 @@ const InventoryScreen: React.FC = () => {
 
   const setNavigationFluid = (newNav: NavigationContext | ((prev: NavigationContext) => NavigationContext)) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setIsReordering(false);
     setNavigation(newNav);
   };
 
@@ -433,6 +442,7 @@ const InventoryScreen: React.FC = () => {
         if (prevNav.state !== 'home') {
           return { state: 'home' };
         }
+        setIsReordering(false);
         return prevNav;
       });
     });
@@ -536,7 +546,10 @@ const InventoryScreen: React.FC = () => {
   };
 
   const getItemsForSubcategory = (subcategory: InventorySubcategory): InventoryItem[] => {
-    const subItems = inventoryItems.filter(item => item.subcategory === subcategory);
+    const subItems = inventoryItems
+      .filter(item => item.subcategory === subcategory)
+      .sort((a, b) => (a.order ?? 999999) - (b.order ?? 999999));
+      
     if (showIgnoredOnly) {
       return subItems.filter(item => item.isIgnored);
     }
@@ -838,6 +851,46 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, items, lowStock
     
     const config = getCategoryConfig(navigation.category);
     const subcategories = inventoryManager.getSubcategoriesForCategory(navigation.category);
+
+    const renderDraggableSubcategory = ({ item, drag, isActive }: RenderItemParams<InventorySubcategory>) => {
+      const subName = item;
+      const subItems = getItemsForSubcategory(subName as InventorySubcategory);
+      const lowStockCount = subItems.filter(it => it.quantity <= 0.25).length;
+      const config = inventoryManager.getSubcategoryConfig(subName as InventorySubcategory);
+
+      return (
+        <ScaleDecorator>
+          <TouchableOpacity
+            onLongPress={drag}
+            disabled={isActive}
+            style={[
+              styles.subcategoryCard, 
+              { backgroundColor: isActive ? theme.colors.elevation.level3 : theme.colors.surface, transform: isActive ? [{scale: 1.05}] : [] }
+            ]}
+          >
+            <Card.Content style={styles.subcategoryContent}>
+              <View style={[styles.iconContainer, { backgroundColor: (config?.color || theme.colors.primary) + '15' }]}>
+                <Icon name={(config?.icon || 'help-circle') as any} size={24} color={config?.color || theme.colors.primary} />
+              </View>
+              <View style={styles.subcategoryInfo}>
+                <Title style={[styles.subcategoryTitle, { color: theme.colors.onSurface }]}>
+                  {subName}
+                </Title>
+                <Text style={[styles.subcategoryStats, { color: theme.colors.onSurfaceVariant }]}>
+                  {subItems.length} items
+                </Text>
+                {lowStockCount > 0 && (
+                  <Text style={[styles.subcategoryStats, { color: theme.colors.error, fontWeight: '600' }]}>
+                    {lowStockCount} need restocking
+                  </Text>
+                )}
+              </View>
+              <Icon name="drag" size={24} color={theme.colors.onSurfaceVariant} />
+            </Card.Content>
+          </TouchableOpacity>
+        </ScaleDecorator>
+      );
+    };
     
     return (
       <View style={styles.container}>
@@ -850,39 +903,63 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, items, lowStock
           <Title style={[styles.headerTitle, { color: theme.colors.onSurface }]}>
             {navigation.category}
           </Title>
-          <IconButton
-            icon="plus"
-            size={24}
-            onPress={openSubAddDialog}
-          />
-        </View>
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={{ paddingBottom: 110 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        >
-          <View style={styles.subcategoriesList}>
-            {subcategories.map(subName => {
-              const items = getItemsForSubcategory(subName as InventorySubcategory);
-              const lowStockCount = items.filter(it => it.quantity <= 0.25).length;
-              const config = inventoryManager.getSubcategoryConfig(subName as InventorySubcategory);
-              return (
-                <SubcategoryRow
-                  key={subName}
-                  subName={subName}
-                  navigation={navigation}
-                  theme={theme}
-                  items={items}
-                  lowStockCount={lowStockCount}
-                  config={config}
-                  onDelete={setSubToDeleteId}
-                  onEdit={openSubEditDialog}
-                  setNavigationFluid={setNavigationFluid}
-                />
-              );
-            })}
+          <View style={{ flexDirection: 'row' }}>
+            <IconButton
+              icon={isReordering ? "check" : "sort-variant"}
+              size={24}
+              onPress={() => setIsReordering(!isReordering)}
+            />
+            {!isReordering && (
+              <IconButton
+                icon="plus"
+                size={24}
+                onPress={openSubAddDialog}
+              />
+            )}
           </View>
-        </ScrollView>
+        </View>
+        {isReordering ? (
+          <DraggableFlatList
+            data={subcategories}
+            onDragEnd={({ data }) => {
+              if (navigation.category) {
+                 inventoryManager.updateSubcategoryOrder(navigation.category, data as string[]);
+              }
+            }}
+            keyExtractor={(item) => item}
+            renderItem={renderDraggableSubcategory}
+            containerStyle={styles.container}
+            contentContainerStyle={{ paddingBottom: 110, padding: 16 }}
+          />
+        ) : (
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={{ paddingBottom: 110 }}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          >
+            <View style={styles.subcategoriesList}>
+              {subcategories.map(subName => {
+                const items = getItemsForSubcategory(subName as InventorySubcategory);
+                const lowStockCount = items.filter(it => it.quantity <= 0.25).length;
+                const config = inventoryManager.getSubcategoryConfig(subName as InventorySubcategory);
+                return (
+                  <SubcategoryRow
+                    key={subName}
+                    subName={subName}
+                    navigation={navigation}
+                    theme={theme}
+                    items={items}
+                    lowStockCount={lowStockCount}
+                    config={config}
+                    onDelete={setSubToDeleteId}
+                    onEdit={openSubEditDialog}
+                    setNavigationFluid={setNavigationFluid}
+                  />
+                );
+              })}
+            </View>
+          </ScrollView>
+        )}
       </View>
     );
   };
@@ -891,6 +968,50 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, items, lowStock
     if (!navigation.subcategory) return null;
 
     const items = getItemsForSubcategory(navigation.subcategory);
+
+    const renderDraggableItem = ({ item, drag, isActive }: RenderItemParams<InventoryItem>) => {
+      const stockColor = getStockColor(item.quantity, theme.dark);
+      return (
+        <ScaleDecorator>
+             <TouchableOpacity
+               onLongPress={drag}
+               disabled={isActive}
+               style={[
+                 styles.itemCard, 
+                 { 
+                   backgroundColor: isActive ? theme.colors.elevation.level3 : theme.colors.surface,
+                   transform: isActive ? [{scale: 1.05}] : [] 
+                 }
+               ]}
+             >
+               <Card.Content style={styles.compactItemContent}>
+                 <View style={styles.itemHeaderCompact}>
+                   <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
+                     <Icon name="drag" size={24} color={theme.colors.onSurfaceVariant} style={{marginRight: 12}} />
+                     <Text 
+                       style={[
+                         styles.itemTitle, 
+                         { 
+                           color: theme.colors.onSurface,
+                           textDecorationLine: item.isIgnored ? 'line-through' : 'none',
+                           opacity: item.isIgnored ? 0.5 : 1
+                         }
+                       ]}
+                       numberOfLines={2}
+                     >
+                       {item.name}
+                     </Text>
+                   </View>
+                   <Text style={[styles.itemPercentage, { color: stockColor }]}>
+                     {Math.round(item.quantity * 100)}%
+                   </Text>
+                 </View>
+                {/* Simplified controls for drag mode */}
+               </Card.Content>
+             </TouchableOpacity>
+        </ScaleDecorator>
+      );
+    };
 
     return (
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -909,27 +1030,50 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, items, lowStock
           </Title>
           <View style={{ flexDirection: 'row' }}>
             <IconButton
-              icon={showIgnoredOnly ? "eye-off" : "eye-off-outline"}
+              icon={isReordering ? "check" : "sort-variant"}
               size={24}
-              iconColor={showIgnoredOnly ? theme.colors.error : theme.colors.onSurfaceVariant}
-              onPress={() => setShowIgnoredOnly(!showIgnoredOnly)}
+              onPress={() => setIsReordering(!isReordering)}
             />
-            <IconButton
-              icon="plus"
-              size={24}
-              onPress={() => setShowingAddDialog(true)}
-            />
+            {!isReordering && (
+              <>
+                <IconButton
+                  icon={showIgnoredOnly ? "eye-off" : "eye-off-outline"}
+                  size={24}
+                  iconColor={showIgnoredOnly ? theme.colors.error : theme.colors.onSurfaceVariant}
+                  onPress={() => setShowIgnoredOnly(!showIgnoredOnly)}
+                />
+                <IconButton
+                  icon="plus"
+                  size={24}
+                  onPress={() => setShowingAddDialog(true)}
+                />
+              </>
+            )}
           </View>
         </View>
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={{ paddingBottom: 110 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        >
-          <View style={styles.itemsList}>
-            {items.map(renderItemRow)}
-          </View>
-        </ScrollView>
+        {isReordering ? (
+          <DraggableFlatList
+            data={items}
+            onDragEnd={({ data }) => {
+              const updates = data.map((item, index) => ({ id: item.id, order: index }));
+              inventoryManager.updateItemOrder(updates);
+            }}
+            keyExtractor={(item) => item.id}
+            renderItem={renderDraggableItem}
+            containerStyle={styles.container}
+            contentContainerStyle={{ paddingBottom: 110, padding: 16 }}
+          />
+        ) : (
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={{ paddingBottom: 110 }}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          >
+            <View style={styles.itemsList}>
+              {items.map(renderItemRow)}
+            </View>
+          </ScrollView>
+        )}
       </View>
     );
   };
@@ -1125,7 +1269,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, items, lowStock
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <GestureHandlerRootView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <DoodleBackground />
       {navigation.state === 'home' && renderHomeScreen()}
       {navigation.state === 'category' && renderCategoryScreen()}
@@ -1153,7 +1297,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, items, lowStock
           {snackbarMessage}
         </Snackbar>
       </Portal>
-    </View>
+    </GestureHandlerRootView>
   );
 };
 
