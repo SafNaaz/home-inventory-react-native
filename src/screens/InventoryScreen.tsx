@@ -13,12 +13,14 @@ import {
   Platform,
   UIManager,
   ActivityIndicator,
+  Modal,
+  KeyboardAvoidingView, 
 } from 'react-native';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
-import { Swipeable, GestureHandlerRootView } from 'react-native-gesture-handler';
+import { Swipeable, GestureHandlerRootView, ScrollView as GHScrollView, PanGestureHandler, State } from 'react-native-gesture-handler';
 import DraggableFlatList, { ScaleDecorator, RenderItemParams } from 'react-native-draggable-flatlist';
 import {
   Card,
@@ -841,7 +843,15 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, items, lowStock
 
   // Search Effect
   const itemsRef = useRef(inventoryItems);
+  const sheetTranslateY = useRef(new Animated.Value(0)).current;
+
   useEffect(() => { itemsRef.current = inventoryItems; }, [inventoryItems]);
+
+  useEffect(() => {
+    if (isSearchVisible) {
+      sheetTranslateY.setValue(0);
+    }
+  }, [isSearchVisible]);
 
   const filterItems = (query: string, items: InventoryItem[]) => {
     return items.filter(item => 
@@ -1273,15 +1283,15 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, items, lowStock
   const renderFloatingActionButton = () => {
     return (
       <>
-        {navigation.state !== 'home' && (
-          <FAB
-            icon="magnify"
-            style={[styles.fab, { backgroundColor: theme.colors.surface, bottom: 190, zIndex: 90 }]}
-            color={theme.colors.onSurface}
-            onPress={() => setIsSearchVisible(true)}
-            small
-          />
-        )}
+        {/* Search FAB - always visible, positioned above shopping FAB */}
+        <FAB
+          icon="magnify"
+          style={[styles.fab, { backgroundColor: theme.colors.surface, bottom: 190, zIndex: 90 }]}
+          color={theme.colors.onSurface}
+          onPress={() => setIsSearchVisible(true)}
+          small
+        />
+        {/* Shopping Cart FAB */}
         <FAB
           icon="auto-fix"
           style={[styles.fab, { backgroundColor: theme.colors.primary }]}
@@ -1348,62 +1358,127 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, items, lowStock
   );
 
 
+
   const renderSearchOverlay = () => {
-    if (!isSearchVisible) return null;
     
+    const onHandlerStateChange = (event: any) => {
+      if (event.nativeEvent.state === State.END) {
+        // If dragged down more than 60px, close
+        if (event.nativeEvent.translationY > 60) {
+          setIsSearchVisible(false);
+          setSearchQuery('');
+        }
+      }
+    };
+
     return (
-      <Portal>
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.colors.background, zIndex: 9999 }]}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', padding: 8, paddingTop: Platform.OS === 'ios' ? 48 : 8 }}>
-            <IconButton icon="arrow-left" onPress={() => { setIsSearchVisible(false); setSearchQuery(''); }} />
-            <Searchbar
-              placeholder="Search items..."
-              onChangeText={setSearchQuery}
-              value={searchQuery}
-              style={[
-                styles.searchBar, 
-                { flex: 1, backgroundColor: theme.dark ? theme.colors.elevation.level2 : '#fff' }
-              ]}
-              inputStyle={{ minHeight: 0 }} 
-              iconColor={theme.colors.onSurfaceVariant}
-              placeholderTextColor={theme.colors.onSurfaceVariant}
-              elevation={2}
-              autoFocus
-            />
-          </View>
-          
-          < View style={{flex: 1}}>
-             {isSearching ? (
-                  <View style={{ padding: 32, alignItems: 'center' }}>
-                    <ActivityIndicator size="large" color={theme.colors.primary} />
-                    <Text style={{ marginTop: 12, color: theme.colors.onSurfaceVariant }}>Searching...</Text>
+      <Modal
+        visible={isSearchVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => {
+          setIsSearchVisible(false);
+          setSearchQuery('');
+        }}
+      >
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={{ flex: 1 }}
+          >
+            <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+              {/* Backdrop */}
+              <TouchableOpacity 
+                style={StyleSheet.absoluteFill} 
+                activeOpacity={1} 
+                onPress={() => {
+                  setIsSearchVisible(false);
+                  setSearchQuery('');
+                }}
+              >
+                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }} />
+              </TouchableOpacity>
+
+              {/* Bottom Sheet */}
+              <View style={{ 
+                height: '92%', 
+                backgroundColor: theme.colors.elevation?.level1 || theme.colors.surface, 
+                borderTopLeftRadius: 28, 
+                borderTopRightRadius: 28,
+                ...commonStyles.shadow,
+                elevation: 24,
+              }}>
+                <PanGestureHandler
+                  onHandlerStateChange={onHandlerStateChange}
+                  activeOffsetY={10}
+                >
+                  <View style={{ backgroundColor: 'transparent' }}>
+                    {/* Drag Handle - Increased hit area */}
+                    <View style={{ alignItems: 'center', paddingVertical: 22, width: '100%' }}>
+                      <View style={{ width: 40, height: 5, borderRadius: 3, backgroundColor: theme.colors.onSurfaceVariant, opacity: 0.4 }} />
+                    </View>
+
+                    {/* Header */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 8 }}>
+                      <Searchbar
+                        placeholder="Search and update..."
+                        onChangeText={setSearchQuery}
+                        value={searchQuery}
+                        style={[
+                          styles.searchBar, 
+                          { flex: 1, backgroundColor: theme.dark ? theme.colors.elevation?.level3 : theme.colors.surfaceVariant }
+                        ]}
+                        inputStyle={{ minHeight: 0 }} 
+                        iconColor={theme.colors.onSurfaceVariant}
+                        placeholderTextColor={theme.colors.onSurfaceVariant}
+                        elevation={0}
+                        autoFocus
+                      />
+                      <IconButton 
+                        icon="close-circle-outline" 
+                        size={28}
+                        onPress={() => { setIsSearchVisible(false); setSearchQuery(''); }}
+                        style={{ marginLeft: 8 }}
+                      />
+                    </View>
                   </View>
-                ) : (
-                  <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }} keyboardShouldPersistTaps="handled">
-                    {searchQuery.trim() ? (
-                        <>
-                            <Text style={{ marginVertical: 8, marginLeft: 4, color: theme.colors.onSurfaceVariant }}>
-                               Found {searchResults.length} items
-                            </Text>
-                            {searchResults.map(renderItemRow)}
-                            {searchResults.length === 0 && (
-                              <View style={{ alignItems: 'center', marginTop: 32 }}>
-                                <Icon name="magnify-remove-outline" size={48} color={theme.colors.onSurfaceVariant} />
-                                <Text style={{ marginTop: 8, color: theme.colors.onSurfaceVariant }}>No items found</Text>
-                              </View>
-                            )}
-                        </>
+                </PanGestureHandler>
+              
+              <View style={{flex: 1}}>
+                {isSearching ? (
+                      <View style={{ padding: 32, alignItems: 'center' }}>
+                        <ActivityIndicator size="large" color={theme.colors.primary} />
+                        <Text style={{ marginTop: 12, color: theme.colors.onSurfaceVariant }}>Searching...</Text>
+                      </View>
                     ) : (
-                         <View style={{ alignItems: 'center', marginTop: 32, opacity: 0.5 }}>
-                            <Icon name="keyboard-outline" size={48} color={theme.colors.onSurfaceVariant} />
-                            <Text style={{ marginTop: 8, color: theme.colors.onSurfaceVariant }}>Type to search...</Text>
-                          </View>
+                      <GHScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }} keyboardShouldPersistTaps="handled">
+                        {searchQuery.trim() ? (
+                            <>
+                                <Text style={{ marginVertical: 8, marginLeft: 4, color: theme.colors.onSurfaceVariant }}>
+                                  Found {searchResults.length} items
+                                </Text>
+                                {searchResults.map(renderItemRow)}
+                                {searchResults.length === 0 && (
+                                  <View style={{ alignItems: 'center', marginTop: 32 }}>
+                                    <Icon name="magnify-remove-outline" size={48} color={theme.colors.onSurfaceVariant} />
+                                    <Text style={{ marginTop: 8, color: theme.colors.onSurfaceVariant }}>No items found</Text>
+                                  </View>
+                                )}
+                            </>
+                        ) : (
+                            <View style={{ alignItems: 'center', marginTop: 32, opacity: 0.5 }}>
+                                <Icon name="keyboard-outline" size={48} color={theme.colors.onSurfaceVariant} />
+                                <Text style={{ marginTop: 8, color: theme.colors.onSurfaceVariant }}>Type to search...</Text>
+                              </View>
+                        )}
+                      </GHScrollView>
                     )}
-                  </ScrollView>
-                )}
+              </View>
+            </View>
           </View>
-        </View>
-      </Portal>
+        </KeyboardAvoidingView>
+      </GestureHandlerRootView>
+    </Modal>
     );
   };
 
