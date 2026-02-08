@@ -14,7 +14,9 @@ import {
   UIManager,
   ActivityIndicator,
   Modal,
-  KeyboardAvoidingView, 
+  KeyboardAvoidingView,
+  Keyboard,
+  InteractionManager,
 } from 'react-native';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -423,6 +425,7 @@ const InventoryScreen: React.FC = () => {
         // Go back to category view
         setNavigation({ state: 'category', category: navigation.category });
         setIsReordering(false);
+        setShowIgnoredOnly(false); // Reset ignored filter when going back
         return true; // Prevent default behavior (closing app)
       } else if (navigation.state === 'category') {
         // Go back to home view
@@ -682,7 +685,9 @@ const InventoryScreen: React.FC = () => {
   const renderCategoryCard = useCallback((category: InventoryCategory) => {
     const config = CATEGORY_CONFIG[category];
     const subcategories = inventoryManager.getSubcategoriesForCategory(category);
-    const itemsCount = inventoryManager.getItemsForCategory(category).length;
+    const allCategoryItems = inventoryManager.getItemsForCategory(category);
+    const itemsCount = allCategoryItems.length;
+    const lowStockCount = allCategoryItems.filter(it => it.quantity <= 0.25).length;
 
     return (
       <Card
@@ -708,12 +713,20 @@ const InventoryScreen: React.FC = () => {
               {itemsCount} items total
             </Text>
           </View>
+          {lowStockCount > 0 && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
+              <Icon name="alert-circle" size={16} color={theme.colors.error} />
+              <Text style={{ marginLeft: 4, fontSize: 12, color: theme.colors.error, fontWeight: '600' }}>
+                {lowStockCount} need restock
+              </Text>
+            </View>
+          )}
         </Card.Content>
       </Card>
     );
   }, [cardWidth, theme]);
 
-const SubcategoryRow = React.memo(({ subName, navigation, theme, items, lowStockCount, config, onDelete, onEdit, setNavigationFluid }: any) => {
+const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hiddenCount, lowStockCount, config, onDelete, onEdit, setNavigationFluid }: any) => {
   const swipeableRef = useRef<Swipeable>(null);
 
   const closeSwipeable = () => {
@@ -784,7 +797,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, items, lowStock
               {subName}
             </Title>
             <Text style={[styles.subcategoryStats, { color: theme.colors.onSurfaceVariant }]}>
-              {items.length} items
+              {activeCount} active{hiddenCount > 0 ? `, ${hiddenCount} hidden` : ''}
             </Text>
             {lowStockCount > 0 && (
               <Text style={[styles.subcategoryStats, { color: theme.colors.error, fontWeight: '600' }]}>
@@ -844,12 +857,28 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, items, lowStock
   // Search Effect
   const itemsRef = useRef(inventoryItems);
   const sheetTranslateY = useRef(new Animated.Value(0)).current;
+  const searchInputRef = useRef<TextInput>(null);
 
   useEffect(() => { itemsRef.current = inventoryItems; }, [inventoryItems]);
 
   useEffect(() => {
     if (isSearchVisible) {
       sheetTranslateY.setValue(0);
+      // Use InteractionManager to wait for modal animation to complete
+      const handle = InteractionManager.runAfterInteractions(() => {
+        // Try multiple times with increasing delays
+        const focusInput = () => {
+          if (searchInputRef.current) {
+            searchInputRef.current.focus();
+          }
+        };
+        
+        focusInput();
+        setTimeout(focusInput, 100);
+        setTimeout(focusInput, 300);
+        setTimeout(focusInput, 500);
+      });
+      return () => handle.cancel();
     }
   }, [isSearchVisible]);
 
@@ -1017,8 +1046,11 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, items, lowStock
           >
             <View style={styles.subcategoriesList}>
               {subcategories.map(subName => {
+                const allSubItems = inventoryItems.filter(item => item.subcategory === subName);
+                const activeCount = allSubItems.filter(it => !it.isIgnored).length;
+                const hiddenCount = allSubItems.filter(it => it.isIgnored).length;
                 const items = getItemsForSubcategory(subName as InventorySubcategory);
-                const lowStockCount = items.filter(it => it.quantity <= 0.25).length;
+                const lowStockCount = allSubItems.filter(it => it.quantity <= 0.25).length;
                 const config = inventoryManager.getSubcategoryConfig(subName as InventorySubcategory);
                 return (
                   <SubcategoryRow
@@ -1027,6 +1059,8 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, items, lowStock
                     navigation={navigation}
                     theme={theme}
                     items={items}
+                    activeCount={activeCount}
+                    hiddenCount={hiddenCount}
                     lowStockCount={lowStockCount}
                     config={config}
                     onDelete={setSubToDeleteId}
@@ -1100,7 +1134,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, items, lowStock
             size={24}
             onPress={() => {
               setNavigation({ state: 'category', category: navigation.category });
-              setShowIgnoredOnly(false);
+              setShowIgnoredOnly(false); // Reset ignored filter when going back
             }}
           />
           <Title style={[styles.headerTitle, { color: theme.colors.onSurface }]}>
@@ -1421,6 +1455,8 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, items, lowStock
                     {/* Header */}
                     <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 8 }}>
                       <Searchbar
+                        key={isSearchVisible ? 'search-active' : 'search-inactive'}
+                        ref={searchInputRef}
                         placeholder="Search and update..."
                         onChangeText={setSearchQuery}
                         value={searchQuery}
@@ -1432,7 +1468,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, items, lowStock
                         iconColor={theme.colors.onSurfaceVariant}
                         placeholderTextColor={theme.colors.onSurfaceVariant}
                         elevation={0}
-                        autoFocus
+                        autoFocus={true}
                       />
                       <IconButton 
                         icon="close-circle-outline" 
