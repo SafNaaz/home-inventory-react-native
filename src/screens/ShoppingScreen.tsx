@@ -32,7 +32,8 @@ import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 
 import { inventoryManager } from '../managers/InventoryManager';
 import { settingsManager } from '../managers/SettingsManager';
-import { ShoppingListItem, ShoppingState, InventoryItem } from '../models/Types';
+import { ShoppingListItem, ShoppingState, InventoryItem, InventoryCategory } from '../models/Types';
+import { getCategoryConfig, getSubcategoryConfig } from '../constants/CategoryConfig';
 import { commonStyles } from '../themes/AppTheme';
 import DoodleBackground from '../components/DoodleBackground';
 
@@ -198,31 +199,57 @@ const ShoppingScreen: React.FC = () => {
   const getCheckedItems = () => shoppingList.filter(item => item.isChecked);
   const getUncheckedItems = () => shoppingList.filter(item => !item.isChecked);
 
+  // Helper to get item details efficiently
+  const getItemDetails = (item: ShoppingListItem) => {
+    if (item.isTemporary || !item.inventoryItemId) {
+      return { category: 'Misc', subConfig: null, categoryConfig: null };
+    }
+    const invItem = inventoryManager.getInventoryItems().find(i => i.id === item.inventoryItemId);
+    if (!invItem) return { category: 'Misc', subConfig: null, categoryConfig: null }; // Fallback
+
+    const subConfig = inventoryManager.getSubcategoryConfig(invItem.subcategory);
+    const category = subConfig ? subConfig.category : 'Misc';
+    const categoryConfig = category !== 'Misc' ? getCategoryConfig(category as InventoryCategory) : null;
+    
+    return { category, subConfig, categoryConfig };
+  };
+
   const renderShoppingListItem = (item: ShoppingListItem) => {
     const canToggle = shoppingState === ShoppingState.SHOPPING;
     const canRemove = shoppingState === ShoppingState.GENERATING;
+    const { subConfig } = getItemDetails(item);
 
     return (
       <List.Item
         key={item.id}
         title={item.name}
-        description={item.isTemporary ? 'Misc Item' : 'Inventory Item'}
-        left={() => canToggle ? (
-          <Checkbox
-            status={item.isChecked ? 'checked' : 'unchecked'}
-            onPress={() => canToggle && handleToggleItem(item)}
-          />
-        ) : (
-          <List.Icon icon={item.isTemporary ? "tag-outline" : "package-variant-closed"} />
+        description={item.isTemporary ? 'Misc Item' : undefined}
+        left={() => (
+            <View style={{ flexDirection: 'row', alignItems: 'center', minWidth: 24 }}>
+                {canToggle ? (
+                   <Checkbox
+                     status={item.isChecked ? 'checked' : 'unchecked'}
+                     onPress={() => canToggle && handleToggleItem(item)}
+                   />
+                ) : null}
+                {/* Always show icon if not temporary (or minimal icon for temp) */}
+                <View style={{ marginLeft: canToggle ? 0 : 8, width: 32, alignItems: 'center', justifyContent: 'center' }}>
+                     <Icon 
+                        name={(subConfig ? subConfig.icon : (item.isTemporary ? "tag-outline" : "package-variant")) as any} 
+                        size={20} 
+                        color={subConfig ? subConfig.color : theme.colors.onSurfaceVariant}
+                     />
+                </View>
+            </View>
         )}
         right={() => (
-          canRemove ? (
-            <IconButton
-              icon="close"
-              size={20}
-              onPress={() => handleRemoveItem(item)}
-            />
-          ) : null
+            canRemove ? (
+                <IconButton
+                  icon="close"
+                  size={20}
+                  onPress={() => handleRemoveItem(item)}
+                />
+              ) : null
         )}
         onPress={() => canToggle && handleToggleItem(item)}
         style={[
@@ -240,6 +267,56 @@ const ShoppingScreen: React.FC = () => {
         ]}
       />
     );
+  };
+
+  const renderGroupedItems = (items: ShoppingListItem[]) => {
+      // Group items
+      const groups: Record<string, ShoppingListItem[]> = {};
+      const categories: string[] = []; // To keep order
+
+      items.forEach(item => {
+          const { category } = getItemDetails(item);
+          const catKey = category.toString();
+          if (!groups[catKey]) {
+              groups[catKey] = [];
+              categories.push(catKey);
+          }
+          groups[catKey].push(item);
+      });
+
+      // Sort categories: defined ones first, then Misc
+      categories.sort((a, b) => {
+          if (a === 'Misc') return 1;
+          if (b === 'Misc') return -1;
+          return a.localeCompare(b);
+      });
+
+      return (
+          <View>
+              {categories.map(catKey => {
+                  const categoryItems = groups[catKey];
+                  const isMisc = catKey === 'Misc';
+                  const config = !isMisc ? getCategoryConfig(catKey as InventoryCategory) : null;
+                  
+                  return (
+                      <View key={catKey} style={styles.categoryGroup}>
+                          <View style={styles.categoryHeader}>
+                              <Icon 
+                                name={(config ? config.icon : 'tag-multiple') as any} 
+                                size={20} 
+                                color={config ? config.color : theme.colors.secondary} 
+                                style={{ marginRight: 8 }}
+                              />
+                              <Text style={[styles.categoryTitle, { color: config ? config.color : theme.colors.secondary }]}>
+                                  {isMisc ? 'Miscellaneous' : catKey.charAt(0).toUpperCase() + catKey.slice(1).toLowerCase().replace('_', ' ')}
+                              </Text>
+                          </View>
+                          {categoryItems.map(renderShoppingListItem)}
+                      </View>
+                  );
+              })}
+          </View>
+      );
   };
 
   const renderEmptyState = () => (
@@ -290,7 +367,7 @@ const ShoppingScreen: React.FC = () => {
           <Card style={styles.listCard}>
             <Card.Content>
               <Title>Shopping List ({shoppingList.length} items)</Title>
-              {shoppingList.map(renderShoppingListItem)}
+              {renderGroupedItems(shoppingList)}
             </Card.Content>
           </Card>
         ) : (
@@ -359,7 +436,7 @@ const ShoppingScreen: React.FC = () => {
         <Card style={styles.listCard}>
           <Card.Content>
             <Title>Shopping List ({shoppingList.length} items)</Title>
-            {shoppingList.map(renderShoppingListItem)}
+            {renderGroupedItems(shoppingList)}
           </Card.Content>
         </Card>
       </ScrollView>
@@ -414,7 +491,7 @@ const ShoppingScreen: React.FC = () => {
             <Card style={styles.listCard}>
               <Card.Content>
                 <Title>To Buy ({uncheckedItems.length} items)</Title>
-                {uncheckedItems.map(renderShoppingListItem)}
+                {renderGroupedItems(uncheckedItems)}
               </Card.Content>
             </Card>
           )}
@@ -423,7 +500,7 @@ const ShoppingScreen: React.FC = () => {
             <Card style={styles.listCard}>
               <Card.Content>
                 <Title>In Cart ({checkedItems.length} items)</Title>
-                {checkedItems.map(renderShoppingListItem)}
+                {renderGroupedItems(checkedItems)}
               </Card.Content>
             </Card>
           )}
@@ -712,9 +789,9 @@ const styles = StyleSheet.create({
     ...commonStyles.shadow,
   },
   listItem: {
-    paddingVertical: 8,
-    borderRadius: 16,
-    marginVertical: 2,
+    paddingVertical: 0,
+    borderRadius: 8,
+    marginVertical: 0,
   },
   // removed checkedItem and checkedText as we handle them inline for theme support
   actionButtons: {
@@ -746,7 +823,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     margin: 20,
     right: 0,
-    bottom: 150, // Above tab bar and action buttons
+    bottom: 200, // Above tab bar and action buttons
     borderRadius: 28,
   },
   emptyState: {
@@ -792,6 +869,21 @@ const styles = StyleSheet.create({
     marginRight: 8,
     borderRadius: 12,
     borderWidth: 1,
+  },
+  categoryGroup: {
+      marginBottom: 0,
+  },
+  categoryHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 8,
+      paddingVertical: 8,
+      marginTop: 8,
+  },
+  categoryTitle: {
+      fontSize: 14,
+      fontWeight: '700',
+      letterSpacing: 0.5,
   },
 });
 
