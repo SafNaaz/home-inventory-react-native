@@ -32,6 +32,7 @@ import {
   TextInput,
   ProgressBar,
   Snackbar,
+  Checkbox,
 } from 'react-native-paper';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { settingsManager } from '../managers/SettingsManager';
@@ -212,9 +213,10 @@ interface ItemRowProps {
   onUpdate: (item: InventoryItem, q: number) => void;
   onDelete: (item: InventoryItem) => void;
   onEdit: (item: InventoryItem) => void;
+  onToggleIgnore: (item: InventoryItem) => void;
 }
 
-const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, onUpdate, onDelete, onEdit }: ItemRowProps) => {
+const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, onUpdate, onDelete, onEdit, onToggleIgnore }: ItemRowProps) => {
   const stockColor = getStockColor(item.quantity, theme.dark);
 
   const swipeableRef = useRef<Swipeable>(null);
@@ -295,9 +297,26 @@ const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, on
       <Card style={styles.itemCard}>
         <Card.Content style={styles.compactItemContent}>
           <View style={styles.itemHeaderCompact}>
-            <Text style={[styles.itemTitle, { color: theme.colors.onSurface }]}>
-              {item.name}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
+              <Checkbox.Android
+                status={item.isIgnored ? 'checked' : 'unchecked'}
+                onPress={() => onToggleIgnore(item)}
+                color={theme.colors.error}
+              />
+              <Text 
+                style={[
+                  styles.itemTitle, 
+                  { 
+                    color: theme.colors.onSurface,
+                    textDecorationLine: item.isIgnored ? 'line-through' : 'none',
+                    opacity: item.isIgnored ? 0.5 : 1
+                  }
+                ]}
+                numberOfLines={2}
+              >
+                {item.name}
+              </Text>
+            </View>
             <Text style={[styles.itemPercentage, { color: stockColor }]}>
               {Math.round(item.quantity * 100)}%
             </Text>
@@ -350,6 +369,7 @@ const InventoryScreen: React.FC = () => {
   const pendingUpdatesRef = useRef<Record<string, number>>({});
   const [refreshing, setRefreshing] = useState(false);
   const [navigation, setNavigation] = useState<NavigationContext>({ state: 'home' });
+  const [showIgnoredOnly, setShowIgnoredOnly] = useState(false);
   const [showingAddDialog, setShowingAddDialog] = useState(false);
   const [newItemName, setNewItemName] = useState('');
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
@@ -516,8 +536,21 @@ const InventoryScreen: React.FC = () => {
   };
 
   const getItemsForSubcategory = (subcategory: InventorySubcategory): InventoryItem[] => {
-    return inventoryItems.filter(item => item.subcategory === subcategory);
+    const subItems = inventoryItems.filter(item => item.subcategory === subcategory);
+    if (showIgnoredOnly) {
+      return subItems.filter(item => item.isIgnored);
+    }
+    return subItems.filter(item => !item.isIgnored);
   };
+
+  const handleToggleIgnore = useCallback(async (item: InventoryItem) => {
+    try {
+      await inventoryManager.toggleItemIgnore(item.id);
+    } catch (err: any) {
+      setSnackbarMessage(err.message);
+      setSnackbarVisible(true);
+    }
+  }, []);
 
   const handleQuantityUpdate = useCallback(async (item: InventoryItem, newQuantity: number) => {
     pendingUpdatesRef.current[item.id] = newQuantity;
@@ -777,6 +810,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, items, lowStock
         onUpdate={handleQuantityUpdate}
         onDelete={confirmDelete}
         onEdit={confirmEdit}
+        onToggleIgnore={handleToggleIgnore}
       />
     );
   };
@@ -865,16 +899,27 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, items, lowStock
           <IconButton
             icon="arrow-left"
             size={24}
-            onPress={() => setNavigation({ state: 'category', category: navigation.category })}
+            onPress={() => {
+              setNavigation({ state: 'category', category: navigation.category });
+              setShowIgnoredOnly(false);
+            }}
           />
           <Title style={[styles.headerTitle, { color: theme.colors.onSurface }]}>
             {navigation.subcategory}
           </Title>
-          <IconButton
-            icon="plus"
-            size={24}
-            onPress={() => setShowingAddDialog(true)}
-          />
+          <View style={{ flexDirection: 'row' }}>
+            <IconButton
+              icon={showIgnoredOnly ? "eye-off" : "eye-off-outline"}
+              size={24}
+              iconColor={showIgnoredOnly ? theme.colors.error : theme.colors.onSurfaceVariant}
+              onPress={() => setShowIgnoredOnly(!showIgnoredOnly)}
+            />
+            <IconButton
+              icon="plus"
+              size={24}
+              onPress={() => setShowingAddDialog(true)}
+            />
+          </View>
         </View>
         <ScrollView
           style={styles.scrollView}

@@ -233,6 +233,21 @@ export class InventoryManager {
     this.notifyListeners();
   }
 
+  async toggleItemIgnore(itemId: string): Promise<void> {
+    const item = this.inventoryItems.find(item => item.id === itemId);
+    if (!item) {
+      console.error(`❌ Item not found: ${itemId}`);
+      return;
+    }
+
+    item.isIgnored = !item.isIgnored;
+    item.lastUpdated = new Date();
+
+    await StorageService.saveInventoryItems(this.inventoryItems);
+    console.log(`🔄 Toggled ignore status for ${item.name}: ${item.isIgnored}`);
+    this.notifyListeners();
+  }
+
   async updateItemName(itemId: string, newName: string): Promise<void> {
     const item = this.inventoryItems.find(item => item.id === itemId);
     if (!item) {
@@ -406,7 +421,7 @@ export class InventoryManager {
     
     // Add items that need attention (≤25%) - sorted by urgency
     const attentionItems = this.inventoryItems
-      .filter(item => item.quantity <= 0.25)
+      .filter(item => item.quantity <= 0.25 && !item.isIgnored)
       .sort((a, b) => a.quantity - b.quantity);
     
     console.log(`⚠️ Found ${attentionItems.length} items needing attention`);
