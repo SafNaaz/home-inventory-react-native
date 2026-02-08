@@ -32,7 +32,7 @@ import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 
 import { inventoryManager } from '../managers/InventoryManager';
 import { settingsManager } from '../managers/SettingsManager';
-import { ShoppingListItem, ShoppingState } from '../models/Types';
+import { ShoppingListItem, ShoppingState, InventoryItem } from '../models/Types';
 import { commonStyles } from '../themes/AppTheme';
 import DoodleBackground from '../components/DoodleBackground';
 
@@ -51,6 +51,9 @@ const ShoppingScreen: React.FC = () => {
   const [emptyListAlertVisible, setEmptyListAlertVisible] = useState(false);
   const [invalidInputAlertVisible, setInvalidInputAlertVisible] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [ignoredItemsDialogVisible, setIgnoredItemsDialogVisible] = useState(false);
+  const [ignoredItems, setIgnoredItems] = useState<InventoryItem[]>([]);
+  const [selectedIgnoredIds, setSelectedIgnoredIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     // Load initial data
@@ -142,6 +145,41 @@ const ShoppingScreen: React.FC = () => {
     setNewItemName(suggestion);
   };
 
+  const handleOpenIgnoredItemsDialog = () => {
+    const ignored = inventoryManager.getIgnoredItems();
+    // Filter out items already in the shopping list
+    const availableIgnored = ignored.filter(item => 
+      !shoppingList.some(sl => sl.inventoryItemId === item.id)
+    );
+    
+    setIgnoredItems(availableIgnored);
+    setSelectedIgnoredIds(new Set()); // Start with none selected
+    setIgnoredItemsDialogVisible(true);
+  };
+
+  const toggleIgnoredItemSelection = (id: string) => {
+    const newSet = new Set(selectedIgnoredIds);
+    if (newSet.has(id)) {
+      newSet.delete(id);
+    } else {
+      newSet.add(id);
+    }
+    setSelectedIgnoredIds(newSet);
+  };
+
+  const handleAddSelectedIgnoredItems = async () => {
+    if (selectedIgnoredIds.size === 0) return;
+    
+    await inventoryManager.addIgnoredItemsToShoppingList(Array.from(selectedIgnoredIds));
+    setIgnoredItemsDialogVisible(false);
+    
+    // If we were empty, we are now generating.
+    // The listener will update the state, but we can also force a refresh if needed.
+    // InventoryManager.addIgnoredItemsToShoppingList handles state update to GENERATING if it was EMPTY.
+    // However, if we are in empty state, we might need to handle the transition UX if not auto-handled.
+    // The listener loadShoppingData should handle it.
+  };
+
   const getStateDescription = (): string => {
     switch (shoppingState) {
       case ShoppingState.EMPTY:
@@ -214,6 +252,14 @@ const ShoppingScreen: React.FC = () => {
       >
         Generate Shopping List
       </Button>
+      <Button
+        mode="text"
+        onPress={handleOpenIgnoredItemsDialog}
+        style={{ marginTop: 16 }}
+        textColor={theme.colors.secondary}
+      >
+        Add Ignored Items
+      </Button>
     </View>
   );
 
@@ -249,6 +295,14 @@ const ShoppingScreen: React.FC = () => {
       </ScrollView>
 
       <View style={styles.actionButtons}>
+        <Button
+          mode="text"
+          onPress={handleOpenIgnoredItemsDialog}
+          style={styles.actionButton}
+          textColor={theme.colors.secondary}
+        >
+          Add Ignored
+        </Button>
         <Button
           mode="outlined"
           onPress={handleCancelShopping}
@@ -381,6 +435,14 @@ const ShoppingScreen: React.FC = () => {
             Complete Shopping
           </Button>
         </View>
+        <Button
+          mode="text"
+          onPress={handleOpenIgnoredItemsDialog}
+          style={{ marginBottom: 16, marginHorizontal: 16 }}
+          textColor={theme.colors.secondary}
+        >
+          Add Ignored Items
+        </Button>
       </View>
     );
   };
@@ -439,8 +501,43 @@ const ShoppingScreen: React.FC = () => {
     </Portal>
   );
 
+  const renderIgnoredItemsDialog = () => (
+    <Portal>
+      <Dialog visible={ignoredItemsDialogVisible} onDismiss={() => setIgnoredItemsDialogVisible(false)} style={{ maxHeight: '80%' }}>
+        <Dialog.Title>Add Ignored Items</Dialog.Title>
+        <Dialog.Content>
+          {ignoredItems.length > 0 ? (
+             <ScrollView style={{ maxHeight: 300 }}>
+             {ignoredItems.map(item => (
+               <List.Item
+                 key={item.id}
+                 title={item.name}
+                 description={`${Math.round(item.quantity * 100)}% stock`}
+                 left={() => (
+                   <Checkbox
+                     status={selectedIgnoredIds.has(item.id) ? 'checked' : 'unchecked'}
+                     onPress={() => toggleIgnoredItemSelection(item.id)}
+                   />
+                 )}
+                 onPress={() => toggleIgnoredItemSelection(item.id)}
+               />
+             ))}
+           </ScrollView>
+          ) : (
+            <Text style={{ color: theme.colors.onSurfaceVariant }}>No ignored items available to add.</Text>
+          )}
+        </Dialog.Content>
+        <Dialog.Actions>
+          <Button onPress={() => setIgnoredItemsDialogVisible(false)}>Cancel</Button>
+          <Button onPress={handleAddSelectedIgnoredItems} disabled={selectedIgnoredIds.size === 0}>Add Selected</Button>
+        </Dialog.Actions>
+      </Dialog>
+    </Portal>
+  );
+
   const renderConfirmDialogs = () => (
     <Portal>
+      {renderIgnoredItemsDialog()}
       {/* Complete Shopping Dialog */}
       <Dialog visible={completeConfirmVisible} onDismiss={() => setCompleteConfirmVisible(false)}>
         <Dialog.Title>Complete Shopping</Dialog.Title>

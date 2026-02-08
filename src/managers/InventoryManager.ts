@@ -627,6 +627,49 @@ export class InventoryManager {
       .sort((a, b) => a.quantity - b.quantity);
   }
 
+  getIgnoredItems(): InventoryItem[] {
+    return this.inventoryItems.filter(item => item.isIgnored);
+  }
+
+  async addIgnoredItemsToShoppingList(itemIds: string[]): Promise<void> {
+    if (this.shoppingState === ShoppingState.EMPTY) {
+        // If empty, start a new list first
+        this.shoppingList = [];
+        this.shoppingState = ShoppingState.GENERATING;
+    }
+
+    let addedCount = 0;
+    
+    for (const itemId of itemIds) {
+      const item = this.inventoryItems.find(i => i.id === itemId);
+      if (!item) continue;
+      
+      // Check if already in shopping list
+      const existing = this.shoppingList.find(sl => sl.inventoryItemId === itemId);
+      if (existing) continue;
+
+      const shoppingItem: ShoppingListItem = {
+        id: uuidv4(),
+        name: item.name,
+        isChecked: false, // Default to unchecked so they are "to buy"
+        isTemporary: false,
+        inventoryItemId: item.id,
+      };
+      
+      this.shoppingList.push(shoppingItem);
+      addedCount++;
+      console.log(`➕ Added ignored item to shopping list: ${item.name}`);
+    }
+
+    if (addedCount > 0) {
+        await Promise.all([
+            StorageService.saveShoppingList(this.shoppingList),
+            StorageService.saveShoppingState(this.shoppingState),
+        ]);
+        this.notifyListeners();
+    }
+  }
+
   getActiveCategoriesCount(): number {
     const activeCategories = new Set(
       this.inventoryItems.map(item => this.getSubcategoryConfigInternal(item.subcategory)?.category)
