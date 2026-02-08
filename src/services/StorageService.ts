@@ -201,7 +201,7 @@ export class StorageService {
     const evening = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 18, 0);
 
     return {
-      isDarkMode: false,
+      themeMode: 'system',
       isSecurityEnabled: false,
       isAuthenticated: false,
       isInventoryReminderEnabled: false,
@@ -215,6 +215,8 @@ export class StorageService {
         ['Hygiene']: 15,
         ['Personal Care']: 30,
       } as any,
+      isHealthAlertsEnabled: false,
+      securityLockTimeout: 0,
     };
   }
 

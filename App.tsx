@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { NavigationContainer, DefaultTheme as NavDefaultTheme, DarkTheme as NavDarkTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Provider as PaperProvider, IconButton, Title, Paragraph, Button } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { StatusBar, Alert, View, StyleSheet, AppState } from 'react-native';
@@ -306,6 +307,7 @@ const App: React.FC = () => {
   };
 
   return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
     <PaperProvider theme={theme}>
       <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
         <StatusBar
@@ -373,6 +375,7 @@ const App: React.FC = () => {
         </NavigationContainer>
       </View>
     </PaperProvider>
+    </GestureHandlerRootView>
   );
 };
 

@@ -12,6 +12,7 @@ import {
   LayoutAnimation,
   Platform,
   UIManager,
+  ActivityIndicator,
 } from 'react-native';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -34,6 +35,7 @@ import {
   ProgressBar,
   Snackbar,
   Checkbox,
+  Searchbar,
 } from 'react-native-paper';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { settingsManager } from '../managers/SettingsManager';
@@ -388,6 +390,10 @@ const InventoryScreen: React.FC = () => {
   const [newSubIcon, setNewSubIcon] = useState('');
   const [subToDeleteId, setSubToDeleteId] = useState<string | null>(null);
   const [isReordering, setIsReordering] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<InventoryItem[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [isSearchVisible, setIsSearchVisible] = useState(false);
 
   useEffect(() => {
     loadInventoryData();
@@ -402,6 +408,11 @@ const InventoryScreen: React.FC = () => {
 
     // Handle Android back button
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (isSearchVisible) {
+        setIsSearchVisible(false);
+        setSearchQuery('');
+        return true;
+      }
       if (isReordering) {
         setIsReordering(false);
         return true;
@@ -828,23 +839,80 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, items, lowStock
     );
   };
 
-  const renderHomeScreen = () => (
-    <ScrollView
-      style={styles.scrollView}
-      contentContainerStyle={{ paddingBottom: 110 }}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-    >
-      {renderStatsHeader()}
-      <View style={styles.categoriesGrid}>
-        <View style={styles.categoryRow}>
-          {getAllCategories().slice(0, 2).map(renderCategoryCard)}
+  // Search Effect
+  const itemsRef = useRef(inventoryItems);
+  useEffect(() => { itemsRef.current = inventoryItems; }, [inventoryItems]);
+
+  const filterItems = (query: string, items: InventoryItem[]) => {
+    return items.filter(item => 
+      item.name.toLowerCase().includes(query.toLowerCase()) || 
+      (item.isIgnored && item.name.toLowerCase().includes(query.toLowerCase()))
+    );
+  };
+
+  // Debounced search on query change
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+    const timer = setTimeout(() => {
+      // Use ref to get latest items to avoid stale closures if data updates during debounce
+      setSearchResults(filterItems(searchQuery, itemsRef.current));
+      setIsSearching(false);
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]); 
+
+  // Immediate update on data change (silent, no loader)
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      setSearchResults(filterItems(searchQuery, inventoryItems));
+    }
+  }, [inventoryItems]); // Removed searchQuery from deps to prevent re-run on typing (already handled above)
+
+
+  const renderHomeScreen = () => {
+    return (
+      <View style={{ flex: 1 }}>
+        <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8 }}>
+          <TouchableOpacity activeOpacity={0.9} onPress={() => setIsSearchVisible(true)}>
+             <View pointerEvents="none">
+                <Searchbar
+                  placeholder="Search items..."
+                  value=""
+                  style={[styles.searchBar, { backgroundColor: theme.dark ? theme.colors.elevation.level2 : '#fff' }]}
+                  iconColor={theme.colors.onSurfaceVariant}
+                  placeholderTextColor={theme.colors.onSurfaceVariant}
+                  elevation={2}
+                />
+             </View>
+          </TouchableOpacity>
         </View>
-        <View style={styles.categoryRow}>
-          {getAllCategories().slice(2, 4).map(renderCategoryCard)}
-        </View>
+        
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={{ paddingBottom: 110 }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          keyboardShouldPersistTaps="handled"
+        >
+          {renderStatsHeader()}
+          <View style={styles.categoriesGrid}>
+            <View style={styles.categoryRow}>
+              {getAllCategories().slice(0, 2).map(renderCategoryCard)}
+            </View>
+            <View style={styles.categoryRow}>
+              {getAllCategories().slice(2, 4).map(renderCategoryCard)}
+            </View>
+          </View>
+        </ScrollView>
       </View>
-    </ScrollView>
-  );
+    );
+  };
 
   const renderCategoryScreen = () => {
     if (!navigation.category) return null;
@@ -1204,12 +1272,23 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, items, lowStock
 
   const renderFloatingActionButton = () => {
     return (
-      <FAB
-        icon="auto-fix"
-        style={[styles.fab, { backgroundColor: theme.colors.primary }]}
-        color={theme.dark ? '#000' : '#fff'}
-        onPress={handleStartShopping}
-      />
+      <>
+        {navigation.state !== 'home' && (
+          <FAB
+            icon="magnify"
+            style={[styles.fab, { backgroundColor: theme.colors.surface, bottom: 190, zIndex: 90 }]}
+            color={theme.colors.onSurface}
+            onPress={() => setIsSearchVisible(true)}
+            small
+          />
+        )}
+        <FAB
+          icon="auto-fix"
+          style={[styles.fab, { backgroundColor: theme.colors.primary }]}
+          color={theme.dark ? '#000' : '#fff'}
+          onPress={handleStartShopping}
+        />
+      </>
     );
   };
   const renderSubAddDialog = () => (
@@ -1268,12 +1347,74 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, items, lowStock
     </Portal>
   );
 
+
+  const renderSearchOverlay = () => {
+    if (!isSearchVisible) return null;
+    
+    return (
+      <Portal>
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.colors.background, zIndex: 9999 }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', padding: 8, paddingTop: Platform.OS === 'ios' ? 48 : 8 }}>
+            <IconButton icon="arrow-left" onPress={() => { setIsSearchVisible(false); setSearchQuery(''); }} />
+            <Searchbar
+              placeholder="Search items..."
+              onChangeText={setSearchQuery}
+              value={searchQuery}
+              style={[
+                styles.searchBar, 
+                { flex: 1, backgroundColor: theme.dark ? theme.colors.elevation.level2 : '#fff' }
+              ]}
+              inputStyle={{ minHeight: 0 }} 
+              iconColor={theme.colors.onSurfaceVariant}
+              placeholderTextColor={theme.colors.onSurfaceVariant}
+              elevation={2}
+              autoFocus
+            />
+          </View>
+          
+          < View style={{flex: 1}}>
+             {isSearching ? (
+                  <View style={{ padding: 32, alignItems: 'center' }}>
+                    <ActivityIndicator size="large" color={theme.colors.primary} />
+                    <Text style={{ marginTop: 12, color: theme.colors.onSurfaceVariant }}>Searching...</Text>
+                  </View>
+                ) : (
+                  <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }} keyboardShouldPersistTaps="handled">
+                    {searchQuery.trim() ? (
+                        <>
+                            <Text style={{ marginVertical: 8, marginLeft: 4, color: theme.colors.onSurfaceVariant }}>
+                               Found {searchResults.length} items
+                            </Text>
+                            {searchResults.map(renderItemRow)}
+                            {searchResults.length === 0 && (
+                              <View style={{ alignItems: 'center', marginTop: 32 }}>
+                                <Icon name="magnify-remove-outline" size={48} color={theme.colors.onSurfaceVariant} />
+                                <Text style={{ marginTop: 8, color: theme.colors.onSurfaceVariant }}>No items found</Text>
+                              </View>
+                            )}
+                        </>
+                    ) : (
+                         <View style={{ alignItems: 'center', marginTop: 32, opacity: 0.5 }}>
+                            <Icon name="keyboard-outline" size={48} color={theme.colors.onSurfaceVariant} />
+                            <Text style={{ marginTop: 8, color: theme.colors.onSurfaceVariant }}>Type to search...</Text>
+                          </View>
+                    )}
+                  </ScrollView>
+                )}
+          </View>
+        </View>
+      </Portal>
+    );
+  };
+
   return (
     <GestureHandlerRootView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <DoodleBackground />
       {navigation.state === 'home' && renderHomeScreen()}
       {navigation.state === 'category' && renderCategoryScreen()}
       {navigation.state === 'subcategory' && renderSubcategoryScreen()}
+
+      {renderSearchOverlay()}
 
       {renderFloatingActionButton()}
       {renderAddItemDialog()}
@@ -1583,6 +1724,11 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 120,
     borderRadius: 28,
+  },
+  searchBar: {
+    borderRadius: 16,
+    backgroundColor: '#fff', 
+    // Removed fixed height to allow auto-sizing and better alignment
   },
 });
 
