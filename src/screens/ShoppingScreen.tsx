@@ -227,10 +227,16 @@ const ShoppingScreen: React.FC = () => {
         onPress={() => canToggle && handleToggleItem(item)}
         style={[
           styles.listItem,
-          item.isChecked && styles.checkedItem,
+          item.isChecked && { 
+            backgroundColor: theme.dark ? 'rgba(255,255,255,0.05)' : '#f1f5f9',
+            opacity: 0.7 
+          },
         ]}
         titleStyle={[
-          item.isChecked && styles.checkedText,
+          item.isChecked && { 
+            textDecorationLine: 'line-through',
+            color: theme.colors.onSurfaceDisabled || theme.colors.onSurfaceVariant 
+          },
         ]}
       />
     );
@@ -296,28 +302,32 @@ const ShoppingScreen: React.FC = () => {
 
       <View style={styles.actionButtons}>
         <Button
-          mode="text"
-          onPress={handleOpenIgnoredItemsDialog}
-          style={styles.actionButton}
-          textColor={theme.colors.secondary}
-        >
-          Add Ignored
-        </Button>
-        <Button
-          mode="outlined"
-          onPress={handleCancelShopping}
-          style={styles.actionButton}
-        >
-          Cancel
-        </Button>
-        <Button
           mode="contained"
           onPress={handleFinalizeList}
-          style={styles.actionButton}
+          style={styles.mainActionButton}
+          contentStyle={styles.actionButtonContent}
           disabled={shoppingList.length === 0}
         >
           Finalize List
         </Button>
+        
+        <View style={styles.secondaryActions}>
+          <Button
+            mode="outlined"
+            onPress={handleOpenIgnoredItemsDialog}
+            style={styles.secondaryActionButton}
+            textColor={theme.colors.secondary}
+          >
+            Add Ignored
+          </Button>
+          <Button
+            mode="outlined"
+            onPress={handleCancelShopping}
+            style={styles.secondaryActionButton}
+          >
+            Cancel
+          </Button>
+        </View>
       </View>
 
       <FAB
@@ -356,18 +366,19 @@ const ShoppingScreen: React.FC = () => {
 
       <View style={styles.actionButtons}>
         <Button
-          mode="outlined"
-          onPress={handleCancelShopping}
-          style={styles.actionButton}
-        >
-          Cancel
-        </Button>
-        <Button
           mode="contained"
           onPress={handleStartShopping}
-          style={styles.actionButton}
+          style={styles.mainActionButton}
+          contentStyle={styles.actionButtonContent}
         >
           Start Shopping
+        </Button>
+        <Button
+          mode="outlined"
+          onPress={handleCancelShopping}
+          style={styles.secondaryActionButtonFull}
+        >
+          Cancel
         </Button>
       </View>
     </View>
@@ -420,29 +431,33 @@ const ShoppingScreen: React.FC = () => {
 
         <View style={styles.actionButtons}>
           <Button
-            mode="outlined"
-            onPress={handleCancelShopping}
-            style={styles.actionButton}
-          >
-            Cancel
-          </Button>
-          <Button
             mode="contained"
             onPress={handleCompleteAndRestore}
-            style={styles.actionButton}
+            style={styles.mainActionButton}
+            contentStyle={styles.actionButtonContent}
             disabled={checkedItems.length === 0}
           >
             Complete Shopping
           </Button>
+          
+          <View style={styles.secondaryActions}>
+            <Button
+              mode="text"
+              onPress={handleOpenIgnoredItemsDialog}
+              style={styles.secondaryActionButton}
+              textColor={theme.colors.secondary}
+            >
+              Add Ignored
+            </Button>
+            <Button
+              mode="outlined"
+              onPress={handleCancelShopping}
+              style={styles.secondaryActionButton}
+            >
+              Cancel
+            </Button>
+          </View>
         </View>
-        <Button
-          mode="text"
-          onPress={handleOpenIgnoredItemsDialog}
-          style={{ marginBottom: 16, marginHorizontal: 16 }}
-          textColor={theme.colors.secondary}
-        >
-          Add Ignored Items
-        </Button>
       </View>
     );
   };
@@ -701,24 +716,31 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginVertical: 2,
   },
-  checkedItem: {
-    opacity: 0.5,
-    backgroundColor: '#f1f5f9',
-  },
-  checkedText: {
-    textDecorationLine: 'line-through',
-    color: '#94a3b8',
-  },
+  // removed checkedItem and checkedText as we handle them inline for theme support
   actionButtons: {
-    flexDirection: 'row',
     padding: 16,
+    paddingTop: 8,
     gap: 12,
     backgroundColor: 'transparent',
   },
-  actionButton: {
+  mainActionButton: {
+    borderRadius: 16,
+    elevation: 2,
+  },
+  actionButtonContent: {
+    paddingVertical: 6,
+  },
+  secondaryActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  secondaryActionButton: {
     flex: 1,
     borderRadius: 16,
-    paddingVertical: 4,
+  },
+  secondaryActionButtonFull: {
+    width: '100%',
+    borderRadius: 16,
   },
   fab: {
     position: 'absolute',
