@@ -821,7 +821,7 @@ const InventoryScreen: React.FC = () => {
   }, [navigationObj, theme]);
 
   const loadInventoryData = () => {
-    const items = inventoryManager.getInventoryItems().map(it => {
+    const items = inventoryManager.getVisibleInventoryItems().map(it => {
       const pending = pendingUpdatesRef.current[it.id];
       if (pending !== undefined) {
         return { ...it, quantity: pending };
@@ -838,9 +838,9 @@ const InventoryScreen: React.FC = () => {
     setRefreshing(false);
   };
 
-  const getTotalItems = () => inventoryItems.length;
+  const getTotalItems = () => inventoryItems.filter(item => !item.isIgnored).length;
   
-  const getLowStockCount = () => inventoryItems.filter(item => item.quantity <= 0.25).length;
+  const getLowStockCount = () => inventoryItems.filter(item => !item.isIgnored && item.quantity <= 0.25).length;
 
   const getItemsForCategory = (category: InventoryCategory): InventoryItem[] => {
     return inventoryItems.filter(item => {
@@ -1057,7 +1057,7 @@ const InventoryScreen: React.FC = () => {
   const renderCategoryCard = useCallback((category: InventoryCategory) => {
     const config = CATEGORY_CONFIG[category];
     const subcategories = inventoryManager.getSubcategoriesForCategory(category);
-    const allCategoryItems = inventoryManager.getItemsForCategory(category).filter(it => !it.isIgnored);
+    const allCategoryItems = inventoryManager.getItemsForCategory(category).filter(item => !item.isIgnored);
     const itemsCount = allCategoryItems.length;
     const lowStockCount = allCategoryItems.filter(it => it.quantity <= 0.25).length;
 
