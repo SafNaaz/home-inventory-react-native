@@ -123,6 +123,7 @@ export interface AppSettings {
   miscItemHistory: string[];
   activityThresholds: Record<InventoryCategory, number>;
   isHealthAlertsEnabled: boolean;
+  healthAlertTime: Date;
   securityLockTimeout: number; // in milliseconds, 0 = immediately
 }
 

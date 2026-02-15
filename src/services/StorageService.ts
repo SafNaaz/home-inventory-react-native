@@ -159,7 +159,7 @@ export class StorageService {
   static async saveSettings(settings: AppSettings): Promise<void> {
     try {
       const serializedSettings = JSON.stringify(settings, (key, value) => {
-        if (key === 'reminderTime1' || key === 'reminderTime2') {
+        if (key === 'reminderTime1' || key === 'reminderTime2' || key === 'healthAlertTime') {
           return value instanceof Date ? value.toISOString() : value;
         }
         return value;
@@ -181,7 +181,7 @@ export class StorageService {
       }
 
       const settings = JSON.parse(serializedSettings, (key, value) => {
-        if (key === 'reminderTime1' || key === 'reminderTime2') {
+        if (key === 'reminderTime1' || key === 'reminderTime2' || key === 'healthAlertTime') {
           return new Date(value);
         }
         return value;
@@ -199,6 +199,7 @@ export class StorageService {
     const now = new Date();
     const morning = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 9, 0);
     const evening = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 18, 0);
+    const healthTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 10, 0);
 
     return {
       themeMode: 'system',
@@ -216,6 +217,7 @@ export class StorageService {
         ['Personal Care']: 30,
       } as any,
       isHealthAlertsEnabled: false,
+      healthAlertTime: healthTime,
       securityLockTimeout: 0,
     };
   }
