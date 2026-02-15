@@ -1106,7 +1106,7 @@ const InventoryScreen: React.FC = () => {
   const renderCategoryCard = useCallback((category: InventoryCategory) => {
     const config = CATEGORY_CONFIG[category];
     const subcategories = inventoryManager.getSubcategoriesForCategory(category);
-    const allCategoryItems = inventoryManager.getItemsForCategory(category);
+    const allCategoryItems = inventoryManager.getItemsForCategory(category).filter(it => !it.isIgnored);
     const itemsCount = allCategoryItems.length;
     const lowStockCount = allCategoryItems.filter(it => it.quantity <= 0.25).length;
 
@@ -1220,16 +1220,8 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
             </Title>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Text style={[styles.subcategoryStats, { color: theme.colors.onSurfaceVariant }]}>
-                {activeCount} active
+                {activeCount} items
               </Text>
-              {hiddenCount > 0 && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 8 }}>
-                  <Icon name="eye-off-outline" size={14} color={theme.colors.onSurfaceVariant} style={{ marginRight: 4 }} />
-                  <Text style={[styles.subcategoryStats, { color: theme.colors.onSurfaceVariant }]}>
-                    {hiddenCount}
-                  </Text>
-                </View>
-              )}
             </View>
             {lowStockCount > 0 && (
               <Text style={[styles.subcategoryStats, { color: theme.colors.error, fontWeight: '600' }]}>
@@ -1512,7 +1504,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
                 const activeCount = allSubItems.filter(it => !it.isIgnored).length;
                 const hiddenCount = allSubItems.filter(it => it.isIgnored).length;
                 const items = getItemsForSubcategory(subName as InventorySubcategory);
-                const lowStockCount = allSubItems.filter(it => it.quantity <= 0.25).length;
+                const lowStockCount = allSubItems.filter(it => !it.isIgnored && it.quantity <= 0.25).length;
                 const config = inventoryManager.getSubcategoryConfig(subName as InventorySubcategory);
                 return (
                   <SubcategoryRow

@@ -60,7 +60,9 @@ const SectionHeader: React.FC<{
   badgeCount?: number;
   badgeColor?: string;
   theme: any;
-}> = ({ icon, title, subtitle, iconColor, badgeCount, badgeColor, theme }) => (
+  actionIcon?: string;
+  onAction?: () => void;
+}> = ({ icon, title, subtitle, iconColor, badgeCount, badgeColor, theme, actionIcon, onAction }) => (
   <View style={styles.sectionHeader}>
     <View style={[styles.sectionIconWrap, { backgroundColor: iconColor + '18' }]}>
       <Icon name={icon as any} size={22} color={iconColor} />
@@ -76,6 +78,14 @@ const SectionHeader: React.FC<{
       </View>
       <Text style={[styles.sectionSubtitle, { color: theme.colors.onSurfaceVariant }]}>{subtitle}</Text>
     </View>
+    {actionIcon && onAction && (
+      <TouchableOpacity
+        onPress={onAction}
+        style={[styles.sectionActionBtn, { backgroundColor: theme.colors.surfaceVariant }]}
+      >
+        <Icon name={actionIcon as any} size={20} color={theme.colors.onSurfaceVariant} />
+      </TouchableOpacity>
+    )}
   </View>
 );
 
@@ -228,24 +238,7 @@ const EmptyState: React.FC<{
 
 // ─── Quick Stat Tile ───────────────────────────────────────────────────────────
 
-const StatTile: React.FC<{
-  icon: string;
-  label: string;
-  value: string;
-  color: string;
-  theme: any;
-}> = ({ icon, label, value, color, theme }) => (
-  <Surface
-    style={[styles.statTile, { backgroundColor: theme.dark ? theme.colors.surface : '#FFFFFF' }]}
-    elevation={theme.dark ? 1 : 2}
-  >
-    <View style={[styles.statTileIcon, { backgroundColor: color + '15' }]}>
-      <Icon name={icon as any} size={18} color={color} />
-    </View>
-    <Text style={[styles.statTileValue, { color: theme.colors.onSurface }]}>{value}</Text>
-    <Text style={[styles.statTileLabel, { color: theme.colors.onSurfaceVariant }]}>{label}</Text>
-  </Surface>
-);
+
 
 // ─── Main Screen ───────────────────────────────────────────────────────────────
 
@@ -256,6 +249,7 @@ const InsightsScreen: React.FC = () => {
 
   // Expand/collapse state for each section
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
+  const [showHiddenLowStock, setShowHiddenLowStock] = useState(false);
 
   const toggleSection = (key: string) => {
     toggleAnimation();
@@ -292,6 +286,8 @@ const InsightsScreen: React.FC = () => {
     staleItems.forEach(item => {
       const config = inventoryManager.getSubcategoryConfig(item.subcategory);
       if (!config) return;
+      if (item.quantity === 0) return;
+      
       const category = config.category;
       const catConfig = CATEGORY_CONFIG[category as InventoryCategory];
       if (!grouped[category]) {
@@ -335,12 +331,14 @@ const InsightsScreen: React.FC = () => {
       .slice(0, 10);
   }, [inventoryItems, staleItemIds]);
 
-  // Running low (quantity ≤ 25%) — excludes stale items
+  // Running low (quantity ≤ 25%)
+  // Running low (quantity ≤ 25%)
   const lowStockItems = useMemo(() => {
     return [...inventoryItems]
-      .filter(item => item.quantity <= 0.25 && !staleItemIds.has(item.id))
+      .filter(item => item.quantity <= 0.25)
+      .filter(item => showHiddenLowStock ? true : !item.isIgnored)
       .sort((a, b) => a.quantity - b.quantity);
-  }, [inventoryItems, staleItemIds]);
+  }, [inventoryItems, showHiddenLowStock]);
 
   // Category health summary
   const categoryHealth = useMemo(() => {
@@ -377,32 +375,7 @@ const InsightsScreen: React.FC = () => {
     return inventoryItems.filter(item => (!item.purchaseHistory || item.purchaseHistory.length === 0) && !staleItemIds.has(item.id));
   }, [inventoryItems, staleItemIds]);
 
-  // Quick stats
-  const quickStats = useMemo(() => {
-    const totalRestocks = inventoryItems.reduce((sum, item) => sum + (item.purchaseHistory?.length || 0), 0);
-    const avgStock = inventoryItems.length > 0
-      ? Math.round((inventoryItems.reduce((s, i) => s + i.quantity, 0) / inventoryItems.length) * 100)
-      : 0;
 
-    // Most active category (most restocks)
-    const catRestocks: Record<string, number> = {};
-    inventoryItems.forEach(item => {
-      const config = inventoryManager.getSubcategoryConfig(item.subcategory);
-      if (config) {
-        catRestocks[config.category] = (catRestocks[config.category] || 0) + (item.purchaseHistory?.length || 0);
-      }
-    });
-    const mostActiveCat = Object.entries(catRestocks).sort((a, b) => b[1] - a[1])[0];
-
-    // Oldest item (by lastUpdated)
-    const oldest = inventoryItems.length > 0
-      ? inventoryItems.reduce((prev, curr) =>
-          new Date(prev.lastUpdated).getTime() < new Date(curr.lastUpdated).getTime() ? prev : curr
-        )
-      : null;
-
-    return { totalRestocks, avgStock, mostActiveCat, oldest };
-  }, [inventoryItems]);
 
   // ── Monthly Summary Data ──
 
@@ -691,6 +664,8 @@ const InsightsScreen: React.FC = () => {
           badgeCount={lowStockItems.length}
           badgeColor={accentColor}
           theme={theme}
+          actionIcon={showHiddenLowStock ? 'eye' : 'eye-off'}
+          onAction={() => setShowHiddenLowStock(prev => !prev)}
         />
         <Surface style={[styles.card, { backgroundColor: theme.dark ? theme.colors.surface : '#FFFFFF' }]} elevation={theme.dark ? 1 : 2}>
           {lowStockItems.length === 0 ? (
@@ -983,52 +958,7 @@ const InsightsScreen: React.FC = () => {
     );
   };
 
-  const renderQuickStatsSection = () => {
-    const mostActiveName = quickStats.mostActiveCat ? quickStats.mostActiveCat[0] : '—';
-    const oldestDays = quickStats.oldest ? daysSince(quickStats.oldest.lastUpdated) : 0;
 
-    return (
-      <View style={styles.sectionContainer}>
-        <SectionHeader
-          icon="lightning-bolt"
-          title="Quick Stats"
-          subtitle="At-a-glance summary of your inventory"
-          iconColor={theme.dark ? '#38BDF8' : '#0EA5E9'}
-          theme={theme}
-        />
-        <View style={styles.statsGrid}>
-          <StatTile
-            icon="cart-arrow-down"
-            label="Total Restocks"
-            value={`${quickStats.totalRestocks}`}
-            color={theme.dark ? '#34D399' : '#10B981'}
-            theme={theme}
-          />
-          <StatTile
-            icon="gauge"
-            label="Avg Stock Level"
-            value={`${quickStats.avgStock}%`}
-            color={theme.dark ? '#38BDF8' : '#0EA5E9'}
-            theme={theme}
-          />
-          <StatTile
-            icon="star-circle"
-            label="Most Active"
-            value={mostActiveName}
-            color={theme.dark ? '#FBBF24' : '#F59E0B'}
-            theme={theme}
-          />
-          <StatTile
-            icon="calendar-clock"
-            label="Oldest Unchanged"
-            value={oldestDays === 0 ? 'Today' : `${oldestDays}d`}
-            color={theme.dark ? '#F472B6' : '#EC4899'}
-            theme={theme}
-          />
-        </View>
-      </View>
-    );
-  };
 
   // ── Main Render ──
 
@@ -1102,7 +1032,7 @@ const InsightsScreen: React.FC = () => {
         {renderCategoryHealthSection()}
         {renderNeverRestockedSection()}
         {renderMonthlySummarySection()}
-        {renderQuickStatsSection()}
+
 
         <View style={{ height: 20 }} />
       </ScrollView>
@@ -1229,6 +1159,14 @@ const styles = StyleSheet.create({
   countBadgeText: {
     fontSize: 12,
     fontWeight: '800',
+  },
+  sectionActionBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
   },
 
   // Card
