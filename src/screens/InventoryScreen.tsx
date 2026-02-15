@@ -887,9 +887,9 @@ const InventoryScreen: React.FC = () => {
     setRefreshing(false);
   };
 
-  const getTotalItems = () => inventoryItems.length;
+  const getTotalItems = () => inventoryItems.filter(item => !item.isIgnored).length;
   
-  const getLowStockCount = () => inventoryItems.filter(item => item.quantity <= 0.25).length;
+  const getLowStockCount = () => inventoryItems.filter(item => !item.isIgnored && item.quantity <= 0.25).length;
 
   const getItemsForCategory = (category: InventoryCategory): InventoryItem[] => {
     return inventoryItems.filter(item => {
@@ -1106,7 +1106,7 @@ const InventoryScreen: React.FC = () => {
   const renderCategoryCard = useCallback((category: InventoryCategory) => {
     const config = CATEGORY_CONFIG[category];
     const subcategories = inventoryManager.getSubcategoriesForCategory(category);
-    const allCategoryItems = inventoryManager.getItemsForCategory(category);
+    const allCategoryItems = inventoryManager.getItemsForCategory(category).filter(item => !item.isIgnored);
     const itemsCount = allCategoryItems.length;
     const lowStockCount = allCategoryItems.filter(it => it.quantity <= 0.25).length;
 
@@ -1512,7 +1512,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
                 const activeCount = allSubItems.filter(it => !it.isIgnored).length;
                 const hiddenCount = allSubItems.filter(it => it.isIgnored).length;
                 const items = getItemsForSubcategory(subName as InventorySubcategory);
-                const lowStockCount = allSubItems.filter(it => it.quantity <= 0.25).length;
+                const lowStockCount = allSubItems.filter(it => !it.isIgnored && it.quantity <= 0.25).length;
                 const config = inventoryManager.getSubcategoryConfig(subName as InventorySubcategory);
                 return (
                   <SubcategoryRow
