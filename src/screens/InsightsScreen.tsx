@@ -59,23 +59,31 @@ const SectionHeader: React.FC<{
   iconColor: string;
   badgeCount?: number;
   badgeColor?: string;
+  rightElement?: React.ReactNode;
   theme: any;
-}> = ({ icon, title, subtitle, iconColor, badgeCount, badgeColor, theme }) => (
+}> = ({ icon, title, subtitle, iconColor, badgeCount, badgeColor, rightElement, theme }) => (
   <View style={styles.sectionHeader}>
-    <View style={[styles.sectionIconWrap, { backgroundColor: iconColor + '18' }]}>
-      <Icon name={icon as any} size={22} color={iconColor} />
+    <View style={{flexDirection: 'row', flex: 1}}>
+        <View style={[styles.sectionIconWrap, { backgroundColor: iconColor + '18' }]}>
+        <Icon name={icon as any} size={22} color={iconColor} />
+        </View>
+        <View style={styles.sectionHeaderText}>
+        <View style={styles.sectionTitleRow}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.onBackground }]}>{title}</Text>
+            {badgeCount !== undefined && badgeCount > 0 && (
+            <View style={[styles.countBadge, { backgroundColor: (badgeColor || iconColor) + '20' }]}>
+                <Text style={[styles.countBadgeText, { color: badgeColor || iconColor }]}>{badgeCount}</Text>
+            </View>
+            )}
+        </View>
+        <Text style={[styles.sectionSubtitle, { color: theme.colors.onSurfaceVariant }]}>{subtitle}</Text>
+        </View>
     </View>
-    <View style={styles.sectionHeaderText}>
-      <View style={styles.sectionTitleRow}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.onBackground }]}>{title}</Text>
-        {badgeCount !== undefined && badgeCount > 0 && (
-          <View style={[styles.countBadge, { backgroundColor: (badgeColor || iconColor) + '20' }]}>
-            <Text style={[styles.countBadgeText, { color: badgeColor || iconColor }]}>{badgeCount}</Text>
-          </View>
-        )}
-      </View>
-      <Text style={[styles.sectionSubtitle, { color: theme.colors.onSurfaceVariant }]}>{subtitle}</Text>
-    </View>
+    {rightElement && (
+        <View style={{justifyContent: 'center', paddingLeft: 8}}>
+            {rightElement}
+        </View>
+    )}
   </View>
 );
 
@@ -270,7 +278,7 @@ const InsightsScreen: React.FC = () => {
   }, []);
 
   const loadInventoryData = () => {
-    const items = inventoryManager.getInventoryItems();
+    const items = inventoryManager.getVisibleInventoryItems();
     setInventoryItems(items);
   };
 
@@ -280,13 +288,16 @@ const InsightsScreen: React.FC = () => {
     setRefreshing(false);
   };
 
+  // State for show hidden running low
+  const [showHiddenRunLow, setShowHiddenRunLow] = useState(false);
+
   // ── Computed Data ──
 
   const thresholds = useMemo(() => settingsManager.getActivityThresholds(), [inventoryItems]);
 
-  // Stale items grouped by category
+  // Stale items grouped by category - Exclude hidden
   const staleByCategory = useMemo(() => {
-    const staleItems = inventoryManager.getStaleItemsByThreshold(thresholds);
+    const staleItems = inventoryManager.getStaleItemsByThreshold(thresholds).filter(i => !i.isIgnored);
     const grouped: Record<string, { items: (InventoryItem & { daysStale: number; thresholdDays: number })[]; config: any; threshold: number }> = {};
 
     staleItems.forEach(item => {
@@ -319,35 +330,41 @@ const InsightsScreen: React.FC = () => {
     return ids;
   }, [staleByCategory]);
 
-  // Top 10 most used (by purchase history length)
+  // Top 10 most used (by purchase history length) - Exclude hidden
   const topUsed = useMemo(() => {
     return [...inventoryItems]
-      .filter(item => (item.purchaseHistory?.length || 0) > 0)
+      .filter(item => !item.isIgnored && (item.purchaseHistory?.length || 0) > 0)
       .sort((a, b) => (b.purchaseHistory?.length || 0) - (a.purchaseHistory?.length || 0))
       .slice(0, 10);
   }, [inventoryItems]);
 
-  // Least used (by longest time since last update, top 10) — excludes stale items
+  // Least used (by longest time since last update, top 10) — excludes stale items and hidden
   const leastUsed = useMemo(() => {
     return [...inventoryItems]
-      .filter(item => !staleItemIds.has(item.id))
+      .filter(item => !item.isIgnored && !staleItemIds.has(item.id))
       .sort((a, b) => new Date(a.lastUpdated).getTime() - new Date(b.lastUpdated).getTime())
       .slice(0, 10);
   }, [inventoryItems, staleItemIds]);
 
-  // Running low (quantity ≤ 25%) — excludes stale items
+  // Running low (quantity ≤ 25%) — excludes stale items, respects showHiddenRunLow
   const lowStockItems = useMemo(() => {
     return [...inventoryItems]
-      .filter(item => item.quantity <= 0.25 && !staleItemIds.has(item.id))
+      .filter(item => {
+        // Must be low stock and not stale
+        if (item.quantity > 0.25 || staleItemIds.has(item.id)) return false;
+        // Respect hidden toggle
+        return showHiddenRunLow ? true : !item.isIgnored;
+      })
       .sort((a, b) => a.quantity - b.quantity);
-  }, [inventoryItems, staleItemIds]);
+  }, [inventoryItems, staleItemIds, showHiddenRunLow]);
 
-  // Category health summary
+  // Category health summary - Exclude hidden
   const categoryHealth = useMemo(() => {
-    const allStaleItems = inventoryManager.getStaleItemsByThreshold(thresholds);
+    const allStaleItems = inventoryManager.getStaleItemsByThreshold(thresholds).filter(i => !i.isIgnored);
     return getAllCategories().map(category => {
       const config = CATEGORY_CONFIG[category];
       const categoryItems = inventoryItems.filter(item => {
+        if (item.isIgnored) return false; // Exclude hidden
         const subcatConfig = inventoryManager.getSubcategoryConfig(item.subcategory);
         return subcatConfig?.category === category;
       });
@@ -372,21 +389,22 @@ const InsightsScreen: React.FC = () => {
     }).filter(c => c.totalItems > 0);
   }, [inventoryItems, thresholds]);
 
-  // Never restocked items — excludes stale items
+  // Never restocked items — excludes stale items and hidden
   const neverRestocked = useMemo(() => {
-    return inventoryItems.filter(item => (!item.purchaseHistory || item.purchaseHistory.length === 0) && !staleItemIds.has(item.id));
+    return inventoryItems.filter(item => !item.isIgnored && (!item.purchaseHistory || item.purchaseHistory.length === 0) && !staleItemIds.has(item.id));
   }, [inventoryItems, staleItemIds]);
 
-  // Quick stats
+  // Quick stats - Exclude hidden
   const quickStats = useMemo(() => {
-    const totalRestocks = inventoryItems.reduce((sum, item) => sum + (item.purchaseHistory?.length || 0), 0);
-    const avgStock = inventoryItems.length > 0
-      ? Math.round((inventoryItems.reduce((s, i) => s + i.quantity, 0) / inventoryItems.length) * 100)
+    const activeItems = inventoryItems.filter(i => !i.isIgnored);
+    const totalRestocks = activeItems.reduce((sum, item) => sum + (item.purchaseHistory?.length || 0), 0);
+    const avgStock = activeItems.length > 0
+      ? Math.round((activeItems.reduce((s, i) => s + i.quantity, 0) / activeItems.length) * 100)
       : 0;
 
     // Most active category (most restocks)
     const catRestocks: Record<string, number> = {};
-    inventoryItems.forEach(item => {
+    activeItems.forEach(item => {
       const config = inventoryManager.getSubcategoryConfig(item.subcategory);
       if (config) {
         catRestocks[config.category] = (catRestocks[config.category] || 0) + (item.purchaseHistory?.length || 0);
@@ -395,8 +413,8 @@ const InsightsScreen: React.FC = () => {
     const mostActiveCat = Object.entries(catRestocks).sort((a, b) => b[1] - a[1])[0];
 
     // Oldest item (by lastUpdated)
-    const oldest = inventoryItems.length > 0
-      ? inventoryItems.reduce((prev, curr) =>
+    const oldest = activeItems.length > 0
+      ? activeItems.reduce((prev, curr) =>
           new Date(prev.lastUpdated).getTime() < new Date(curr.lastUpdated).getTime() ? prev : curr
         )
       : null;
@@ -409,10 +427,13 @@ const InsightsScreen: React.FC = () => {
   const monthlySummary = useMemo(() => {
     const now = new Date();
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    // Only active items for stats
+    const activeItems = inventoryItems.filter(i => !i.isIgnored);
 
     // Collect ALL purchase dates across all items
     const allDates: Date[] = [];
-    inventoryItems.forEach(item => {
+    activeItems.forEach(item => {
       (item.purchaseHistory || []).forEach(d => allDates.push(new Date(d)));
     });
 
@@ -691,6 +712,19 @@ const InsightsScreen: React.FC = () => {
           badgeCount={lowStockItems.length}
           badgeColor={accentColor}
           theme={theme}
+          rightElement={
+            <TouchableOpacity 
+              onPress={() => setShowHiddenRunLow(!showHiddenRunLow)} 
+              style={{ padding: 8 }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+                <Icon 
+                  name={showHiddenRunLow ? 'eye' : 'eye-off-outline'} 
+                  size={24} 
+                  color={showHiddenRunLow ? accentColor : theme.colors.onSurfaceVariant} 
+                />
+            </TouchableOpacity>
+          }
         />
         <Surface style={[styles.card, { backgroundColor: theme.dark ? theme.colors.surface : '#FFFFFF' }]} elevation={theme.dark ? 1 : 2}>
           {lowStockItems.length === 0 ? (
