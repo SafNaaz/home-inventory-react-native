@@ -7,6 +7,7 @@ import {
   LayoutAnimation,
   Platform,
   UIManager,
+  ActivityIndicator,
 } from 'react-native';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -60,6 +61,7 @@ const ShoppingScreen: React.FC = () => {
   const [itemSearchQuery, setItemSearchQuery] = useState('');
   const [filteredAllItems, setFilteredAllItems] = useState<InventoryItem[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [isSearchingItems, setIsSearchingItems] = useState(false);
 
   useEffect(() => {
     // Load initial data
@@ -202,11 +204,17 @@ const ShoppingScreen: React.FC = () => {
   useEffect(() => {
     if (!itemSearchQuery.trim()) {
       setFilteredAllItems(allItems);
+      setIsSearchingItems(false);
     } else {
-      const filtered = allItems.filter(item => 
-        item.name.toLowerCase().includes(itemSearchQuery.toLowerCase())
-      );
-      setFilteredAllItems(filtered);
+      setIsSearchingItems(true);
+      const timer = setTimeout(() => {
+        const filtered = allItems.filter(item => 
+          item.name.toLowerCase().includes(itemSearchQuery.toLowerCase())
+        );
+        setFilteredAllItems(filtered);
+        setIsSearchingItems(false);
+      }, 500); // Debounce
+      return () => clearTimeout(timer);
     }
   }, [itemSearchQuery, allItems]);
 
@@ -730,13 +738,22 @@ const ShoppingScreen: React.FC = () => {
             <TextInput
               label="Search items..."
               value={itemSearchQuery}
-              onChangeText={setItemSearchQuery}
+              onChangeText={(text) => {
+                setItemSearchQuery(text);
+                if (text.trim().length > 0) {
+                  setIsSearchingItems(true);
+                }
+              }}
               mode="outlined"
               style={{ marginBottom: 8 }}
               right={<TextInput.Icon icon="magnify" />}
             />
             <ScrollView style={{ maxHeight: 300 }}>
-              {filteredAllItems.length > 0 ? (
+              {isSearchingItems ? (
+                <View style={{ padding: 20, alignItems: 'center' }}>
+                  <ActivityIndicator size="small" color={theme.colors.primary} />
+                </View>
+              ) : filteredAllItems.length > 0 ? (
                 filteredAllItems.map(item => (
                   <List.Item
                     key={item.id}
