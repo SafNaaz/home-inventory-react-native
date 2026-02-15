@@ -31,9 +31,10 @@ const NotificationSettingsScreen: React.FC = () => {
   const [reminderTime1, setReminderTime1] = useState(new Date());
   const [reminderTime2, setReminderTime2] = useState(new Date());
   const [timePickerVisible, setTimePickerVisible] = useState(false);
-  const [timePickerType, setTimePickerType] = useState<'time1' | 'time2'>('time1');
+  const [timePickerType, setTimePickerType] = useState<'time1' | 'time2' | 'health'>('time1');
   const [thresholds, setThresholds] = useState<Record<string, number>>({});
   const [isHealthAlertsEnabled, setIsHealthAlertsEnabled] = useState(true);
+  const [healthAlertTime, setHealthAlertTime] = useState(new Date());
 
   useEffect(() => {
     loadSettings();
@@ -53,6 +54,7 @@ const NotificationSettingsScreen: React.FC = () => {
     setReminderTime2(new Date(settings.reminderTime2));
     setThresholds(settings.activityThresholds);
     setIsHealthAlertsEnabled(settings.isHealthAlertsEnabled);
+    setHealthAlertTime(new Date(settings.healthAlertTime));
   };
 
   const handleInventoryReminderToggle = async () => {
@@ -67,11 +69,15 @@ const NotificationSettingsScreen: React.FC = () => {
     await settingsManager.toggleHealthAlerts();
   };
 
+  const handleTestHealthAlert = async () => {
+    await settingsManager.sendTestHealthNotification();
+  };
+
   const formatTime = (date: Date): string => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  const handleTimePickerOpen = (type: 'time1' | 'time2') => {
+  const handleTimePickerOpen = (type: 'time1' | 'time2' | 'health') => {
     setTimePickerType(type);
     setTimePickerVisible(true);
   };
@@ -79,8 +85,14 @@ const NotificationSettingsScreen: React.FC = () => {
   const handleTimePickerConfirm = async (date: Date) => {
     if (timePickerType === 'time1') {
       await settingsManager.updateReminderTime1(date);
-    } else {
+    } else if (timePickerType === 'time2') {
       await settingsManager.updateReminderTime2(date);
+    } else {
+      // Clamp to 8 AM - 10 PM
+      const hour = date.getHours();
+      if (hour < 8) date.setHours(8, 0, 0, 0);
+      if (hour >= 22) date.setHours(21, 55, 0, 0);
+      await settingsManager.updateHealthAlertTime(date);
     }
     setTimePickerVisible(false);
   };
@@ -163,17 +175,17 @@ const NotificationSettingsScreen: React.FC = () => {
         {/* Inventory Health Section */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: theme.colors.onBackground }]}>
-            Health Tracking Settings
+            Health Notifications
           </Text>
           <Text style={[styles.sectionDescription, { color: theme.colors.onSurfaceVariant }]}>
-            Define when an item should be flagged for health review based on its last update.
+            Get a daily health check notification about stale items, low stock, and items needing attention. Fires once daily between 8 AM — 10 PM.
           </Text>
         </View>
 
         <List.Section>
           <List.Item
             title="Enable Health Notifications"
-            description="Include health analysis in your reminders"
+            description="Daily inventory health report"
             left={(props) => <List.Icon {...props} icon="heart-pulse" />}
             right={() => (
               <Switch
@@ -186,39 +198,53 @@ const NotificationSettingsScreen: React.FC = () => {
 
           <Divider />
 
-          {isHealthAlertsEnabled && Object.values(InventoryCategory).map((category) => {
-            const config = CATEGORY_CONFIG[category];
-            const days = thresholds[category] || 0;
-            
-            return (
-              <React.Fragment key={category}>
-                <View style={styles.thresholdItem}>
-                  <View style={styles.thresholdHeader}>
-                    <View style={styles.thresholdTitleRow}>
-                      <Icon name={config.icon as any} size={24} color={config.color} />
-                      <Text style={[styles.thresholdLabel, { color: theme.colors.onSurface }]}>{category}</Text>
+          {isHealthAlertsEnabled && (
+            <>
+              <List.Item
+                title="Health Alert Time"
+                description={`Daily at ${formatTime(healthAlertTime)}`}
+                left={(props) => <List.Icon {...props} icon="clock-outline" />}
+                right={(props) => <List.Icon {...props} icon="chevron-right" />}
+                onPress={() => handleTimePickerOpen('health')}
+              />
+
+              <Divider />
+
+              {Object.values(InventoryCategory).map((category) => {
+                const config = CATEGORY_CONFIG[category];
+                const days = thresholds[category] || 0;
+                
+                return (
+                  <React.Fragment key={category}>
+                    <View style={styles.thresholdItem}>
+                      <View style={styles.thresholdHeader}>
+                        <View style={styles.thresholdTitleRow}>
+                          <Icon name={config.icon as any} size={24} color={config.color} />
+                          <Text style={[styles.thresholdLabel, { color: theme.colors.onSurface }]}>{category}</Text>
+                        </View>
+                        <Text style={[styles.thresholdValue, { color: theme.colors.primary }]}>
+                          Every {days} {days === 1 ? 'day' : 'days'}
+                        </Text>
+                      </View>
+                      <Slider
+                        style={styles.slider}
+                        minimumValue={1}
+                        maximumValue={30}
+                        step={1}
+                        value={days}
+                        onValueChange={(val) => setThresholds(prev => ({ ...prev, [category]: val }))}
+                        onSlidingComplete={(value: number) => settingsManager.updateActivityThreshold(category, value)}
+                        minimumTrackTintColor={theme.colors.primary}
+                        maximumTrackTintColor={theme.colors.surfaceVariant}
+                        thumbTintColor={theme.colors.primary}
+                      />
                     </View>
-                    <Text style={[styles.thresholdValue, { color: theme.colors.primary }]}>
-                      Every {days} {days === 1 ? 'day' : 'days'}
-                    </Text>
-                  </View>
-                  <Slider
-                    style={styles.slider}
-                    minimumValue={1}
-                    maximumValue={30}
-                    step={1}
-                    value={days}
-                    onValueChange={(val) => setThresholds(prev => ({ ...prev, [category]: val }))}
-                    onSlidingComplete={(value: number) => settingsManager.updateActivityThreshold(category, value)}
-                    minimumTrackTintColor={theme.colors.primary}
-                    maximumTrackTintColor={theme.colors.surfaceVariant}
-                    thumbTintColor={theme.colors.primary}
-                  />
-                </View>
-                <Divider />
-              </React.Fragment>
-            );
-          })}
+                    <Divider />
+                  </React.Fragment>
+                );
+              })}
+            </>
+          )}
         </List.Section>
 
         {/* Information Section */}
@@ -227,33 +253,45 @@ const NotificationSettingsScreen: React.FC = () => {
             <Icon name="information" size={24} color={theme.colors.primary} />
             <View style={styles.infoContent}>
               <Text style={[styles.infoTitle, { color: theme.colors.onSurface }]}>
-                About Inventory Reminders
+                About Notifications
               </Text>
               <Text style={[styles.infoDescription, { color: theme.colors.onSurfaceVariant }]}>
-                Inventory reminders help you stay on top of your household supplies. 
-                You'll receive notifications at your chosen times to check items that are running low.
+                Inventory reminders help you stay on top of your supplies.{' '}
+                Health notifications alert you when items cross their staleness thresholds or run low on stock.
               </Text>
             </View>
           </View>
         </View>
 
-        {/* Test Notification Button */}
-        {isInventoryReminderEnabled && (
+        {/* Test Buttons */}
+        {(isInventoryReminderEnabled || isHealthAlertsEnabled) && (
           <View style={styles.section}>
-            <Button
-              mode="outlined"
-              onPress={handleTestNotification}
-              icon="bell-ring"
-              style={styles.testButton}
-            >
-              Send Test Notification
-            </Button>
+            {isInventoryReminderEnabled && (
+              <Button
+                mode="outlined"
+                onPress={handleTestNotification}
+                icon="bell-ring"
+                style={styles.testButton}
+              >
+                Send Test Reminder
+              </Button>
+            )}
+            {isHealthAlertsEnabled && (
+              <Button
+                mode="outlined"
+                onPress={handleTestHealthAlert}
+                icon="heart-pulse"
+                style={[styles.testButton, { marginTop: isInventoryReminderEnabled ? 8 : 0 }]}
+              >
+                Send Test Health Alert
+              </Button>
+            )}
           </View>
         )}
 
         {timePickerVisible && (
           <DateTimePicker
-            value={timePickerType === 'time1' ? reminderTime1 : reminderTime2}
+            value={timePickerType === 'time1' ? reminderTime1 : timePickerType === 'time2' ? reminderTime2 : healthAlertTime}
             mode="time"
             is24Hour={false}
             onChange={(event, selectedDate) => {

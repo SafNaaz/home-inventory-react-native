@@ -1,52 +1,272 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   ScrollView,
   StyleSheet,
   RefreshControl,
-  Dimensions,
+  TouchableOpacity,
+  LayoutAnimation,
+  Platform,
+  UIManager,
 } from 'react-native';
 import {
-  Card,
-  Title,
-  Paragraph,
   Text,
   useTheme,
-  ProgressBar,
   Surface,
-  List,
+  ProgressBar,
 } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { inventoryManager } from '../managers/InventoryManager';
 import { settingsManager } from '../managers/SettingsManager';
 import { InventoryItem, InventoryCategory } from '../models/Types';
 import { CATEGORY_CONFIG, getAllCategories } from '../constants/CategoryConfig';
-import { getCategoryColor, commonStyles } from '../themes/AppTheme';
+import { commonStyles } from '../themes/AppTheme';
 import DoodleBackground from '../components/DoodleBackground';
 
-const { width } = Dimensions.get('window');
-const cardWidth = (width - 48) / 2; // 2 columns with padding
+// Enable LayoutAnimation on Android
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+const COLLAPSED_COUNT = 3;
+
+// ─── Helpers ───────────────────────────────────────────────────────────────────
+
+const daysSince = (date: Date): number => {
+  const now = new Date();
+  const diffMs = Math.abs(now.getTime() - new Date(date).getTime());
+  return Math.floor(diffMs / (1000 * 60 * 60 * 24));
+};
+
+const formatDaysAgo = (days: number): string => {
+  if (days === 0) return 'Today';
+  if (days === 1) return '1 day ago';
+  if (days < 30) return `${days} days ago`;
+  if (days < 60) return '1 month ago';
+  return `${Math.floor(days / 30)} months ago`;
+};
+
+const toggleAnimation = () => {
+  LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+};
+
+// ─── Section Header Component ──────────────────────────────────────────────────
+
+const SectionHeader: React.FC<{
+  icon: string;
+  title: string;
+  subtitle: string;
+  iconColor: string;
+  badgeCount?: number;
+  badgeColor?: string;
+  theme: any;
+}> = ({ icon, title, subtitle, iconColor, badgeCount, badgeColor, theme }) => (
+  <View style={styles.sectionHeader}>
+    <View style={[styles.sectionIconWrap, { backgroundColor: iconColor + '18' }]}>
+      <Icon name={icon as any} size={22} color={iconColor} />
+    </View>
+    <View style={styles.sectionHeaderText}>
+      <View style={styles.sectionTitleRow}>
+        <Text style={[styles.sectionTitle, { color: theme.colors.onBackground }]}>{title}</Text>
+        {badgeCount !== undefined && badgeCount > 0 && (
+          <View style={[styles.countBadge, { backgroundColor: (badgeColor || iconColor) + '20' }]}>
+            <Text style={[styles.countBadgeText, { color: badgeColor || iconColor }]}>{badgeCount}</Text>
+          </View>
+        )}
+      </View>
+      <Text style={[styles.sectionSubtitle, { color: theme.colors.onSurfaceVariant }]}>{subtitle}</Text>
+    </View>
+  </View>
+);
+
+// ─── Show More / Less Button ───────────────────────────────────────────────────
+
+const ShowMoreButton: React.FC<{
+  expanded: boolean;
+  totalCount: number;
+  onPress: () => void;
+  accentColor: string;
+  theme: any;
+}> = ({ expanded, totalCount, onPress, accentColor, theme }) => {
+  if (totalCount <= COLLAPSED_COUNT) return null;
+  const remaining = totalCount - COLLAPSED_COUNT;
+
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      style={[styles.showMoreBtn, { backgroundColor: accentColor + '10' }]}
+      activeOpacity={0.7}
+    >
+      <Text style={[styles.showMoreText, { color: accentColor }]}>
+        {expanded ? 'Show Less' : `Show ${remaining} More`}
+      </Text>
+      <Icon
+        name={expanded ? 'chevron-up' : 'chevron-down'}
+        size={18}
+        color={accentColor}
+      />
+    </TouchableOpacity>
+  );
+};
+
+// ─── Stale Item Row ────────────────────────────────────────────────────────────
+
+const StaleItemRow: React.FC<{
+  item: InventoryItem;
+  daysStale: number;
+  thresholdDays: number;
+  theme: any;
+}> = ({ item, daysStale, thresholdDays, theme }) => {
+  const overdueDays = daysStale - thresholdDays;
+  const urgency = overdueDays > thresholdDays ? 'critical' : overdueDays > thresholdDays / 2 ? 'warning' : 'mild';
+  const urgencyColors = {
+    critical: { bg: '#EF444420', text: '#EF4444', icon: 'alert-circle' },
+    warning: { bg: '#F59E0B20', text: '#F59E0B', icon: 'alert' },
+    mild: { bg: '#F9731620', text: '#F97316', icon: 'clock-alert-outline' },
+  };
+  const u = urgencyColors[urgency];
+
+  return (
+    <View style={[styles.staleRow, { backgroundColor: theme.dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)' }]}>
+      <View style={[styles.staleUrgencyDot, { backgroundColor: u.text }]} />
+      <View style={styles.staleRowInfo}>
+        <Text style={[styles.staleItemName, { color: theme.colors.onSurface }]} numberOfLines={1}>{item.name}</Text>
+        <Text style={[styles.staleItemMeta, { color: theme.colors.onSurfaceVariant }]}>
+          Last updated {formatDaysAgo(daysStale)} · {overdueDays}d overdue
+        </Text>
+      </View>
+      <View style={[styles.staleUrgencyBadge, { backgroundColor: u.bg }]}>
+        <Icon name={u.icon as any} size={14} color={u.text} />
+      </View>
+    </View>
+  );
+};
+
+// ─── Ranked Item Row ───────────────────────────────────────────────────────────
+
+const RankedItemRow: React.FC<{
+  item: InventoryItem;
+  rank: number;
+  metric: string;
+  metricLabel: string;
+  accentColor: string;
+  theme: any;
+}> = ({ item, rank, metric, metricLabel, accentColor, theme }) => {
+  const isTop3 = rank <= 3;
+  const medalColors: Record<number, string> = { 1: '#FFD700', 2: '#C0C0C0', 3: '#CD7F32' };
+
+  return (
+    <View style={[styles.rankedRow, { backgroundColor: theme.dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)' }]}>
+      <View style={[
+        styles.rankBadge,
+        { backgroundColor: isTop3 ? (medalColors[rank] || accentColor) + '25' : theme.dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }
+      ]}>
+        <Text style={[
+          styles.rankNumber,
+          { color: isTop3 ? (medalColors[rank] || accentColor) : theme.colors.onSurfaceVariant }
+        ]}>
+          {rank}
+        </Text>
+      </View>
+      <View style={styles.rankedInfo}>
+        <Text style={[styles.rankedItemName, { color: theme.colors.onSurface }]} numberOfLines={1}>{item.name}</Text>
+        <Text style={[styles.rankedItemMeta, { color: theme.colors.onSurfaceVariant }]}>{metricLabel}</Text>
+      </View>
+      <View style={[styles.metricBadge, { backgroundColor: accentColor + '15' }]}>
+        <Text style={[styles.metricText, { color: accentColor }]}>{metric}</Text>
+      </View>
+    </View>
+  );
+};
+
+// ─── Low Stock Item Row ────────────────────────────────────────────────────────
+
+const LowStockRow: React.FC<{
+  item: InventoryItem;
+  theme: any;
+}> = ({ item, theme }) => {
+  const pct = Math.round(item.quantity * 100);
+  const color = pct === 0 ? '#EF4444' : pct <= 10 ? '#F97316' : '#F59E0B';
+
+  return (
+    <View style={[styles.rankedRow, { backgroundColor: theme.dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)' }]}>
+      <View style={[styles.lowStockIndicator, { backgroundColor: color + '20' }]}>
+        <Icon name={pct === 0 ? 'close-circle' : 'arrow-down-bold'} size={16} color={color} />
+      </View>
+      <View style={styles.rankedInfo}>
+        <Text style={[styles.rankedItemName, { color: theme.colors.onSurface }]} numberOfLines={1}>{item.name}</Text>
+        <View style={styles.lowStockBarWrap}>
+          <View style={[styles.lowStockBarBg, { backgroundColor: theme.dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
+            <View style={[styles.lowStockBarFill, { width: `${Math.max(pct, 3)}%`, backgroundColor: color }]} />
+          </View>
+        </View>
+      </View>
+      <View style={[styles.metricBadge, { backgroundColor: color + '15' }]}>
+        <Text style={[styles.metricText, { color }]}>{pct}%</Text>
+      </View>
+    </View>
+  );
+};
+
+// ─── Empty State ───────────────────────────────────────────────────────────────
+
+const EmptyState: React.FC<{
+  icon: string;
+  title: string;
+  subtitle: string;
+  color: string;
+  theme: any;
+}> = ({ icon, title, subtitle, color, theme }) => (
+  <View style={styles.emptyState}>
+    <View style={[styles.emptyIconWrap, { backgroundColor: color + '12' }]}>
+      <Icon name={icon as any} size={32} color={color + '80'} />
+    </View>
+    <Text style={[styles.emptyTitle, { color: theme.colors.onSurfaceVariant }]}>{title}</Text>
+    <Text style={[styles.emptySubtitle, { color: theme.colors.onSurfaceVariant + 'AA' }]}>{subtitle}</Text>
+  </View>
+);
+
+// ─── Quick Stat Tile ───────────────────────────────────────────────────────────
+
+const StatTile: React.FC<{
+  icon: string;
+  label: string;
+  value: string;
+  color: string;
+  theme: any;
+}> = ({ icon, label, value, color, theme }) => (
+  <Surface
+    style={[styles.statTile, { backgroundColor: theme.dark ? theme.colors.surface : '#FFFFFF' }]}
+    elevation={theme.dark ? 1 : 2}
+  >
+    <View style={[styles.statTileIcon, { backgroundColor: color + '15' }]}>
+      <Icon name={icon as any} size={18} color={color} />
+    </View>
+    <Text style={[styles.statTileValue, { color: theme.colors.onSurface }]}>{value}</Text>
+    <Text style={[styles.statTileLabel, { color: theme.colors.onSurfaceVariant }]}>{label}</Text>
+  </Surface>
+);
+
+// ─── Main Screen ───────────────────────────────────────────────────────────────
 
 const InsightsScreen: React.FC = () => {
   const theme = useTheme();
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Expand/collapse state for each section
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
+
+  const toggleSection = (key: string) => {
+    toggleAnimation();
+    setExpandedSections(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
   useEffect(() => {
     loadInventoryData();
-
-    const unsubscribeInventory = inventoryManager.addListener(() => {
-      loadInventoryData();
-    });
-
-    const unsubscribeSettings = settingsManager.addListener(() => {
-      loadInventoryData();
-    });
-
-    return () => {
-      unsubscribeInventory();
-      unsubscribeSettings();
-    };
+    const unsubInventory = inventoryManager.addListener(() => loadInventoryData());
+    const unsubSettings = settingsManager.addListener(() => loadInventoryData());
+    return () => { unsubInventory(); unsubSettings(); };
   }, []);
 
   const loadInventoryData = () => {
@@ -54,694 +274,1375 @@ const InsightsScreen: React.FC = () => {
     setInventoryItems(items);
   };
 
-  const onRefresh = async () => {
+  const onRefresh = () => {
     setRefreshing(true);
     loadInventoryData();
     setRefreshing(false);
   };
 
-  // Analytics calculations
-  const getTotalItems = () => inventoryItems.length;
-  
-  const getLowStockCount = () => inventoryItems.filter(item => item.quantity <= 0.25).length;
-  
-  const getAverageStockLevel = () => {
-    if (inventoryItems.length === 0) return 0;
-    const total = inventoryItems.reduce((sum, item) => sum + item.quantity, 0);
-    return Math.round((total / inventoryItems.length) * 100);
-  };
-  
-  const getActiveCategoriesCount = () => {
-    const categories = new Set(
-      inventoryItems.map(item => {
-        const subcategoryConfig = CATEGORY_CONFIG[Object.keys(CATEGORY_CONFIG).find(cat => 
-          CATEGORY_CONFIG[cat as InventoryCategory].subcategories.includes(item.subcategory)
-        ) as InventoryCategory];
-        return subcategoryConfig;
-      }).filter(Boolean)
-    );
-    return categories.size;
-  };
+  // ── Computed Data ──
 
-  const getMostRestockedItem = () => {
-    if (inventoryItems.length === 0) return null;
-    return inventoryItems.reduce((prev, current) => 
-      (prev.purchaseHistory?.length || 0) > (current.purchaseHistory?.length || 0) ? prev : current
-    );
-  };
+  const thresholds = useMemo(() => settingsManager.getActivityThresholds(), [inventoryItems]);
 
-  const getLeastUsedItem = () => {
-    if (inventoryItems.length === 0) return null;
-    return inventoryItems.reduce((prev, current) => 
-      prev.lastUpdated < current.lastUpdated ? prev : current
-    );
-  };
-
-  const getDaysSinceLastUpdate = (item: InventoryItem) => {
-    const now = new Date();
-    const diffTime = Math.abs(now.getTime() - item.lastUpdated.getTime());
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  };
-
-  const getItemsNeedingAttention = () => inventoryItems.filter(item => item.quantity <= 0.25);
-
-  const getItemsForCategory = (category: InventoryCategory): InventoryItem[] => {
-    const config = CATEGORY_CONFIG[category];
-    return inventoryItems.filter(item => config.subcategories.includes(item.subcategory));
-  };
-
-  const renderOverviewSection = () => {
-    const avgStock = getAverageStockLevel();
-    const lowStock = getLowStockCount();
-    const thresholds = settingsManager.getActivityThresholds();
+  // Stale items grouped by category
+  const staleByCategory = useMemo(() => {
     const staleItems = inventoryManager.getStaleItemsByThreshold(thresholds);
-    
-    // Group stale items by category
-    const staleCategories = new Set();
+    const grouped: Record<string, { items: (InventoryItem & { daysStale: number; thresholdDays: number })[]; config: any; threshold: number }> = {};
+
     staleItems.forEach(item => {
       const config = inventoryManager.getSubcategoryConfig(item.subcategory);
-      if (config) staleCategories.add(config.category);
+      if (!config) return;
+      const category = config.category;
+      const catConfig = CATEGORY_CONFIG[category as InventoryCategory];
+      if (!grouped[category]) {
+        grouped[category] = { items: [], config: catConfig, threshold: thresholds[category as InventoryCategory] };
+      }
+      const daysStale = daysSince(item.lastUpdated);
+      grouped[category].items.push({ ...item, daysStale, thresholdDays: thresholds[category as InventoryCategory] });
     });
-    
-    return (
-      <View style={[styles.section, { paddingHorizontal: 16, marginBottom: 12 }]}>
-        <Text variant="headlineSmall" style={[styles.sectionTitle, { color: theme.colors.onBackground }]}>
-          Inventory Overview
-        </Text>
-        
-        <Surface 
-          style={[
-            styles.summaryCard, 
-            { backgroundColor: theme.dark ? theme.colors.surfaceVariant : theme.colors.primary, marginBottom: 16 }
-          ]} 
-          elevation={theme.dark ? 1 : 4}
-        >
-          <View style={styles.summaryHeader}>
-            <View>
-              <Text style={[styles.summaryLabel, { color: theme.dark ? theme.colors.onSurfaceVariant : 'rgba(255,255,255,0.8)' }]}>
-                Overall Stock Health
-              </Text>
-              <Text style={[styles.summaryValue, { color: theme.dark ? theme.colors.primary : '#FFFFFF' }]}>
-                {avgStock}%
-              </Text>
-            </View>
-            <Icon 
-              name="chart-arc" 
-              size={48} 
-              color={theme.dark ? theme.colors.primary + '40' : 'rgba(255,255,255,0.8)'} 
-            />
-          </View>
-          <ProgressBar 
-            progress={avgStock / 100} 
-            color={theme.dark ? theme.colors.primary : '#FFFFFF'} 
-            style={[styles.summaryProgress, { backgroundColor: theme.dark ? theme.colors.surface : 'rgba(255,255,255,0.2)' }]} 
-          />
-          <View style={styles.summaryStats}>
-            <View style={styles.summaryStatItem}>
-              <Text style={[styles.summaryStatValue, { color: theme.dark ? theme.colors.onSurface : '#FFFFFF' }]}>
-                {getTotalItems()}
-              </Text>
-              <Text style={[styles.summaryStatLabel, { color: theme.dark ? theme.colors.onSurfaceVariant : 'rgba(255,255,255,0.7)' }]}>
-                Total Items
-              </Text>
-            </View>
-            <View style={[styles.summaryStatDivider, { backgroundColor: theme.dark ? theme.colors.outlineVariant : 'rgba(255,255,255,0.2)' }]} />
-            <View style={styles.summaryStatItem}>
-              <Text style={[styles.summaryStatValue, { color: theme.dark ? theme.colors.onSurface : '#FFFFFF' }]}>
-                {lowStock}
-              </Text>
-              <Text style={[styles.summaryStatLabel, { color: theme.dark ? theme.colors.onSurfaceVariant : 'rgba(255,255,255,0.7)' }]}>
-                Low Stock
-              </Text>
-            </View>
-            <View style={[styles.summaryStatDivider, { backgroundColor: theme.dark ? theme.colors.outlineVariant : 'rgba(255,255,255,0.2)' }]} />
-            <View style={styles.summaryStatItem}>
-              <Text style={[styles.summaryStatValue, { color: theme.dark ? theme.colors.onSurface : '#FFFFFF' }]}>
-                {getActiveCategoriesCount()}
-              </Text>
-              <Text style={[styles.summaryStatLabel, { color: theme.dark ? theme.colors.onSurfaceVariant : 'rgba(255,255,255,0.7)' }]}>
-                Categories
-              </Text>
-            </View>
-          </View>
-        </Surface>
 
-        <Surface 
-          style={[
-            styles.summaryCard, 
-            { backgroundColor: theme.dark ? theme.colors.surfaceVariant : theme.colors.secondary }
-          ]} 
-          elevation={theme.dark ? 1 : 4}
-        >
-          <View style={styles.summaryHeader}>
-            <View>
-              <Text style={[styles.summaryLabel, { color: theme.dark ? theme.colors.onSurfaceVariant : 'rgba(255,255,255,0.8)' }]}>
-                Integrity & Freshness
-              </Text>
-              <Text style={[styles.summaryValue, { color: theme.dark ? theme.colors.secondary : '#FFFFFF' }]}>
-                {staleItems.length > 0 ? 'Attention' : 'Healthy'}
-              </Text>
-            </View>
-            <Icon 
-              name="heart-pulse" 
-              size={48} 
-              color={theme.dark ? theme.colors.secondary + '40' : 'rgba(255,255,255,0.8)'} 
-            />
-          </View>
-          <View style={styles.summaryStats}>
-            <View style={styles.summaryStatItem}>
-              <Text style={[styles.summaryStatValue, { color: theme.dark ? theme.colors.onSurface : '#FFFFFF' }]}>
-                {staleItems.length}
-              </Text>
-              <Text style={[styles.summaryStatLabel, { color: theme.dark ? theme.colors.onSurfaceVariant : 'rgba(255,255,255,0.7)' }]}>
-                Stale Items
-              </Text>
-            </View>
-            <View style={[styles.summaryStatDivider, { backgroundColor: theme.dark ? theme.colors.outlineVariant : 'rgba(255,255,255,0.2)' }]} />
-            <View style={styles.summaryStatItem}>
-              <Text style={[styles.summaryStatValue, { color: theme.dark ? theme.colors.onSurface : '#FFFFFF' }]}>
-                {staleCategories.size}
-              </Text>
-              <Text style={[styles.summaryStatLabel, { color: theme.dark ? theme.colors.onSurfaceVariant : 'rgba(255,255,255,0.7)' }]}>
-                Stale Cats
-              </Text>
-            </View>
-            <View style={[styles.summaryStatDivider, { backgroundColor: theme.dark ? theme.colors.outlineVariant : 'rgba(255,255,255,0.2)' }]} />
-            <View style={styles.summaryStatItem}>
-              <Text style={[styles.summaryStatValue, { color: theme.dark ? theme.colors.onSurface : '#FFFFFF' }]}>
-                {Math.round((1 - (staleItems.length / (inventoryItems.length || 1))) * 100)}%
-              </Text>
-              <Text style={[styles.summaryStatLabel, { color: theme.dark ? theme.colors.onSurfaceVariant : 'rgba(255,255,255,0.7)' }]}>
-                Freshness
-              </Text>
-            </View>
-          </View>
-        </Surface>
-      </View>
-    );
-  };
+    Object.values(grouped).forEach(g => {
+      g.items.sort((a, b) => (b.daysStale - b.thresholdDays) - (a.daysStale - a.thresholdDays));
+    });
 
-  const renderUsagePatternsSection = () => {
-    const mostRestocked = getMostRestockedItem();
-    const leastUsed = getLeastUsedItem();
+    return grouped;
+  }, [inventoryItems, thresholds]);
 
-    return (
-      <View style={styles.patternsList}>
-        <Card style={styles.patternCard} mode="contained">
-          <Card.Content style={styles.patternContent}>
-            <View style={[styles.patternIconContainer, { backgroundColor: theme.dark ? 'rgba(46, 125, 50, 0.2)' : '#E8F5E9' }]}>
-              <Icon name="trending-up" size={24} color={theme.dark ? '#81C784' : '#2E7D32'} />
-            </View>
-            <View style={styles.patternInfo}>
-              <Text variant="labelLarge" style={{ color: theme.colors.onSurfaceVariant }}>Most Restocked</Text>
-              <Text variant="titleMedium" style={{ fontWeight: '700', color: theme.colors.onSurface }}>
-                {mostRestocked?.name || 'No data yet'}
-              </Text>
-            </View>
-            <View style={[styles.patternBadge, { backgroundColor: theme.dark ? 'rgba(46, 125, 50, 0.3)' : '#E8F5E9' }]}>
-              <Text style={[styles.patternBadgeText, { color: theme.dark ? '#81C784' : '#2E7D32' }]}>
-                {mostRestocked ? `${mostRestocked.purchaseHistory?.length || 0}x` : '-'}
-              </Text>
-            </View>
-          </Card.Content>
-        </Card>
+  const totalStaleCount = useMemo(() => {
+    return Object.values(staleByCategory).reduce((sum, g) => sum + g.items.length, 0);
+  }, [staleByCategory]);
 
-        <Card style={styles.patternCard} mode="contained">
-          <Card.Content style={styles.patternContent}>
-            <View style={[styles.patternIconContainer, { backgroundColor: theme.dark ? 'rgba(239, 108, 0, 0.2)' : '#FFF3E0' }]}>
-              <Icon name="clock-alert-outline" size={24} color={theme.dark ? '#FFB74D' : '#EF6C00'} />
-            </View>
-            <View style={styles.patternInfo}>
-              <Text variant="labelLarge" style={{ color: theme.colors.onSurfaceVariant }}>Least Used</Text>
-              <Text variant="titleMedium" style={{ fontWeight: '700', color: theme.colors.onSurface }}>
-                {leastUsed?.name || 'No data yet'}
-              </Text>
-            </View>
-            <Text variant="bodySmall" style={{ color: theme.dark ? '#FFB74D' : '#EF6C00', fontWeight: '700' }}>
-              {leastUsed ? `${getDaysSinceLastUpdate(leastUsed)}d` : ''}
-            </Text>
-          </Card.Content>
-        </Card>
-      </View>
-    );
-  };
+  // Set of stale item IDs — used to exclude them from other sections
+  const staleItemIds = useMemo(() => {
+    const ids = new Set<string>();
+    Object.values(staleByCategory).forEach(g => g.items.forEach(item => ids.add(item.id)));
+    return ids;
+  }, [staleByCategory]);
 
-  const renderFreshnessAnalysisSection = () => {
-    const thresholds = settingsManager.getActivityThresholds();
-    const staleItems = inventoryManager.getStaleItemsByThreshold(thresholds);
-    
-    const staleByCategory: Record<string, InventoryItem[]> = {};
-    staleItems.forEach(item => {
+  // Top 10 most used (by purchase history length)
+  const topUsed = useMemo(() => {
+    return [...inventoryItems]
+      .filter(item => (item.purchaseHistory?.length || 0) > 0)
+      .sort((a, b) => (b.purchaseHistory?.length || 0) - (a.purchaseHistory?.length || 0))
+      .slice(0, 10);
+  }, [inventoryItems]);
+
+  // Least used (by longest time since last update, top 10) — excludes stale items
+  const leastUsed = useMemo(() => {
+    return [...inventoryItems]
+      .filter(item => !staleItemIds.has(item.id))
+      .sort((a, b) => new Date(a.lastUpdated).getTime() - new Date(b.lastUpdated).getTime())
+      .slice(0, 10);
+  }, [inventoryItems, staleItemIds]);
+
+  // Running low (quantity ≤ 25%) — excludes stale items
+  const lowStockItems = useMemo(() => {
+    return [...inventoryItems]
+      .filter(item => item.quantity <= 0.25 && !staleItemIds.has(item.id))
+      .sort((a, b) => a.quantity - b.quantity);
+  }, [inventoryItems, staleItemIds]);
+
+  // Category health summary
+  const categoryHealth = useMemo(() => {
+    const allStaleItems = inventoryManager.getStaleItemsByThreshold(thresholds);
+    return getAllCategories().map(category => {
+      const config = CATEGORY_CONFIG[category];
+      const categoryItems = inventoryItems.filter(item => {
+        const subcatConfig = inventoryManager.getSubcategoryConfig(item.subcategory);
+        return subcatConfig?.category === category;
+      });
+      const staleCount = allStaleItems.filter(item => {
+        const subcatConfig = inventoryManager.getSubcategoryConfig(item.subcategory);
+        return subcatConfig?.category === category;
+      }).length;
+      const lowCount = categoryItems.filter(i => i.quantity <= 0.25).length;
+      const avgStock = categoryItems.length > 0
+        ? Math.round((categoryItems.reduce((s, i) => s + i.quantity, 0) / categoryItems.length) * 100)
+        : 0;
+
+      return {
+        category,
+        config,
+        totalItems: categoryItems.length,
+        staleCount,
+        lowCount,
+        avgStock,
+        threshold: thresholds[category],
+      };
+    }).filter(c => c.totalItems > 0);
+  }, [inventoryItems, thresholds]);
+
+  // Never restocked items — excludes stale items
+  const neverRestocked = useMemo(() => {
+    return inventoryItems.filter(item => (!item.purchaseHistory || item.purchaseHistory.length === 0) && !staleItemIds.has(item.id));
+  }, [inventoryItems, staleItemIds]);
+
+  // Quick stats
+  const quickStats = useMemo(() => {
+    const totalRestocks = inventoryItems.reduce((sum, item) => sum + (item.purchaseHistory?.length || 0), 0);
+    const avgStock = inventoryItems.length > 0
+      ? Math.round((inventoryItems.reduce((s, i) => s + i.quantity, 0) / inventoryItems.length) * 100)
+      : 0;
+
+    // Most active category (most restocks)
+    const catRestocks: Record<string, number> = {};
+    inventoryItems.forEach(item => {
       const config = inventoryManager.getSubcategoryConfig(item.subcategory);
       if (config) {
-        if (!staleByCategory[config.category]) {
-          staleByCategory[config.category] = [];
-        }
-        staleByCategory[config.category].push(item);
+        catRestocks[config.category] = (catRestocks[config.category] || 0) + (item.purchaseHistory?.length || 0);
       }
     });
+    const mostActiveCat = Object.entries(catRestocks).sort((a, b) => b[1] - a[1])[0];
+
+    // Oldest item (by lastUpdated)
+    const oldest = inventoryItems.length > 0
+      ? inventoryItems.reduce((prev, curr) =>
+          new Date(prev.lastUpdated).getTime() < new Date(curr.lastUpdated).getTime() ? prev : curr
+        )
+      : null;
+
+    return { totalRestocks, avgStock, mostActiveCat, oldest };
+  }, [inventoryItems]);
+
+  // ── Monthly Summary Data ──
+
+  const monthlySummary = useMemo(() => {
+    const now = new Date();
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    // Collect ALL purchase dates across all items
+    const allDates: Date[] = [];
+    inventoryItems.forEach(item => {
+      (item.purchaseHistory || []).forEach(d => allDates.push(new Date(d)));
+    });
+
+    // Build last 6 months data
+    const months: {
+      key: string;
+      label: string;
+      fullLabel: string;
+      restocks: number;
+      shoppingTrips: number;
+      topItem: { name: string; count: number } | null;
+    }[] = [];
+
+    for (let i = 5; i >= 0; i--) {
+      const m = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const year = m.getFullYear();
+      const month = m.getMonth();
+      const key = `${year}-${month}`;
+      const label = monthNames[month];
+      const fullLabel = `${monthNames[month]} ${year}`;
+
+      // Count restocks this month
+      const monthDates = allDates.filter(d => d.getFullYear() === year && d.getMonth() === month);
+      const restocks = monthDates.length;
+
+      // Count shopping trips: unique dates (YYYY-MM-DD) = 1 trip per day
+      const uniqueDays = new Set(monthDates.map(d =>
+        `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+      ));
+      const shoppingTrips = uniqueDays.size;
+
+      // Top restocked item this month
+      const itemCounts: Record<string, number> = {};
+      inventoryItems.forEach(item => {
+        const count = (item.purchaseHistory || []).filter(d => {
+          const dd = new Date(d);
+          return dd.getFullYear() === year && dd.getMonth() === month;
+        }).length;
+        if (count > 0) itemCounts[item.name] = count;
+      });
+      const topEntry = Object.entries(itemCounts).sort((a, b) => b[1] - a[1])[0];
+      const topItem = topEntry ? { name: topEntry[0], count: topEntry[1] } : null;
+
+      months.push({ key, label, fullLabel, restocks, shoppingTrips, topItem });
+    }
+
+    const maxRestocks = Math.max(...months.map(m => m.restocks), 1);
+    const maxTrips = Math.max(...months.map(m => m.shoppingTrips), 1);
+    const totalRestocks = months.reduce((s, m) => s + m.restocks, 0);
+    const totalTrips = months.reduce((s, m) => s + m.shoppingTrips, 0);
+    const avgRestocksPerMonth = months.length > 0 ? Math.round(totalRestocks / months.length) : 0;
+    const avgTripsPerMonth = months.length > 0 ? (totalTrips / months.length).toFixed(1) : '0';
+
+    // Busiest month
+    const busiest = [...months].sort((a, b) => b.restocks - a.restocks)[0];
+
+    // Current month
+    const currentMonth = months[months.length - 1];
+
+    // Trend: compare current vs previous month
+    const prevMonth = months.length >= 2 ? months[months.length - 2] : null;
+    let trend: 'up' | 'down' | 'same' = 'same';
+    let trendPct = 0;
+    if (prevMonth && prevMonth.restocks > 0) {
+      trendPct = Math.round(((currentMonth.restocks - prevMonth.restocks) / prevMonth.restocks) * 100);
+      trend = trendPct > 0 ? 'up' : trendPct < 0 ? 'down' : 'same';
+    } else if (currentMonth.restocks > 0 && (!prevMonth || prevMonth.restocks === 0)) {
+      trend = 'up';
+      trendPct = 100;
+    }
+
+    return {
+      months,
+      maxRestocks,
+      maxTrips,
+      totalRestocks,
+      totalTrips,
+      avgRestocksPerMonth,
+      avgTripsPerMonth,
+      busiest,
+      currentMonth,
+      trend,
+      trendPct: Math.abs(trendPct),
+    };
+  }, [inventoryItems]);
+
+  // ── Render Helpers ──
+
+  const renderItemList = <T,>(
+    items: T[],
+    sectionKey: string,
+    renderItem: (item: T, index: number) => React.ReactNode,
+    accentColor: string,
+  ) => {
+    const expanded = expandedSections[sectionKey] || false;
+    const visibleItems = expanded ? items : items.slice(0, COLLAPSED_COUNT);
 
     return (
-      <View style={styles.freshnessContainer}>
-        {Object.values(InventoryCategory).map(category => {
-          const items = staleByCategory[category] || [];
-          const config = CATEGORY_CONFIG[category];
-          const threshold = thresholds[category];
-          
-          return (
-            <Card key={category} style={styles.freshnessCard} mode="contained">
-              <Card.Content style={styles.freshnessContent}>
-                <View style={[styles.freshnessIconContainer, { backgroundColor: config.color + '15' }]}>
-                  <Icon name={config.icon as any} size={24} color={config.color} />
-                </View>
-                <View style={styles.freshnessInfo}>
-                  <Text style={[styles.freshnessTitle, { color: theme.colors.onSurface }]}>{category}</Text>
-                  <Text style={[styles.freshnessSubtitle, { color: theme.colors.onSurfaceVariant }]}>
-                    Check every {threshold} days
-                  </Text>
-                </View>
-                <View style={styles.freshnessStatus}>
-                  {items.length > 0 ? (
-                    <View style={[styles.staleBadge, { backgroundColor: theme.dark ? 'rgba(239, 68, 68, 0.2)' : '#FEE2E2' }]}>
-                      <Text style={[styles.staleBadgeText, { color: theme.dark ? '#FCA5A5' : '#EF4444' }]}>{items.length} stale</Text>
-                    </View>
-                  ) : (
-                    <Icon name="check-circle" size={24} color={theme.dark ? '#81C784' : theme.colors.secondary} />
-                  )}
-                </View>
-              </Card.Content>
-              {items.length > 0 && (
-                <Card.Actions style={styles.freshnessActions}>
-                  <View style={[styles.staleItemsList, { backgroundColor: theme.dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}>
-                    <Text style={[styles.staleItemsText, { color: theme.colors.onSurfaceVariant }]} numberOfLines={1}>
-                      Needs update: {items.map(it => it.name).join(', ')}
+      <>
+        {visibleItems.map((item, index) => renderItem(item, index))}
+        <ShowMoreButton
+          expanded={expanded}
+          totalCount={items.length}
+          onPress={() => toggleSection(sectionKey)}
+          accentColor={accentColor}
+          theme={theme}
+        />
+      </>
+    );
+  };
+
+  const renderDivider = (index: number) => {
+    if (index === 0) return null;
+    return <View style={[styles.divider, { backgroundColor: theme.dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }]} />;
+  };
+
+  const renderStaleSection = () => {
+    const categoryEntries = Object.entries(staleByCategory);
+
+    return (
+      <View style={styles.sectionContainer}>
+        <SectionHeader
+          icon="alert-decagram"
+          title="Stale Items"
+          subtitle="Items not updated within their check-in threshold"
+          iconColor={theme.dark ? '#FCA5A5' : '#EF4444'}
+          badgeCount={totalStaleCount}
+          badgeColor={theme.dark ? '#FCA5A5' : '#EF4444'}
+          theme={theme}
+        />
+
+        {categoryEntries.length === 0 ? (
+          <Surface style={[styles.card, { backgroundColor: theme.dark ? theme.colors.surface : '#FFFFFF' }]} elevation={theme.dark ? 1 : 2}>
+            <EmptyState
+              icon="check-decagram"
+              title="Everything's Fresh!"
+              subtitle="All items are within their activity thresholds"
+              color={theme.dark ? '#34D399' : '#10B981'}
+              theme={theme}
+            />
+          </Surface>
+        ) : (
+          categoryEntries.map(([category, group]) => {
+            const sectionKey = `stale_${category}`;
+            return (
+              <Surface
+                key={category}
+                style={[styles.card, { backgroundColor: theme.dark ? theme.colors.surface : '#FFFFFF' }]}
+                elevation={theme.dark ? 1 : 2}
+              >
+                <View style={styles.staleCategoryHeader}>
+                  <View style={[styles.staleCatIconWrap, { backgroundColor: group.config.color + '15' }]}>
+                    <Icon name={group.config.icon as any} size={20} color={group.config.color} />
+                  </View>
+                  <View style={styles.staleCatInfo}>
+                    <Text style={[styles.staleCatName, { color: theme.colors.onSurface }]}>{category}</Text>
+                    <Text style={[styles.staleCatThreshold, { color: theme.colors.onSurfaceVariant }]}>
+                      Threshold: every {group.threshold} days
                     </Text>
                   </View>
-                </Card.Actions>
-              )}
-            </Card>
-          );
-        })}
+                  <View style={[styles.staleCatBadge, { backgroundColor: theme.dark ? 'rgba(239,68,68,0.2)' : '#FEE2E2' }]}>
+                    <Text style={[styles.staleCatBadgeText, { color: theme.dark ? '#FCA5A5' : '#EF4444' }]}>
+                      {group.items.length}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.staleItemsContainer}>
+                  {renderItemList(
+                    group.items,
+                    sectionKey,
+                    (item, index) => (
+                      <View key={item.id}>
+                        {renderDivider(index)}
+                        <StaleItemRow item={item} daysStale={item.daysStale} thresholdDays={item.thresholdDays} theme={theme} />
+                      </View>
+                    ),
+                    theme.dark ? '#FCA5A5' : '#EF4444',
+                  )}
+                </View>
+              </Surface>
+            );
+          })
+        )}
       </View>
     );
   };
 
-  const renderCategoryAnalysisSection = () => (
-    <View style={styles.categoryList}>
-      {getAllCategories().map((category) => {
-        const items = getItemsForCategory(category);
-        if (items.length === 0) return null;
-
-        const lowStockCount = items.filter(item => item.quantity <= 0.25).length;
-        const averageStock = items.reduce((sum, item) => sum + item.quantity, 0) / items.length;
-        const config = CATEGORY_CONFIG[category];
-
-        return (
-          <Card key={category} style={styles.categoryCard} mode="outlined">
-            <Card.Content style={styles.categoryContent}>
-              <View style={[styles.categoryIconBox, { backgroundColor: config.color + '15' }]}>
-                <Icon name={config.icon as any} size={24} color={config.color} />
-              </View>
-              <View style={styles.categoryInfo}>
-                <View style={styles.categoryHeaderRow}>
-                  <Text variant="titleMedium" style={{ fontWeight: '700', color: theme.colors.onSurface }}>{category}</Text>
-                  <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>{items.length} items</Text>
+  const renderTopUsedSection = () => {
+    const accentColor = theme.dark ? '#FBBF24' : '#F59E0B';
+    return (
+      <View style={styles.sectionContainer}>
+        <SectionHeader
+          icon="trophy"
+          title="Most Restocked"
+          subtitle="Items you restock the most frequently"
+          iconColor={accentColor}
+          badgeCount={topUsed.length}
+          badgeColor={accentColor}
+          theme={theme}
+        />
+        <Surface style={[styles.card, { backgroundColor: theme.dark ? theme.colors.surface : '#FFFFFF' }]} elevation={theme.dark ? 1 : 2}>
+          {topUsed.length === 0 ? (
+            <EmptyState icon="cart-off" title="No Restock Data Yet" subtitle="Complete a shopping trip to start tracking" color={accentColor} theme={theme} />
+          ) : (
+            <View style={styles.rankedList}>
+              {renderItemList(topUsed, 'topUsed', (item, index) => (
+                <View key={item.id}>
+                  {renderDivider(index)}
+                  <RankedItemRow
+                    item={item}
+                    rank={index + 1}
+                    metric={`${item.purchaseHistory?.length || 0}×`}
+                    metricLabel={`Restocked ${item.purchaseHistory?.length || 0} times`}
+                    accentColor={accentColor}
+                    theme={theme}
+                  />
                 </View>
-                <ProgressBar 
-                  progress={averageStock} 
-                  color={config.color} 
-                  style={styles.categoryProgress} 
-                />
-                <View style={styles.categoryFooterRow}>
-                  <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>Avg Stock: {Math.round(averageStock * 100)}%</Text>
-                  {lowStockCount > 0 && (
-                    <Text variant="labelSmall" style={{ color: theme.colors.error, fontWeight: '700' }}>
-                      {lowStockCount} Low
+              ), accentColor)}
+            </View>
+          )}
+        </Surface>
+      </View>
+    );
+  };
+
+  const renderLeastUsedSection = () => {
+    const accentColor = theme.dark ? '#94A3B8' : '#64748B';
+    return (
+      <View style={styles.sectionContainer}>
+        <SectionHeader
+          icon="sleep"
+          title="Least Active"
+          subtitle="Items untouched for the longest time"
+          iconColor={accentColor}
+          badgeCount={leastUsed.length > 0 ? leastUsed.length : undefined}
+          badgeColor={accentColor}
+          theme={theme}
+        />
+        <Surface style={[styles.card, { backgroundColor: theme.dark ? theme.colors.surface : '#FFFFFF' }]} elevation={theme.dark ? 1 : 2}>
+          {leastUsed.length === 0 ? (
+            <EmptyState icon="package-variant" title="No Items Yet" subtitle="Add items to your inventory to see activity insights" color={accentColor} theme={theme} />
+          ) : (
+            <View style={styles.rankedList}>
+              {renderItemList(leastUsed, 'leastUsed', (item, index) => {
+                const days = daysSince(item.lastUpdated);
+                return (
+                  <View key={item.id}>
+                    {renderDivider(index)}
+                    <RankedItemRow
+                      item={item}
+                      rank={index + 1}
+                      metric={days === 0 ? 'Today' : `${days}d`}
+                      metricLabel={`Last updated ${formatDaysAgo(days)}`}
+                      accentColor={accentColor}
+                      theme={theme}
+                    />
+                  </View>
+                );
+              }, accentColor)}
+            </View>
+          )}
+        </Surface>
+      </View>
+    );
+  };
+
+  const renderLowStockSection = () => {
+    const accentColor = theme.dark ? '#FBBF24' : '#EF4444';
+    return (
+      <View style={styles.sectionContainer}>
+        <SectionHeader
+          icon="arrow-down-bold-circle"
+          title="Running Low"
+          subtitle="Items at 25% stock or below"
+          iconColor={accentColor}
+          badgeCount={lowStockItems.length}
+          badgeColor={accentColor}
+          theme={theme}
+        />
+        <Surface style={[styles.card, { backgroundColor: theme.dark ? theme.colors.surface : '#FFFFFF' }]} elevation={theme.dark ? 1 : 2}>
+          {lowStockItems.length === 0 ? (
+            <EmptyState icon="check-circle" title="Fully Stocked!" subtitle="No items are running low right now" color={theme.dark ? '#34D399' : '#10B981'} theme={theme} />
+          ) : (
+            <View style={styles.rankedList}>
+              {renderItemList(lowStockItems, 'lowStock', (item, index) => (
+                <View key={item.id}>
+                  {renderDivider(index)}
+                  <LowStockRow item={item} theme={theme} />
+                </View>
+              ), accentColor)}
+            </View>
+          )}
+        </Surface>
+      </View>
+    );
+  };
+
+  const renderCategoryHealthSection = () => {
+    const accentColor = theme.dark ? '#818CF8' : '#6366F1';
+    return (
+      <View style={styles.sectionContainer}>
+        <SectionHeader
+          icon="view-grid"
+          title="Category Health"
+          subtitle="Staleness & stock levels per category"
+          iconColor={accentColor}
+          theme={theme}
+        />
+        <Surface style={[styles.card, { backgroundColor: theme.dark ? theme.colors.surface : '#FFFFFF' }]} elevation={theme.dark ? 1 : 2}>
+          {categoryHealth.length === 0 ? (
+            <EmptyState icon="shape-outline" title="No Categories Yet" subtitle="Add items to see category-level insights" color={accentColor} theme={theme} />
+          ) : (
+            <View style={styles.categoryHealthList}>
+              {categoryHealth.map((cat, index) => (
+                <View key={cat.category}>
+                  {index > 0 && <View style={[styles.divider, { backgroundColor: theme.dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }]} />}
+                  <View style={styles.catHealthRow}>
+                    <View style={[styles.catHealthIcon, { backgroundColor: cat.config.color + '15' }]}>
+                      <Icon name={cat.config.icon as any} size={20} color={cat.config.color} />
+                    </View>
+                    <View style={styles.catHealthInfo}>
+                      <View style={styles.catHealthNameRow}>
+                        <Text style={[styles.catHealthName, { color: theme.colors.onSurface }]}>{cat.category}</Text>
+                        <Text style={[styles.catHealthItemCount, { color: theme.colors.onSurfaceVariant }]}>{cat.totalItems} items</Text>
+                      </View>
+                      <ProgressBar
+                        progress={cat.avgStock / 100}
+                        color={cat.config.color}
+                        style={[styles.catHealthBar, { backgroundColor: theme.dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
+                      />
+                      <View style={styles.catHealthDetails}>
+                        <Text style={[styles.catHealthDetailText, { color: theme.colors.onSurfaceVariant }]}>
+                          Avg {cat.avgStock}%
+                        </Text>
+                        {cat.staleCount > 0 && (
+                          <View style={[styles.catHealthBadge, { backgroundColor: theme.dark ? 'rgba(239,68,68,0.2)' : '#FEE2E2' }]}>
+                            <Text style={[styles.catHealthBadgeText, { color: theme.dark ? '#FCA5A5' : '#EF4444' }]}>
+                              {cat.staleCount} stale
+                            </Text>
+                          </View>
+                        )}
+                        {cat.lowCount > 0 && (
+                          <View style={[styles.catHealthBadge, { backgroundColor: theme.dark ? 'rgba(251,191,36,0.2)' : '#FEF3C7' }]}>
+                            <Text style={[styles.catHealthBadgeText, { color: theme.dark ? '#FBBF24' : '#D97706' }]}>
+                              {cat.lowCount} low
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+        </Surface>
+      </View>
+    );
+  };
+
+  const renderNeverRestockedSection = () => {
+    const accentColor = theme.dark ? '#A78BFA' : '#7C3AED';
+    return (
+      <View style={styles.sectionContainer}>
+        <SectionHeader
+          icon="package-variant-closed"
+          title="Never Restocked"
+          subtitle="Items that have never been through a shopping trip"
+          iconColor={accentColor}
+          badgeCount={neverRestocked.length}
+          badgeColor={accentColor}
+          theme={theme}
+        />
+        <Surface style={[styles.card, { backgroundColor: theme.dark ? theme.colors.surface : '#FFFFFF' }]} elevation={theme.dark ? 1 : 2}>
+          {neverRestocked.length === 0 ? (
+            <EmptyState icon="cart-check" title="All Restocked!" subtitle="Every item has been through at least one shopping trip" color={accentColor} theme={theme} />
+          ) : (
+            <View style={styles.rankedList}>
+              {renderItemList(neverRestocked, 'neverRestocked', (item, index) => {
+                const days = daysSince(item.lastUpdated);
+                return (
+                  <View key={item.id}>
+                    {renderDivider(index)}
+                    <View style={[styles.rankedRow, { backgroundColor: theme.dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)' }]}>
+                      <View style={[styles.neverRestockedIcon, { backgroundColor: accentColor + '15' }]}>
+                        <Icon name="package-variant-closed" size={16} color={accentColor} />
+                      </View>
+                      <View style={styles.rankedInfo}>
+                        <Text style={[styles.rankedItemName, { color: theme.colors.onSurface }]} numberOfLines={1}>{item.name}</Text>
+                        <Text style={[styles.rankedItemMeta, { color: theme.colors.onSurfaceVariant }]}>
+                          Added {formatDaysAgo(days)} · {Math.round(item.quantity * 100)}% stock
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                );
+              }, accentColor)}
+            </View>
+          )}
+        </Surface>
+      </View>
+    );
+  };
+
+  const renderMonthlySummarySection = () => {
+    const { months, maxRestocks, maxTrips, totalRestocks, totalTrips, avgRestocksPerMonth, avgTripsPerMonth, busiest, currentMonth, trend, trendPct } = monthlySummary;
+    const chartAccent = theme.dark ? '#818CF8' : '#6366F1';
+    const tripsAccent = theme.dark ? '#34D399' : '#10B981';
+    const trendColor = trend === 'up' ? (theme.dark ? '#34D399' : '#10B981') : trend === 'down' ? (theme.dark ? '#FCA5A5' : '#EF4444') : theme.colors.onSurfaceVariant;
+    const trendIcon = trend === 'up' ? 'trending-up' : trend === 'down' ? 'trending-down' : 'minus';
+
+    return (
+      <View style={styles.sectionContainer}>
+        <SectionHeader
+          icon="calendar-month"
+          title="Monthly Summary"
+          subtitle="Restocking activity over the last 6 months"
+          iconColor={chartAccent}
+          theme={theme}
+        />
+
+        {/* Restocks Bar Chart */}
+        <Surface style={[styles.card, { backgroundColor: theme.dark ? theme.colors.surface : '#FFFFFF' }]} elevation={theme.dark ? 1 : 2}>
+          <View style={styles.chartSection}>
+            <View style={styles.chartLegendRow}>
+              <View style={styles.chartLegendItem}>
+                <View style={[styles.chartLegendDot, { backgroundColor: chartAccent }]} />
+                <Text style={[styles.chartLegendText, { color: theme.colors.onSurfaceVariant }]}>Restocks</Text>
+              </View>
+              <View style={styles.chartLegendItem}>
+                <View style={[styles.chartLegendDot, { backgroundColor: tripsAccent }]} />
+                <Text style={[styles.chartLegendText, { color: theme.colors.onSurfaceVariant }]}>Shopping Trips</Text>
+              </View>
+            </View>
+
+            <View style={styles.chartContainer}>
+              {months.map((m) => {
+                const restockHeight = maxRestocks > 0 ? Math.max((m.restocks / maxRestocks) * 100, m.restocks > 0 ? 8 : 2) : 2;
+                const tripHeight = maxTrips > 0 ? Math.max((m.shoppingTrips / maxTrips) * 100, m.shoppingTrips > 0 ? 8 : 2) : 2;
+                const isCurrentMonth = m.key === currentMonth.key;
+
+                return (
+                  <View key={m.key} style={styles.chartBarGroup}>
+                    <View style={styles.chartBarValues}>
+                      {m.restocks > 0 && (
+                        <Text style={[styles.chartBarValueText, { color: chartAccent }]}>{m.restocks}</Text>
+                      )}
+                    </View>
+                    <View style={styles.chartBarsWrap}>
+                      <View
+                        style={[
+                          styles.chartBar,
+                          {
+                            height: restockHeight,
+                            backgroundColor: isCurrentMonth ? chartAccent : chartAccent + '60',
+                            borderRadius: 4,
+                          },
+                        ]}
+                      />
+                      <View
+                        style={[
+                          styles.chartBar,
+                          {
+                            height: tripHeight,
+                            backgroundColor: isCurrentMonth ? tripsAccent : tripsAccent + '60',
+                            borderRadius: 4,
+                          },
+                        ]}
+                      />
+                    </View>
+                    <Text style={[
+                      styles.chartLabel,
+                      { color: isCurrentMonth ? theme.colors.onSurface : theme.colors.onSurfaceVariant, fontWeight: isCurrentMonth ? '800' : '500' }
+                    ]}>
+                      {m.label}
                     </Text>
-                  )}
-                </View>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* Monthly Insights */}
+          <View style={[styles.monthlyInsights, { borderTopColor: theme.dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }]}>
+            {/* Row 1: This month overview */}
+            <View style={styles.monthlyInsightRow}>
+              <View style={[styles.monthlyInsightIcon, { backgroundColor: chartAccent + '15' }]}>
+                <Icon name="calendar-today" size={16} color={chartAccent} />
               </View>
-            </Card.Content>
-          </Card>
-        );
-      })}
-    </View>
-  );
+              <View style={styles.monthlyInsightInfo}>
+                <Text style={[styles.monthlyInsightLabel, { color: theme.colors.onSurfaceVariant }]}>This Month</Text>
+                <Text style={[styles.monthlyInsightValue, { color: theme.colors.onSurface }]}>
+                  {currentMonth.restocks} restocks · {currentMonth.shoppingTrips} trip{currentMonth.shoppingTrips !== 1 ? 's' : ''}
+                </Text>
+              </View>
+              <View style={[styles.trendBadge, { backgroundColor: trendColor + '15' }]}>
+                <Icon name={trendIcon as any} size={14} color={trendColor} />
+                {trendPct > 0 && <Text style={[styles.trendText, { color: trendColor }]}>{trendPct}%</Text>}
+              </View>
+            </View>
 
-  const renderShoppingInsightsSection = () => (
-    <View style={styles.shoppingList}>
-      <Card style={styles.shoppingCard} mode="contained">
-        <Card.Content style={styles.shoppingContent}>
-          <Icon name="cart" size={24} color={theme.dark ? '#64B5F6' : '#3498DB'} style={styles.shoppingIcon} />
-          <View style={styles.shoppingInfo}>
-            <Text style={[styles.shoppingTitle, { color: theme.colors.onSurface }]}>
-              Shopping Frequency
-            </Text>
-            <Text style={[styles.shoppingSubtitle, { color: theme.colors.onSurfaceVariant }]}>
-              Based on restock patterns
-            </Text>
-          </View>
-          <Text style={[styles.shoppingValue, { color: theme.dark ? '#64B5F6' : '#3498DB' }]}>
-            Weekly
-          </Text>
-        </Card.Content>
-      </Card>
+            {/* Row 2: Busiest month */}
+            {busiest && busiest.restocks > 0 && (
+              <>
+                <View style={[styles.monthlyDivider, { backgroundColor: theme.dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }]} />
+                <View style={styles.monthlyInsightRow}>
+                  <View style={[styles.monthlyInsightIcon, { backgroundColor: '#F59E0B15' }]}>
+                    <Icon name="fire" size={16} color={theme.dark ? '#FBBF24' : '#F59E0B'} />
+                  </View>
+                  <View style={styles.monthlyInsightInfo}>
+                    <Text style={[styles.monthlyInsightLabel, { color: theme.colors.onSurfaceVariant }]}>Busiest Month</Text>
+                    <Text style={[styles.monthlyInsightValue, { color: theme.colors.onSurface }]}>
+                      {busiest.fullLabel} — {busiest.restocks} restocks
+                    </Text>
+                  </View>
+                </View>
+              </>
+            )}
 
-      <Card style={styles.shoppingCard} mode="contained">
-        <Card.Content style={styles.shoppingContent}>
-          <Icon name="calendar-clock" size={24} color={theme.dark ? '#CE93D8' : '#9B59B6'} style={styles.shoppingIcon} />
-          <View style={styles.shoppingInfo}>
-            <Text style={[styles.shoppingTitle, { color: theme.colors.onSurface }]}>
-              Next Shopping Trip
-            </Text>
-            <Text style={[styles.shoppingSubtitle, { color: theme.colors.onSurfaceVariant }]}>
-              Estimated based on current stock levels
-            </Text>
-          </View>
-          <Text style={[styles.shoppingValue, { color: theme.dark ? '#CE93D8' : '#9B59B6' }]}>
-            3-5 days
-          </Text>
-        </Card.Content>
-      </Card>
+            {/* Row 3: Averages */}
+            <View style={[styles.monthlyDivider, { backgroundColor: theme.dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }]} />
+            <View style={styles.monthlyInsightRow}>
+              <View style={[styles.monthlyInsightIcon, { backgroundColor: tripsAccent + '15' }]}>
+                <Icon name="chart-line" size={16} color={tripsAccent} />
+              </View>
+              <View style={styles.monthlyInsightInfo}>
+                <Text style={[styles.monthlyInsightLabel, { color: theme.colors.onSurfaceVariant }]}>6-Month Average</Text>
+                <Text style={[styles.monthlyInsightValue, { color: theme.colors.onSurface }]}>
+                  {avgRestocksPerMonth} restocks · {avgTripsPerMonth} trips/month
+                </Text>
+              </View>
+            </View>
 
-      <Card style={styles.shoppingCard} mode="contained">
-        <Card.Content style={styles.shoppingContent}>
-          <Icon name="lightbulb" size={24} color={theme.dark ? '#FFF176' : '#F1C40F'} style={styles.shoppingIcon} />
-          <View style={styles.shoppingInfo}>
-            <Text style={[styles.shoppingTitle, { color: theme.colors.onSurface }]}>
-              Shopping Efficiency
-            </Text>
-            <Text style={[styles.shoppingSubtitle, { color: theme.colors.onSurfaceVariant }]}>
-              Items typically bought together
-            </Text>
+            {/* Row 4: Top item this month */}
+            {currentMonth.topItem && (
+              <>
+                <View style={[styles.monthlyDivider, { backgroundColor: theme.dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }]} />
+                <View style={styles.monthlyInsightRow}>
+                  <View style={[styles.monthlyInsightIcon, { backgroundColor: '#EC489915' }]}>
+                    <Icon name="star" size={16} color={theme.dark ? '#F472B6' : '#EC4899'} />
+                  </View>
+                  <View style={styles.monthlyInsightInfo}>
+                    <Text style={[styles.monthlyInsightLabel, { color: theme.colors.onSurfaceVariant }]}>Top Item This Month</Text>
+                    <Text style={[styles.monthlyInsightValue, { color: theme.colors.onSurface }]}>
+                      {currentMonth.topItem.name} ({currentMonth.topItem.count}×)
+                    </Text>
+                  </View>
+                </View>
+              </>
+            )}
+
+            {/* Row 5: Total lifetime */}
+            <View style={[styles.monthlyDivider, { backgroundColor: theme.dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }]} />
+            <View style={styles.monthlyInsightRow}>
+              <View style={[styles.monthlyInsightIcon, { backgroundColor: '#6366F115' }]}>
+                <Icon name="sigma" size={16} color={chartAccent} />
+              </View>
+              <View style={styles.monthlyInsightInfo}>
+                <Text style={[styles.monthlyInsightLabel, { color: theme.colors.onSurfaceVariant }]}>Total (6 Months)</Text>
+                <Text style={[styles.monthlyInsightValue, { color: theme.colors.onSurface }]}>
+                  {totalRestocks} restocks across {totalTrips} shopping trip{totalTrips !== 1 ? 's' : ''}
+                </Text>
+              </View>
+            </View>
           </View>
-          <Text style={[styles.shoppingValue, { color: theme.dark ? '#FFF176' : '#F1C40F' }]}>
-            Group by category
-          </Text>
-        </Card.Content>
-      </Card>
-    </View>
-  );
+        </Surface>
+      </View>
+    );
+  };
+
+  const renderQuickStatsSection = () => {
+    const mostActiveName = quickStats.mostActiveCat ? quickStats.mostActiveCat[0] : '—';
+    const oldestDays = quickStats.oldest ? daysSince(quickStats.oldest.lastUpdated) : 0;
+
+    return (
+      <View style={styles.sectionContainer}>
+        <SectionHeader
+          icon="lightning-bolt"
+          title="Quick Stats"
+          subtitle="At-a-glance summary of your inventory"
+          iconColor={theme.dark ? '#38BDF8' : '#0EA5E9'}
+          theme={theme}
+        />
+        <View style={styles.statsGrid}>
+          <StatTile
+            icon="cart-arrow-down"
+            label="Total Restocks"
+            value={`${quickStats.totalRestocks}`}
+            color={theme.dark ? '#34D399' : '#10B981'}
+            theme={theme}
+          />
+          <StatTile
+            icon="gauge"
+            label="Avg Stock Level"
+            value={`${quickStats.avgStock}%`}
+            color={theme.dark ? '#38BDF8' : '#0EA5E9'}
+            theme={theme}
+          />
+          <StatTile
+            icon="star-circle"
+            label="Most Active"
+            value={mostActiveName}
+            color={theme.dark ? '#FBBF24' : '#F59E0B'}
+            theme={theme}
+          />
+          <StatTile
+            icon="calendar-clock"
+            label="Oldest Unchanged"
+            value={oldestDays === 0 ? 'Today' : `${oldestDays}d`}
+            color={theme.dark ? '#F472B6' : '#EC4899'}
+            theme={theme}
+          />
+        </View>
+      </View>
+    );
+  };
+
+  // ── Main Render ──
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <DoodleBackground />
       <ScrollView
         style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        {renderOverviewSection()}
-        
-        <List.AccordionGroup>
-          <List.Accordion
-            title="Health Analysis"
-            left={props => <List.Icon {...props} icon="heart-pulse" color={theme.colors.primary} />}
-            id="1"
-            style={styles.accordionHeader}
-            titleStyle={styles.accordionTitle}
-          >
-            {renderFreshnessAnalysisSection()}
-          </List.Accordion>
+        {/* Hero Summary */}
+        <Surface
+          style={[
+            styles.heroCard,
+            { backgroundColor: theme.dark ? theme.colors.surfaceVariant : theme.colors.primary }
+          ]}
+          elevation={theme.dark ? 1 : 4}
+        >
+          <View style={styles.heroContent}>
+            <View style={styles.heroTextWrap}>
+              <Text style={[styles.heroLabel, { color: theme.dark ? theme.colors.onSurfaceVariant : 'rgba(255,255,255,0.8)' }]}>
+                Inventory Health
+              </Text>
+              <Text style={[styles.heroValue, { color: theme.dark ? theme.colors.primary : '#FFFFFF' }]}>
+                {totalStaleCount === 0 ? 'All Good ✓' : `${totalStaleCount} Need${totalStaleCount === 1 ? 's' : ''} Attention`}
+              </Text>
+            </View>
+            <View style={[styles.heroIconWrap, { backgroundColor: theme.dark ? theme.colors.primary + '20' : 'rgba(255,255,255,0.2)' }]}>
+              <Icon
+                name={totalStaleCount === 0 ? 'shield-check' : 'alert-circle-outline'}
+                size={32}
+                color={theme.dark ? theme.colors.primary : '#FFFFFF'}
+              />
+            </View>
+          </View>
+          <View style={styles.heroStats}>
+            <View style={styles.heroStatItem}>
+              <Text style={[styles.heroStatValue, { color: theme.dark ? theme.colors.onSurface : '#FFFFFF' }]}>
+                {inventoryItems.length}
+              </Text>
+              <Text style={[styles.heroStatLabel, { color: theme.dark ? theme.colors.onSurfaceVariant : 'rgba(255,255,255,0.7)' }]}>
+                Total Items
+              </Text>
+            </View>
+            <View style={[styles.heroStatDivider, { backgroundColor: theme.dark ? theme.colors.outlineVariant : 'rgba(255,255,255,0.2)' }]} />
+            <View style={styles.heroStatItem}>
+              <Text style={[styles.heroStatValue, { color: theme.dark ? theme.colors.onSurface : '#FFFFFF' }]}>
+                {totalStaleCount}
+              </Text>
+              <Text style={[styles.heroStatLabel, { color: theme.dark ? theme.colors.onSurfaceVariant : 'rgba(255,255,255,0.7)' }]}>
+                Stale
+              </Text>
+            </View>
+            <View style={[styles.heroStatDivider, { backgroundColor: theme.dark ? theme.colors.outlineVariant : 'rgba(255,255,255,0.2)' }]} />
+            <View style={styles.heroStatItem}>
+              <Text style={[styles.heroStatValue, { color: theme.dark ? theme.colors.onSurface : '#FFFFFF' }]}>
+                {inventoryItems.length > 0 ? Math.round((1 - totalStaleCount / inventoryItems.length) * 100) : 100}%
+              </Text>
+              <Text style={[styles.heroStatLabel, { color: theme.dark ? theme.colors.onSurfaceVariant : 'rgba(255,255,255,0.7)' }]}>
+                Fresh
+              </Text>
+            </View>
+          </View>
+        </Surface>
 
-          <List.Accordion
-            title="Usage Patterns"
-            left={props => <List.Icon {...props} icon="trending-up" color={theme.colors.primary} />}
-            id="2"
-            style={styles.accordionHeader}
-            titleStyle={styles.accordionTitle}
-          >
-            {renderUsagePatternsSection()}
-          </List.Accordion>
+        {renderStaleSection()}
+        {renderTopUsedSection()}
+        {renderLeastUsedSection()}
+        {renderLowStockSection()}
+        {renderCategoryHealthSection()}
+        {renderNeverRestockedSection()}
+        {renderMonthlySummarySection()}
+        {renderQuickStatsSection()}
 
-          <List.Accordion
-            title="Category Deep Dive"
-            left={props => <List.Icon {...props} icon="chart-donut" color={theme.colors.primary} />}
-            id="3"
-            style={styles.accordionHeader}
-            titleStyle={styles.accordionTitle}
-          >
-            {renderCategoryAnalysisSection()}
-          </List.Accordion>
-
-          <List.Accordion
-            title="Smart Tips"
-            left={props => <List.Icon {...props} icon="lightbulb-on" color={theme.colors.primary} />}
-            id="4"
-            style={styles.accordionHeader}
-            titleStyle={styles.accordionTitle}
-          >
-            {renderShoppingInsightsSection()}
-          </List.Accordion>
-        </List.AccordionGroup>
+        <View style={{ height: 20 }} />
       </ScrollView>
     </View>
   );
 };
 
+// ─── Styles ────────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingBottom: 85, // Space for floating tab bar
+    paddingBottom: 85,
   },
   scrollView: {
     flex: 1,
   },
-  section: {
-    paddingVertical: 8,
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
   },
-  sectionTitle: {
-    fontWeight: '900',
-    marginBottom: 16,
-    letterSpacing: -0.5,
-  },
-  summaryCard: {
+
+  // Hero
+  heroCard: {
     padding: 24,
-    borderRadius: 32,
+    borderRadius: 28,
+    marginBottom: 8,
     ...commonStyles.shadow,
   },
-  summaryHeader: {
+  heroContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 20,
-  },
-  summaryLabel: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  summaryValue: {
-    color: '#FFFFFF',
-    fontSize: 42,
-    fontWeight: '900',
-  },
-  summaryProgress: {
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
     marginBottom: 24,
   },
-  summaryStats: {
+  heroTextWrap: {
+    flex: 1,
+  },
+  heroLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  heroValue: {
+    fontSize: 28,
+    fontWeight: '900',
+    letterSpacing: -0.5,
+  },
+  heroIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  heroStats: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
   },
-  summaryStatItem: {
+  heroStatItem: {
     alignItems: 'center',
+    flex: 1,
   },
-  summaryStatValue: {
-    color: '#FFFFFF',
-    fontSize: 20,
+  heroStatValue: {
+    fontSize: 22,
     fontWeight: '800',
   },
-  summaryStatLabel: {
-    color: 'rgba(255,255,255,0.7)',
+  heroStatLabel: {
     fontSize: 11,
     fontWeight: '600',
     textTransform: 'uppercase',
     marginTop: 2,
+    letterSpacing: 0.3,
   },
-  summaryStatDivider: {
+  heroStatDivider: {
     width: 1,
     height: 30,
-    backgroundColor: 'rgba(255,255,255,0.2)',
   },
-  patternsList: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 12,
+
+  // Section
+  sectionContainer: {
+    marginTop: 24,
   },
-  patternCard: {
-    borderRadius: 20,
-    ...commonStyles.shadow,
-  },
-  patternContent: {
+  sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    marginBottom: 12,
+    paddingHorizontal: 4,
   },
-  patternIconContainer: {
-    padding: 12,
-    borderRadius: 16,
-    marginRight: 16,
-  },
-  patternInfo: {
-    flex: 1,
-  },
-  patternBadge: {
-    backgroundColor: '#E8F5E9',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+  sectionIconWrap: {
+    width: 40,
+    height: 40,
     borderRadius: 12,
-  },
-  patternBadgeText: {
-    color: '#2E7D32',
-    fontWeight: '800',
-    fontSize: 14,
-  },
-  categoryList: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 12,
-  },
-  categoryCard: {
-    borderRadius: 20,
-    borderColor: 'rgba(0,0,0,0.05)',
-  },
-  categoryContent: {
-    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
-    padding: 12,
+    marginRight: 12,
   },
-  categoryIconBox: {
-    padding: 12,
-    borderRadius: 16,
-    marginRight: 16,
-  },
-  categoryInfo: {
+  sectionHeaderText: {
     flex: 1,
   },
-  categoryHeaderRow: {
+  sectionTitleRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    gap: 8,
   },
-  categoryProgress: {
-    height: 6,
-    borderRadius: 3,
-    marginBottom: 8,
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: -0.3,
   },
-  categoryFooterRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  sectionSubtitle: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 1,
   },
-  shoppingList: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 16,
+  countBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
   },
-  shoppingCard: {
+  countBadgeText: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+
+  // Card
+  card: {
     borderRadius: 24,
+    marginBottom: 12,
+    overflow: 'hidden',
     ...commonStyles.shadow,
   },
-  shoppingContent: {
+
+  // Show more button
+  showMoreBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 20,
+    justifyContent: 'center',
+    paddingVertical: 10,
+    marginTop: 4,
+    marginHorizontal: 4,
+    borderRadius: 12,
+    gap: 4,
   },
-  shoppingIcon: {
-    marginRight: 16,
-  },
-  shoppingInfo: {
-    flex: 1,
-  },
-  shoppingTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 2,
-  },
-  shoppingSubtitle: {
-    fontSize: 14,
-    fontWeight: '500',
-    opacity: 0.8,
-  },
-  shoppingValue: {
+  showMoreText: {
     fontSize: 13,
     fontWeight: '700',
-    textAlign: 'right',
   },
-  freshnessContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 12,
-  },
-  freshnessCard: {
-    borderRadius: 24,
-    ...commonStyles.shadow,
-    marginBottom: 8,
-  },
-  freshnessContent: {
+
+  // Stale category header
+  staleCategoryHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
+    paddingBottom: 12,
   },
-  freshnessIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  staleCatIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: 12,
   },
-  freshnessInfo: {
+  staleCatInfo: {
     flex: 1,
   },
-  freshnessTitle: {
-    fontSize: 16,
+  staleCatName: {
+    fontSize: 15,
     fontWeight: '700',
   },
-  freshnessSubtitle: {
-    fontSize: 12,
+  staleCatThreshold: {
+    fontSize: 11,
     fontWeight: '500',
+    marginTop: 1,
   },
-  freshnessStatus: {
-    marginLeft: 8,
-  },
-  staleBadge: {
+  staleCatBadge: {
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
   },
-  staleBadgeText: {
-    fontSize: 11,
+  staleCatBadgeText: {
+    fontSize: 13,
     fontWeight: '800',
-    textTransform: 'uppercase',
   },
-  freshnessActions: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    paddingTop: 0,
-  },
-  staleItemsList: {
+
+  // Stale items container
+  staleItemsContainer: {
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    width: '100%',
+    paddingBottom: 12,
   },
-  staleItemsText: {
-    fontSize: 12,
+
+  // Stale row
+  staleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+  },
+  staleUrgencyDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 10,
+  },
+  staleRowInfo: {
+    flex: 1,
+  },
+  staleItemName: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  staleItemMeta: {
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  staleUrgencyBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+
+  // Ranked list
+  rankedList: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  rankedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+  },
+  rankBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  rankNumber: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  rankedInfo: {
+    flex: 1,
+  },
+  rankedItemName: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  rankedItemMeta: {
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  metricBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+    marginLeft: 8,
+  },
+  metricText: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+
+  // Low stock
+  lowStockIndicator: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  lowStockBarWrap: {
+    marginTop: 4,
+  },
+  lowStockBarBg: {
+    height: 4,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  lowStockBarFill: {
+    height: 4,
+    borderRadius: 2,
+  },
+
+  // Never restocked icon
+  neverRestockedIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+
+  // Category health
+  categoryHealthList: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  catHealthRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+  },
+  catHealthIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  catHealthInfo: {
+    flex: 1,
+  },
+  catHealthNameRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  catHealthName: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  catHealthItemCount: {
+    fontSize: 11,
     fontWeight: '500',
   },
-  accordionHeader: {
-    backgroundColor: 'transparent',
-    paddingVertical: 4,
-    paddingHorizontal: 16,
+  catHealthBar: {
+    height: 5,
+    borderRadius: 3,
+    marginBottom: 6,
   },
-  accordionTitle: {
+  catHealthDetails: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  catHealthDetailText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  catHealthBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  catHealthBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+
+  // Monthly summary chart
+  chartSection: {
+    padding: 16,
+  },
+  chartLegendRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 16,
+    marginBottom: 16,
+  },
+  chartLegendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  chartLegendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  chartLegendText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  chartContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    height: 130,
+    paddingHorizontal: 4,
+  },
+  chartBarGroup: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 4,
+  },
+  chartBarValues: {
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chartBarValueText: {
+    fontSize: 10,
     fontWeight: '800',
-    fontSize: 18,
+  },
+  chartBarsWrap: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 3,
+    flex: 1,
+  },
+  chartBar: {
+    width: 14,
+    minHeight: 2,
+  },
+  chartLabel: {
+    fontSize: 11,
+    marginTop: 6,
+  },
+
+  // Monthly insights
+  monthlyInsights: {
+    borderTopWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  monthlyInsightRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  monthlyInsightIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  monthlyInsightInfo: {
+    flex: 1,
+  },
+  monthlyInsightLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginBottom: 1,
+  },
+  monthlyInsightValue: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  monthlyDivider: {
+    height: 1,
+    marginLeft: 44,
+  },
+  trendBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  trendText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+
+  // Quick stats grid
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  statTile: {
+    flex: 1,
+    minWidth: '45%',
+    padding: 16,
+    borderRadius: 20,
+    alignItems: 'center' as const,
+    overflow: 'hidden' as const,
+  },
+  statTileIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  statTileValue: {
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  statTileLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+
+  // Divider
+  divider: {
+    height: 1,
+    marginHorizontal: 12,
+  },
+
+  // Empty state
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 32,
+    paddingHorizontal: 24,
+  },
+  emptyIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  emptyTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  emptySubtitle: {
+    fontSize: 12,
+    fontWeight: '500',
+    textAlign: 'center',
   },
 });
 

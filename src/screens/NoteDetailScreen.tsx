@@ -1,19 +1,146 @@
-import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
-import { View, StyleSheet, ScrollView, BackHandler, Alert, KeyboardAvoidingView, Platform, TouchableOpacity, Dimensions, Animated, TextInput as RNTextInput } from 'react-native';
-import { useTheme, Button, IconButton, Text, Portal, Dialog, Checkbox } from 'react-native-paper';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
+import { View, StyleSheet, ScrollView, BackHandler, KeyboardAvoidingView, Platform, TouchableOpacity, Dimensions, Animated, TextInput as RNTextInput, Keyboard } from 'react-native';
+import { useTheme, Button, IconButton, Text, Portal, Dialog } from 'react-native-paper';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { notesManager } from '../managers/NotesManager';
 import { Note } from '../models/Types';
 import DoodleBackground from '../components/DoodleBackground';
 
-const { width } = Dimensions.get('window');
-
 // Define constants outside to avoid re-creation and dependency issues
 const BULLET_PREFIX = '\u2022 '; 
 const CHECKBOX_PREFIX = '\u2610 ';
 const CHECKED_PREFIX = '\u2611 ';
 
+const getLineInfo = (line: string) => {
+  const safeLine = typeof line === 'string' ? line : '';
+  if (safeLine.startsWith(BULLET_PREFIX)) return { type: 'bullet' as const, text: safeLine.substring(BULLET_PREFIX.length), isChecked: false };
+  if (safeLine.startsWith(CHECKBOX_PREFIX)) return { type: 'checkbox' as const, text: safeLine.substring(CHECKBOX_PREFIX.length), isChecked: false };
+  if (safeLine.startsWith(CHECKED_PREFIX)) return { type: 'checkbox' as const, text: safeLine.substring(CHECKED_PREFIX.length), isChecked: true };
+  return { type: 'none' as const, text: safeLine, isChecked: false };
+};
+
+// ─── Memoized Line Component ────────────────────────────────────────────
+interface LineRowProps {
+  line: string;
+  index: number;
+  isViewMode: boolean;
+  primaryColor: string;
+  onSurfaceColor: string;
+  onSurfaceVariantColor: string;
+  onUpdateLine: (index: number, text: string) => void;
+  onFocusLine: (index: number) => void;
+  onKeyPress: (index: number, e: any) => void;
+  onToggleCheckbox: (index: number) => void;
+  onLayoutLine: (index: number, y: number) => void;
+  inputRef: (index: number, el: any) => void;
+}
+
+const LineRow = React.memo<LineRowProps>(({
+  line,
+  index,
+  isViewMode,
+  primaryColor,
+  onSurfaceColor,
+  onSurfaceVariantColor,
+  onUpdateLine,
+  onFocusLine,
+  onKeyPress,
+  onToggleCheckbox,
+  onLayoutLine,
+  inputRef,
+}) => {
+  const info = getLineInfo(line);
+  const isItemChecked = info.isChecked;
+  const isStrikethrough = isItemChecked && isViewMode;
+
+  const handleChangeText = useCallback((text: string) => {
+    onUpdateLine(index, text);
+  }, [index, onUpdateLine]);
+
+  const handleFocus = useCallback(() => {
+    onFocusLine(index);
+  }, [index, onFocusLine]);
+
+  const handleKeyPress = useCallback((e: any) => {
+    onKeyPress(index, e);
+  }, [index, onKeyPress]);
+
+  const handleLayout = useCallback((e: any) => {
+    onLayoutLine(index, e.nativeEvent.layout.y);
+  }, [index, onLayoutLine]);
+
+  const handleToggle = useCallback(() => {
+    onToggleCheckbox(index);
+  }, [index, onToggleCheckbox]);
+
+  const setRef = useCallback((el: any) => {
+    inputRef(index, el);
+  }, [index, inputRef]);
+
+  return (
+    <View
+      style={[styles.lineRow, { paddingLeft: info.type !== 'none' ? 4 : 16 }]}
+      onLayout={handleLayout}
+    >
+      {info.type !== 'none' && (
+        <View style={styles.prefixContainer}>
+          {info.type === 'bullet' && (
+            <MaterialCommunityIcons
+              name="circle"
+              size={10}
+              color={primaryColor}
+            />
+          )}
+          {info.type === 'checkbox' && (
+            <TouchableOpacity
+              onPress={handleToggle}
+              activeOpacity={0.7}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <MaterialCommunityIcons
+                name={isItemChecked ? 'checkbox-marked' : 'checkbox-blank-outline'}
+                size={20}
+                color={primaryColor}
+              />
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
+      <RNTextInput
+        ref={setRef}
+        value={info.text || ''}
+        onChangeText={handleChangeText}
+        onFocus={handleFocus}
+        onKeyPress={handleKeyPress}
+        editable={!isViewMode}
+        multiline={true}
+        style={[
+          styles.lineInput,
+          { color: isStrikethrough ? onSurfaceVariantColor : onSurfaceColor },
+          isStrikethrough ? styles.strikethroughText : styles.noStrikethrough,
+        ]}
+        textAlignVertical="top"
+        placeholder={index === 0 && (info.text || '') === '' ? 'Start writing...' : ''}
+        placeholderTextColor={onSurfaceVariantColor}
+      />
+    </View>
+  );
+}, (prev, next) => {
+  // Custom comparator — only re-render if something we care about changed
+  return (
+    prev.line === next.line &&
+    prev.index === next.index &&
+    prev.isViewMode === next.isViewMode &&
+    prev.primaryColor === next.primaryColor &&
+    prev.onSurfaceColor === next.onSurfaceColor &&
+    prev.onSurfaceVariantColor === next.onSurfaceVariantColor
+    // callbacks are stable via useCallback in parent, skip comparing
+  );
+});
+
+// ─── Main Screen ────────────────────────────────────────────────────────
 const NoteDetailScreen: React.FC = () => {
   const theme = useTheme();
   const navigation = useNavigation<any>();
@@ -25,30 +152,99 @@ const NoteDetailScreen: React.FC = () => {
   const [content, setContent] = useState('');
   const [isViewMode, setIsViewMode] = useState(initialViewMode);
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
-  
+  const [focusedIndex, setFocusedIndex] = useState<number>(0);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
   const scrollViewRef = useRef<ScrollView>(null);
   const inputRefs = useRef<any[]>([]);
-  const [focusedIndex, setFocusedIndex] = useState<number>(0);
-
-  // Animation values
   const sideMenuOpacity = useRef(new Animated.Value(0.2)).current;
   const scrollTimeout = useRef<any>(null);
+  const lineYPositions = useRef<Record<number, number>>({});
+  const pendingFocusRef = useRef<number | null>(null);
 
+  // Refs to avoid stale closures in effects that shouldn't re-run on every keystroke
+  const contentRef = useRef(content);
+  contentRef.current = content;
+  const titleRef = useRef(title);
+  titleRef.current = title;
+  const noteRef = useRef(note);
+  noteRef.current = note;
+  const isViewModeRef = useRef(isViewMode);
+  isViewModeRef.current = isViewMode;
+  const keyboardHeightRef = useRef(keyboardHeight);
+  keyboardHeightRef.current = keyboardHeight;
+  const isNewRef = useRef(isNew);
+  isNewRef.current = isNew;
+
+  // ─── Effects ────────────────────────────────────────────────────────
   useEffect(() => {
     loadNote();
   }, [noteId]);
 
+  // Track keyboard height for dynamic padding
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const onShow = (e: any) => setKeyboardHeight(e.endCoordinates.height);
+    const onHide = () => setKeyboardHeight(0);
+
+    const subShow = Keyboard.addListener(showEvent, onShow);
+    const subHide = Keyboard.addListener(hideEvent, onHide);
+    return () => { subShow.remove(); subHide.remove(); };
+  }, []);
+
+  // Post-render focus: runs after React finishes rendering new lines
+  useEffect(() => {
+    if (pendingFocusRef.current !== null) {
+      const idx = pendingFocusRef.current;
+      pendingFocusRef.current = null;
+      // Use requestAnimationFrame to ensure the native view is ready
+      requestAnimationFrame(() => {
+        inputRefs.current[idx]?.focus();
+        const yPos = lineYPositions.current[idx];
+        if (scrollViewRef.current && yPos !== undefined) {
+          const screenH = Dimensions.get('window').height;
+          const visibleArea = screenH - keyboardHeightRef.current;
+          const targetOffset = Math.max(0, yPos - visibleArea * 0.35);
+          scrollViewRef.current.scrollTo({ y: targetOffset, animated: true });
+        }
+      });
+    }
+  }, [content]);
+
+  // Back handler — uses refs so we don't re-register on every keystroke
   useFocusEffect(
     useCallback(() => {
       const onBackPress = () => {
-        handleBack();
+        handleBackViaRef();
         return true;
       };
       BackHandler.addEventListener('hardwareBackPress', onBackPress);
       return () => BackHandler.removeEventListener('hardwareBackPress', onBackPress);
-    }, [isNew, isViewMode, note, title, content])
+    }, []) // stable — reads from refs
   );
 
+  // Header — only re-set when mode changes, not on every keystroke
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerTitle: isViewMode ? 'View' : (isNew ? 'New Note' : 'Edit'),
+      headerRight: () => (
+        <View style={headerRightStyle}>
+          {!isViewMode && !isNew && (
+            <IconButton icon="delete" iconColor={theme.colors.error} onPress={() => setDeleteConfirmVisible(true)} />
+          )}
+          {isViewMode ? (
+            <IconButton icon="pencil" iconColor={theme.colors.primary} onPress={() => setIsViewMode(false)} />
+          ) : (
+            <Button onPress={handleSaveFromRef} mode="text" labelStyle={saveLabelStyle}>Save</Button>
+          )}
+        </View>
+      ),
+    });
+  }, [navigation, isViewMode, isNew, theme]);
+
+  // ─── Core Functions ────────────────────────────────────────────────
   const loadNote = () => {
     if (!noteId) return;
     const loadedNote = notesManager.getNote(noteId);
@@ -61,13 +257,12 @@ const NoteDetailScreen: React.FC = () => {
     }
   };
 
-  const handleSave = async () => {
+  // Save that reads from refs (for header button)
+  const handleSaveFromRef = useCallback(async () => {
     if (!noteId) return;
-    
-    // Strict string check and cleanup
-    const currentContent = typeof content === 'string' ? content : '';
+    const currentContent = typeof contentRef.current === 'string' ? contentRef.current : '';
     let lines = currentContent.split('\n');
-    
+
     while (lines.length > 0) {
       const lastLine = lines[lines.length - 1] || '';
       const info = getLineInfo(lastLine);
@@ -77,197 +272,200 @@ const NoteDetailScreen: React.FC = () => {
         break;
       }
     }
-    
+
     const finalContent = lines.join('\n');
     setContent(finalContent);
-    await notesManager.updateNote(noteId, title || '', finalContent);
-    if (isNew) navigation.setParams({ isNew: false });
+    await notesManager.updateNote(noteId, titleRef.current || '', finalContent);
+    if (isNewRef.current) navigation.setParams({ isNew: false });
     setIsViewMode(true);
-  };
+  }, [noteId]);
 
-  const handleBack = async () => {
-    if (isNew) {
+  // Back that reads from refs — isNewRef ensures we always have the latest value
+  const handleBackViaRef = useCallback(async () => {
+    if (isNewRef.current) {
       await notesManager.deleteNote(noteId);
       navigation.goBack();
-    } else if (!isViewMode) {
-      if (note) {
-        setTitle(note.title || '');
-        setContent(note.content || '');
+    } else if (!isViewModeRef.current) {
+      const n = noteRef.current;
+      if (n) {
+        setTitle(n.title || '');
+        setContent(n.content || '');
       }
       setIsViewMode(true);
     } else {
       navigation.goBack();
     }
-  };
+  }, [noteId]);
 
-  const handleDelete = async () => {
+  const handleDelete = useCallback(async () => {
     await notesManager.deleteNote(noteId);
     navigation.goBack();
-  };
+  }, [noteId]);
 
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      headerTitle: isViewMode ? 'View' : (isNew ? 'New Note' : 'Edit'),
-      headerRight: () => (
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          {!isViewMode && !isNew && (
-            <IconButton icon="delete" iconColor={theme.colors.error} onPress={() => setDeleteConfirmVisible(true)} />
-          )}
-          {isViewMode ? (
-            <IconButton icon="pencil" iconColor={theme.colors.primary} onPress={() => setIsViewMode(false)} />
-          ) : (
-            <Button onPress={handleSave} mode="text" labelStyle={{ fontWeight: 'bold' }}>Save</Button>
-          )}
-        </View>
-      ),
+  // ─── Editor Callbacks (stable) ────────────────────────────────────
+  const showMenu = useCallback(() => {
+    Animated.timing(sideMenuOpacity, { toValue: 1, duration: 150, useNativeDriver: true }).start();
+    if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
+    scrollTimeout.current = setTimeout(() => {
+      if (!isViewModeRef.current) {
+        Animated.timing(sideMenuOpacity, { toValue: 0.2, duration: 600, useNativeDriver: true }).start();
+      }
+    }, 4000);
+  }, []);
+
+  const scrollToIndex = useCallback((index: number) => {
+    const yPos = lineYPositions.current[index];
+    if (scrollViewRef.current && yPos !== undefined) {
+      const screenH = Dimensions.get('window').height;
+      const visibleArea = screenH - keyboardHeightRef.current;
+      const targetOffset = Math.max(0, yPos - visibleArea * 0.35);
+      scrollViewRef.current.scrollTo({ y: targetOffset, animated: true });
+    }
+  }, []);
+
+  const onUpdateLine = useCallback((index: number, text: string) => {
+    const safeText = typeof text === 'string' ? text : '';
+    const hasNewline = safeText.includes('\n');
+
+    // Set pending focus BEFORE state update so the useEffect picks it up
+    if (hasNewline) {
+      pendingFocusRef.current = index + 1;
+    }
+
+    setContent((prev) => {
+      const safeContent = typeof prev === 'string' ? prev : '';
+      const lines = safeContent.split('\n');
+      const oldInfo = getLineInfo(lines[index] || '');
+      let prefix = '';
+      if (oldInfo.type === 'bullet') prefix = BULLET_PREFIX;
+      else if (oldInfo.type === 'checkbox') prefix = oldInfo.isChecked ? CHECKED_PREFIX : CHECKBOX_PREFIX;
+
+      if (hasNewline) {
+        lines[index] = prefix + safeText.replace(/\n/g, '');
+        let newLinePrefix = '';
+        if (prefix === BULLET_PREFIX) newLinePrefix = BULLET_PREFIX;
+        else if (prefix === CHECKBOX_PREFIX || prefix === CHECKED_PREFIX) newLinePrefix = CHECKBOX_PREFIX;
+        lines.splice(index + 1, 0, newLinePrefix);
+        return lines.join('\n');
+      }
+
+      lines[index] = prefix + safeText;
+      return lines.join('\n');
     });
-  }, [navigation, isViewMode, isNew, theme, title, content]);
 
-  const getLineInfo = (line: string) => {
-    const safeLine = typeof line === 'string' ? line : '';
-    if (safeLine.startsWith(BULLET_PREFIX)) return { type: 'bullet', text: safeLine.substring(BULLET_PREFIX.length), isChecked: false };
-    if (safeLine.startsWith(CHECKBOX_PREFIX)) return { type: 'checkbox', text: safeLine.substring(CHECKBOX_PREFIX.length), isChecked: false };
-    if (safeLine.startsWith(CHECKED_PREFIX)) return { type: 'checkbox', text: safeLine.substring(CHECKED_PREFIX.length), isChecked: true };
-    return { type: 'none', text: safeLine, isChecked: false };
-  };
+    showMenu();
+  }, [showMenu]);
 
-  const toggleLineCheckbox = useCallback((index: number) => {
+  const onKeyPressLine = useCallback((index: number, e: any) => {
+    const key = e.nativeEvent.key;
+    if (key !== 'Backspace') return;
+
+    setContent((prev) => {
+      const safeContent = typeof prev === 'string' ? prev : '';
+      const lines = safeContent.split('\n');
+      const line = lines[index];
+      if ((line === '' || line === BULLET_PREFIX || line === CHECKBOX_PREFIX || line === CHECKED_PREFIX) && lines.length > 2) {
+        lines.splice(index, 1);
+        // Set pending focus for previous line
+        pendingFocusRef.current = index - 1;
+        return lines.join('\n');
+      }
+      return prev;
+    });
+  }, []);
+
+  const onFocusLine = useCallback((index: number) => {
+    setFocusedIndex(index);
+    showMenu();
+    scrollToIndex(index);
+  }, [showMenu, scrollToIndex]);
+
+  const onToggleCheckbox = useCallback((index: number) => {
     if (index < 0) return;
-    
     setContent((prev) => {
       const currentContent = typeof prev === 'string' ? prev : '';
       const lines = currentContent.split('\n');
       if (index >= lines.length) return currentContent;
-      
+
       const line = lines[index] || '';
       let updatedLine = line;
-      
       if (line.startsWith(CHECKBOX_PREFIX)) {
         updatedLine = CHECKED_PREFIX + line.substring(CHECKBOX_PREFIX.length);
       } else if (line.startsWith(CHECKED_PREFIX)) {
         updatedLine = CHECKBOX_PREFIX + line.substring(CHECKED_PREFIX.length);
       }
-      
       if (updatedLine === line) return currentContent;
-      
+
       lines[index] = updatedLine;
       const finalVal = lines.join('\n');
-      
-      // Background save if in view mode
-      if (isViewMode && noteId) {
-        notesManager.updateNote(noteId, title || '', finalVal);
+
+      if (isViewModeRef.current && noteId) {
+        notesManager.updateNote(noteId, titleRef.current || '', finalVal);
       }
-      
       return finalVal;
     });
     showMenu();
-  }, [noteId, title, isViewMode]);
+  }, [noteId, showMenu]);
 
-  const createNewLine = (index: number) => {
-    const safeContent = typeof content === 'string' ? content : '';
-    const lines = safeContent.split('\n');
-    const currentLine = lines[index] || '';
-    let prefix = '';
-    
-    if (currentLine.startsWith(BULLET_PREFIX)) prefix = BULLET_PREFIX;
-    else if (currentLine.startsWith(CHECKBOX_PREFIX) || currentLine.startsWith(CHECKED_PREFIX)) prefix = CHECKBOX_PREFIX;
-    
-    lines.splice(index + 1, 0, prefix);
-    setContent(lines.join('\n'));
-    setTimeout(() => {
-      inputRefs.current[index + 1]?.focus();
-      scrollToIndex(index + 1);
-    }, 50);
-  };
+  const onLayoutLine = useCallback((index: number, y: number) => {
+    lineYPositions.current[index] = y;
+  }, []);
 
-  const scrollToIndex = (index: number) => {
-    setTimeout(() => {
-        if (scrollViewRef.current) {
-            scrollViewRef.current.scrollTo({ y: Math.max(0, index * 44 - 100), animated: true });
-        }
-    }, 100);
-  };
+  const setInputRef = useCallback((index: number, el: any) => {
+    inputRefs.current[index] = el;
+  }, []);
 
-  const updateLine = (index: number, text: string) => {
-    const safeText = typeof text === 'string' ? text : '';
-    const safeContent = typeof content === 'string' ? content : '';
-    const lines = safeContent.split('\n');
-    const oldInfo = getLineInfo(lines[index] || '');
-    let prefix = '';
-    
-    if (oldInfo.type === 'bullet') prefix = BULLET_PREFIX;
-    else if (oldInfo.type === 'checkbox') prefix = oldInfo.isChecked ? CHECKED_PREFIX : CHECKBOX_PREFIX;
+  const toggleLineStyle = useCallback((type: 'bullet' | 'checkbox') => {
+    setContent((prev) => {
+      const safeContent = typeof prev === 'string' ? prev : '';
+      const lines = safeContent.split('\n');
+      const fi = focusedIndex; // capture at call time
+      const line = lines[fi] || '';
+      const info = getLineInfo(line);
 
-    if (safeText.includes('\n')) {
-        lines[index] = prefix + safeText.replace(/\n/g, '');
-        setContent(lines.join('\n'));
-        createNewLine(index);
-        return;
-    }
-
-    lines[index] = prefix + safeText;
-    setContent(lines.join('\n'));
+      if (type === 'bullet') {
+        lines[fi] = info.type === 'bullet' ? info.text : BULLET_PREFIX + info.text;
+      } else {
+        lines[fi] = info.type === 'checkbox' ? info.text : CHECKBOX_PREFIX + info.text;
+      }
+      return lines.join('\n');
+    });
     showMenu();
-  };
+  }, [focusedIndex, showMenu]);
 
-  const handleKeyPress = (index: number, e: any) => {
-    const key = e.nativeEvent.key;
-    const safeContent = typeof content === 'string' ? content : '';
-    const lines = safeContent.split('\n');
-    
-    if (key === 'Backspace' && (lines[index] === '' || lines[index] === BULLET_PREFIX || lines[index] === CHECKBOX_PREFIX || lines[index] === CHECKED_PREFIX) && lines.length > 2) {
-      lines.splice(index, 1);
-      setContent(lines.join('\n'));
-      setTimeout(() => {
-        inputRefs.current[index - 1]?.focus();
-      }, 50);
-    }
-  };
+  // ─── Derived Data ────────────────────────────────────────────────
+  const lines = useMemo(() => {
+    return (typeof content === 'string' ? content : '').split('\n');
+  }, [content]);
 
-  const toggleLineStyle = (type: 'bullet' | 'checkbox') => {
-    const safeContent = typeof content === 'string' ? content : '';
-    const lines = safeContent.split('\n');
-    let line = lines[focusedIndex] || '';
-    const info = getLineInfo(line);
+  const focusedLineInfo = useMemo(() => {
+    return getLineInfo(lines[focusedIndex] || '');
+  }, [lines, focusedIndex]);
 
-    if (type === 'bullet') {
-      lines[focusedIndex] = info.type === 'bullet' ? info.text : BULLET_PREFIX + info.text;
-    } else {
-      lines[focusedIndex] = info.type === 'checkbox' ? info.text : CHECKBOX_PREFIX + info.text;
-    }
-    setContent(lines.join('\n'));
-    showMenu();
-  };
+  const bottomPadding = useMemo(() => {
+    return keyboardHeight > 0 ? keyboardHeight + 120 : 150;
+  }, [keyboardHeight]);
 
-  const showMenu = () => {
-    Animated.timing(sideMenuOpacity, { toValue: 1, duration: 150, useNativeDriver: true }).start();
-    if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
-    scrollTimeout.current = setTimeout(() => {
-       if (!isViewMode) Animated.timing(sideMenuOpacity, { toValue: 0.2, duration: 600, useNativeDriver: true }).start();
-    }, 4000);
-  };
-
+  // ─── Render ────────────────────────────────────────────────────────
   if (!note) return <View style={styles.container} />;
-
-  const lines = (typeof content === 'string' ? content : '').split('\n');
-  const focusedLineInfo = getLineInfo(lines[focusedIndex] || '');
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <DoodleBackground />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={{ flex: 1 }}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
+        style={flexOne}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
         <View style={styles.mainLayout}>
-          <ScrollView 
+          <ScrollView
             ref={scrollViewRef}
             style={styles.content}
-            contentContainerStyle={{ paddingBottom: 150 }}
+            contentContainerStyle={{ paddingBottom: bottomPadding }}
             keyboardShouldPersistTaps="handled"
+            automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
             onScroll={showMenu}
-            scrollEventThrottle={16}
+            scrollEventThrottle={100}
           >
             <View style={styles.titleSection}>
               <RNTextInput
@@ -281,71 +479,32 @@ const NoteDetailScreen: React.FC = () => {
             </View>
 
             <View style={styles.editorContentWrapper}>
-              {lines.map((line, index) => {
-                const info = getLineInfo(line);
-                const isItemChecked = info.isChecked;
-                const isStrikethrough = isItemChecked && isViewMode;
-                
-                return (
-                  <View key={index} style={[styles.lineRow, { paddingLeft: info.type !== 'none' ? 4 : 16 }]}>
-                    {info.type !== 'none' && (
-                      <View style={styles.prefixContainer}>
-                        {info.type === 'bullet' && (
-                          <MaterialCommunityIcons 
-                            name="circle" 
-                            size={10} 
-                            color={theme.colors.primary} 
-                          />
-                        )}
-                        {info.type === 'checkbox' && (
-                          <TouchableOpacity 
-                            onPress={() => toggleLineCheckbox(index)} 
-                            activeOpacity={0.7} 
-                            hitSlop={{top:10, bottom:10, left:10, right:10}}
-                          >
-                            <MaterialCommunityIcons 
-                              name={isItemChecked ? "checkbox-marked" : "checkbox-blank-outline"} 
-                              size={20} 
-                              color={theme.colors.primary} 
-                            />
-                          </TouchableOpacity>
-                        )}
-                      </View>
-                    )}
-                    
-                    <RNTextInput
-                      ref={el => inputRefs.current[index] = el}
-                      value={info.text || ''}
-                      onChangeText={(text) => updateLine(index, text)}
-                      onFocus={() => { 
-                        setFocusedIndex(index); 
-                        showMenu();
-                        scrollToIndex(index);
-                      }}
-                      onKeyPress={(e) => handleKeyPress(index, e)}
-                      editable={!isViewMode}
-                      multiline={true}
-                      style={[
-                        styles.lineInput, 
-                        { color: isStrikethrough ? theme.colors.onSurfaceVariant : theme.colors.onSurface },
-                        isStrikethrough ? styles.strikethroughText : { textDecorationLine: 'none' }
-                      ]}
-                      textAlignVertical="top"
-                      placeholder={index === 0 && (info.text || '') === '' ? "Start writing..." : ""}
-                      placeholderTextColor={theme.colors.onSurfaceVariant}
-                    />
-                  </View>
-                );
-              })}
+              {lines.map((line, index) => (
+                <LineRow
+                  key={index}
+                  line={line}
+                  index={index}
+                  isViewMode={isViewMode}
+                  primaryColor={theme.colors.primary}
+                  onSurfaceColor={theme.colors.onSurface}
+                  onSurfaceVariantColor={theme.colors.onSurfaceVariant}
+                  onUpdateLine={onUpdateLine}
+                  onFocusLine={onFocusLine}
+                  onKeyPress={onKeyPressLine}
+                  onToggleCheckbox={onToggleCheckbox}
+                  onLayoutLine={onLayoutLine}
+                  inputRef={setInputRef}
+                />
+              ))}
             </View>
           </ScrollView>
 
           {!isViewMode && (
             <Animated.View style={[
-              styles.sideToolbarFixed, 
-              { 
+              styles.sideToolbarFixed,
+              {
                 opacity: sideMenuOpacity,
-                backgroundColor: theme.dark ? 'rgba(30, 41, 59, 0.8)' : 'rgba(255, 255, 255, 0.8)' 
+                backgroundColor: theme.dark ? 'rgba(30, 41, 59, 0.8)' : 'rgba(255, 255, 255, 0.8)'
               }
             ]}>
               <IconButton
@@ -383,11 +542,10 @@ const NoteDetailScreen: React.FC = () => {
   );
 };
 
-// Helper for safer route usage
-const routeSync = () => {
-    // This is just a dummy to satisfy the structure if needed
-    return {};
-};
+// ─── Static styles & constants ──────────────────────────────────────────
+const flexOne = { flex: 1 };
+const headerRightStyle = { flexDirection: 'row' as const, alignItems: 'center' as const };
+const saveLabelStyle = { fontWeight: 'bold' as const };
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
@@ -396,8 +554,8 @@ const styles = StyleSheet.create({
   titleSection: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10 },
   titleInput: { fontSize: 24, fontWeight: 'bold', padding: 0 },
   editorContentWrapper: { paddingRight: 40 },
-  lineRow: { 
-    flexDirection: 'row', 
+  lineRow: {
+    flexDirection: 'row',
     alignItems: 'flex-start',
     minHeight: 40,
     marginVertical: 2,
@@ -410,17 +568,20 @@ const styles = StyleSheet.create({
     marginRight: 0,
     marginTop: 4,
   },
-  lineInput: { 
-    flex: 1, 
-    fontSize: 18, 
+  lineInput: {
+    flex: 1,
+    fontSize: 18,
     lineHeight: 24,
     minHeight: 32,
     padding: 0,
     marginTop: 8,
     textAlignVertical: 'top',
   },
-  strikethroughText: { 
+  strikethroughText: {
     textDecorationLine: 'line-through',
+  },
+  noStrikethrough: {
+    textDecorationLine: 'none',
   },
   sideToolbarFixed: {
     position: 'absolute',
@@ -434,7 +595,7 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   spacer: { height: 10 },
-  charCountSmall: { fontSize: 8, opacity: 0.5, fontWeight: 'bold' }
+  charCountSmall: { fontSize: 8, opacity: 0.5, fontWeight: 'bold' },
 });
 
 export default NoteDetailScreen;

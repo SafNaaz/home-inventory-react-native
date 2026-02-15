@@ -52,7 +52,308 @@ import { CATEGORY_CONFIG, SUBCATEGORY_CONFIG, getAllCategories, getCategoryConfi
 import { getStockColor, getCategoryColor, commonStyles } from '../themes/AppTheme';
 import DoodleBackground from '../components/DoodleBackground';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  statsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    padding: 16,
+    marginBottom: 16,
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statLabel: {
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  statValue: {
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  categoriesGrid: {
+    padding: 16,
+  },
+  categoryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  categoryCard: {
+    minHeight: 180,
+    borderRadius: 32,
+    ...commonStyles.shadow,
+  },
+  categoryCardContent: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+  },
+  categoryIcon: {
+    marginBottom: 16,
+  },
+  categoryTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  categoryStats: {
+    alignItems: 'center',
+  },
+  categoryStatsText: {
+    fontSize: 12,
+    marginBottom: 2,
+  },
+  subcategoriesList: {
+    padding: 16,
+  },
+  subcategoryCard: {
+    marginVertical: 8,
+    marginHorizontal: 4,
+    borderRadius: 24,
+    ...commonStyles.shadow,
+  },
+  addSubCard: {
+    borderStyle: 'dashed',
+    borderWidth: 1,
+    elevation: 0,
+    backgroundColor: 'transparent',
+  },
+  subcategoryContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+  },
+  iconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  subcategoryInfo: {
+    flex: 1,
+  },
+  subcategoryTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  subcategoryStats: {
+    fontSize: 12,
+    marginBottom: 2,
+  },
+  itemsList: {
+    padding: 16,
+  },
+  itemCard: {
+    marginVertical: 8,
+    marginHorizontal: 4,
+    borderRadius: 24,
+    ...commonStyles.shadow,
+  },
+  itemHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  itemTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    flex: 1,
+  },
+  itemActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  itemPercentage: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  stockSliderContainer: {
+    marginBottom: 8,
+  },
+  stockLabel: {
+    fontSize: 12,
+    marginBottom: 8,
+  },
+  stockControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  stockValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginRight: 12,
+    minWidth: 40,
+  },
+  sliderContainer: {
+    flex: 1,
+    height: 40,
+    justifyContent: 'center',
+  },
+  sliderTrack: {
+    height: 12, // Slightly thicker
+    borderRadius: 6,
+    position: 'relative',
+    borderWidth: 1, // Added border for visibility
+    borderColor: 'rgba(0,0,0,0.05)',
+  },
+  sliderProgress: {
+    height: 12,
+    borderRadius: 6,
+    position: 'absolute',
+    left: 0,
+    top: -1, // Adjust for border
+  },
+  sliderThumb: {
+    width: 28, // Slightly larger
+    height: 28,
+    borderRadius: 14,
+    position: 'absolute',
+    top: -9,
+    marginLeft: -14,
+    ...commonStyles.shadow,
+    borderWidth: 3,
+    borderColor: '#fff',
+    elevation: 4,
+  },
+  progressContainer: {
+    flex: 1,
+    marginHorizontal: 8,
+  },
+  progressBar: {
+    height: 6,
+    borderRadius: 3,
+  },
+  lowStockWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  lowStockText: {
+    fontSize: 12,
+    marginLeft: 4,
+  },
+  // New compact styles
+  compactItemContent: {
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+  },
+  itemHeaderCompact: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  stockControlsCompact: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  quantityButton: {
+    margin: 0,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  sliderWrapper: {
+    flex: 1,
+    marginHorizontal: 4,
+  },
+  lowStockWarningCompact: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  lowStockTextCompact: {
+    fontSize: 11,
+    marginLeft: 4,
+  },
+  // Swipe action styles
+  swipeAction: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 80,
+    marginVertical: 8,
+    // Add margin to match card indentation so it blends
+  },
+  deleteAction: {
+    backgroundColor: '#FF3B30',
+    borderTopRightRadius: 24,
+    borderBottomRightRadius: 24,
+    marginRight: 4,
+    marginLeft: -20, // Overlap with card to hide gap
+    paddingLeft: 20, // Center icon
+    width: 100, // 80 visible + 20 overlap
+  },
+  editAction: {
+    backgroundColor: '#007AFF',
+    borderTopLeftRadius: 24,
+    borderBottomLeftRadius: 24,
+    marginLeft: 4,
+    marginRight: -20, // Overlap with card
+    paddingRight: 20, // Center icon
+    width: 100, // 80 visible + 20 overlap
+  },
+  swipeActionButton: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+  },
+  swipeActionText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  fab: {
+    position: 'absolute',
+    margin: 20,
+    right: 0,
+    bottom: 120,
+    borderRadius: 28,
+  },
+  searchBar: {
+    borderRadius: 16,
+    backgroundColor: '#fff', 
+    // Removed fixed height to allow auto-sizing and better alignment
+  },
+  searchPlaceholder: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    height: 56,
+    borderRadius: 16,
+    ...commonStyles.shadow,
+    elevation: 2, // Low elevation for the static placeholder
+  },
+});
 const cardWidth = (width - 48) / 2; // 2 columns with padding
 
 type NavigationState = 'home' | 'category' | 'subcategory';
@@ -293,8 +594,19 @@ const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, on
   };
 
   const card = (
-    <Card style={styles.itemCard}>
-      <Card.Content style={styles.compactItemContent}>
+    <View 
+      collapsable={false}
+      renderToHardwareTextureAndroid={true}
+      style={[
+        styles.itemCard, 
+        { 
+          elevation: item.isIgnored ? 0 : 2,
+          backgroundColor: theme.colors.surface,
+          borderRadius: 24,
+        }
+      ]}
+    >
+      <View style={styles.compactItemContent}>
         <View style={styles.itemHeaderCompact}>
           <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
             {!isSearch && (
@@ -310,7 +622,7 @@ const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, on
                 styles.itemTitle, 
                 { 
                   color: theme.colors.onSurface,
-                  textDecorationLine: item.isIgnored ? 'line-through' : 'none',
+                  textDecorationLine: 'none',
                   opacity: item.isIgnored ? 0.5 : 1,
                   marginLeft: isSearch ? 4 : 0
                 }
@@ -359,8 +671,8 @@ const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, on
             </Text>
           </View>
         )}
-      </Card.Content>
-    </Card>
+      </View>
+    </View>
   );
 
   if (isSearch) {
@@ -379,7 +691,9 @@ const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, on
       containerStyle={{ overflow: 'visible' }}
       childrenContainerStyle={{ overflow: 'visible' }}
     >
-      {card}
+      <View collapsable={false} style={{ overflow: 'visible' }}>
+        {card}
+      </View>
     </Swipeable>
   );
 });
@@ -416,6 +730,9 @@ const InventoryScreen: React.FC = () => {
   const [isFabVisible, setIsFabVisible] = useState(true);
   const [hidingItem, setHidingItem] = useState<InventoryItem | null>(null);
   const lastScrollY = useRef(0);
+  const itemsRef = useRef(inventoryItems);
+  const sheetTranslateY = useRef(new Animated.Value(0)).current;
+  const searchInputRef = useRef<RNTextInput>(null);
 
   const handleScroll = useCallback((event: any) => {
     if (navigation.state === 'home') return; // Only for subcat/items as requested
@@ -471,8 +788,7 @@ const InventoryScreen: React.FC = () => {
     // Handle Android back button
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
       if (isSearchVisible) {
-        setIsSearchVisible(false);
-        setSearchQuery('');
+        closeSearch();
         return true;
       }
       if (isReordering) {
@@ -481,15 +797,12 @@ const InventoryScreen: React.FC = () => {
       }
       if (navigation.state === 'subcategory') {
         // Go back to category view
-        setNavigation({ state: 'category', category: navigation.category });
-        setIsReordering(false);
-        setShowIgnoredOnly(false); // Reset ignored filter when going back
-        return true; // Prevent default behavior (closing app)
+        setNavigationFluid({ state: 'category', category: navigation.category });
+        return true; 
       } else if (navigation.state === 'category') {
         // Go back to home view
-        setNavigation({ state: 'home' });
-        setIsReordering(false);
-        return true; // Prevent default behavior (closing app)
+        setNavigationFluid({ state: 'home' });
+        return true; 
       }
       // If we're on home, let the default behavior happen (close app or go to previous screen)
       return false;
@@ -503,26 +816,58 @@ const InventoryScreen: React.FC = () => {
   }, [navigation]);
 
   const setNavigationFluid = (newNav: NavigationContext | ((prev: NavigationContext) => NavigationContext)) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    Keyboard.dismiss();
+    setShowIgnoredOnly(false); // Immediate reset
     setIsReordering(false);
+    
+    if (isSearchVisible) {
+      setIsSearchVisible(false);
+      setSearchQuery('');
+    }
+    
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setNavigation(newNav);
   };
+
+  // Extra safety: reset filters when navigation state changes
+  useEffect(() => {
+    setShowIgnoredOnly(false);
+    setIsReordering(false);
+  }, [navigation.state, navigation.category]);
 
   // Reset to home view when Inventory tab is pressed
   useEffect(() => {
     const unsubscribe = (navigationObj as any).addListener('tabPress', (e: any) => {
-      // Reset to home if not already there
-      setNavigationFluid(prevNav => {
-        if (prevNav.state !== 'home') {
-          return { state: 'home' };
-        }
-        setIsReordering(false);
-        return prevNav;
+      // Use InteractionManager to wait for the tab press interaction to settle
+      InteractionManager.runAfterInteractions(() => {
+        setNavigationFluid(prevNav => {
+          if (prevNav.state !== 'home') {
+             // Force restore tab bar when jumping home
+             navigationObj.getParent()?.setOptions({
+               tabBarStyle: {
+                 backgroundColor: theme.colors.surface,
+                 borderTopWidth: 0,
+                 height: 65,
+                 paddingBottom: 10,
+                 paddingTop: 10,
+                 position: 'absolute',
+                 bottom: 20,
+                 left: 20,
+                 right: 20,
+                 borderRadius: 32,
+                 elevation: 8,
+               }
+             });
+             return { state: 'home' };
+          }
+          setIsReordering(false);
+          return prevNav;
+        });
       });
     });
 
     return unsubscribe;
-  }, [navigationObj]);
+  }, [navigationObj, theme]);
 
   const loadInventoryData = () => {
     const items = inventoryManager.getInventoryItems().map(it => {
@@ -637,8 +982,19 @@ const InventoryScreen: React.FC = () => {
   const onConfirmToggleIgnore = async () => {
     if (!hidingItem) return;
     try {
-      await inventoryManager.toggleItemIgnore(hidingItem.id);
+      const itemId = hidingItem.id;
       setHidingItem(null);
+      
+      // Use InteractionManager to ensure the dialog unmounting finishes 
+      // before starting the list removal animation to prevent shadow collisions
+      InteractionManager.runAfterInteractions(async () => {
+        LayoutAnimation.configureNext({
+          duration: 200,
+          update: { type: LayoutAnimation.Types.easeInEaseOut },
+          delete: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
+        });
+        await inventoryManager.toggleItemIgnore(itemId);
+      });
     } catch (err: any) {
       setSnackbarMessage(err.message);
       setSnackbarVisible(true);
@@ -931,33 +1287,42 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
     );
   };
 
-  // Search Effect
-  const itemsRef = useRef(inventoryItems);
-  const sheetTranslateY = useRef(new Animated.Value(0)).current;
-  const searchInputRef = useRef<RNTextInput>(null);
+  const searchOpacity = useRef(new Animated.Value(0)).current;
 
-  useEffect(() => { itemsRef.current = inventoryItems; }, [inventoryItems]);
+  const openSearch = () => {
+    setIsSearchVisible(true);
+    sheetTranslateY.setValue(height);
+    searchOpacity.setValue(0);
+    Animated.parallel([
+      Animated.timing(searchOpacity, { toValue: 1, duration: 250, useNativeDriver: true }),
+      Animated.spring(sheetTranslateY, { toValue: 0, tension: 50, friction: 8, useNativeDriver: true })
+    ]).start();
+  };
+
+  const closeSearch = () => {
+    Animated.parallel([
+      Animated.timing(searchOpacity, { toValue: 0, duration: 200, useNativeDriver: true }),
+      Animated.timing(sheetTranslateY, { toValue: height, duration: 200, useNativeDriver: true })
+    ]).start(() => {
+      setIsSearchVisible(false);
+      setSearchQuery('');
+    });
+  };
 
   useEffect(() => {
     if (isSearchVisible) {
-      sheetTranslateY.setValue(0);
-      // Use InteractionManager to wait for modal animation to complete
       const handle = InteractionManager.runAfterInteractions(() => {
-        // Try multiple times with increasing delays
         const focusInput = () => {
-          if (searchInputRef.current) {
-            searchInputRef.current.focus();
-          }
+          if (searchInputRef.current) searchInputRef.current.focus();
         };
-        
         focusInput();
         setTimeout(focusInput, 100);
-        setTimeout(focusInput, 300);
-        setTimeout(focusInput, 500);
       });
       return () => handle.cancel();
     }
   }, [isSearchVisible]);
+
+  useEffect(() => { itemsRef.current = inventoryItems; }, [inventoryItems]);
 
   const filterItems = (query: string, items: InventoryItem[]) => {
     return items.filter(item => 
@@ -994,19 +1359,27 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
 
   const renderHomeScreen = () => {
     return (
-      <View style={{ flex: 1 }}>
+      <View 
+        key="home-screen" 
+        style={{ flex: 1, backgroundColor: theme.colors.background }} 
+        collapsable={false}
+        needsOffscreenAlphaCompositing={true}
+      >
+        <DoodleBackground />
         <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8 }}>
-          <TouchableOpacity activeOpacity={0.9} onPress={() => setIsSearchVisible(true)}>
-             <View pointerEvents="none">
-                <Searchbar
-                  placeholder="Search items..."
-                  value=""
-                  style={[styles.searchBar, { backgroundColor: theme.dark ? theme.colors.elevation.level2 : '#fff' }]}
-                  iconColor={theme.colors.onSurfaceVariant}
-                  placeholderTextColor={theme.colors.onSurfaceVariant}
-                  elevation={2}
-                />
-             </View>
+          <TouchableOpacity 
+            activeOpacity={0.9} 
+            onPress={openSearch}
+            style={[
+              styles.searchPlaceholder, 
+              { 
+                backgroundColor: theme.dark ? theme.colors.elevation.level2 : '#fff',
+                elevation: 1, // Keep it minimal to avoid flash on transition
+              }
+            ]}
+          >
+             <Icon name="magnify" size={24} color={theme.colors.onSurfaceVariant} />
+             <Text style={{ marginLeft: 12, color: theme.colors.onSurfaceVariant, fontSize: 16 }}>Search items...</Text>
           </TouchableOpacity>
         </View>
         
@@ -1017,6 +1390,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
           keyboardShouldPersistTaps="handled"
           onScroll={handleScroll}
           scrollEventThrottle={16}
+          removeClippedSubviews={true}
         >
           {renderStatsHeader()}
           <View style={styles.categoriesGrid}>
@@ -1079,12 +1453,18 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
     };
     
     return (
-      <View style={styles.container}>
+      <View 
+        key={`category-${navigation.category}`} 
+        style={[styles.container, { backgroundColor: theme.colors.background }]} 
+        collapsable={false}
+        needsOffscreenAlphaCompositing={true}
+      >
+        <DoodleBackground />
         <View style={styles.header}>
           <IconButton
             icon="arrow-left"
             size={24}
-            onPress={() => setNavigation({ state: 'home' })}
+            onPress={() => setNavigationFluid({ state: 'home' })}
           />
           <Title style={[styles.headerTitle, { color: theme.colors.onSurface }]}>
             {navigation.category}
@@ -1124,6 +1504,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
             onScroll={handleScroll}
             scrollEventThrottle={16}
+            removeClippedSubviews={true}
           >
             <View style={styles.subcategoriesList}>
               {subcategories.map(subName => {
@@ -1186,8 +1567,8 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
                          styles.itemTitle, 
                          { 
                            color: theme.colors.onSurface,
-                           textDecorationLine: item.isIgnored ? 'line-through' : 'none',
-                           opacity: item.isIgnored ? 0.5 : 1
+                            textDecorationLine: 'none',
+                            opacity: item.isIgnored ? 0.5 : 1
                          }
                        ]}
                        numberOfLines={2}
@@ -1207,14 +1588,19 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
     };
 
     return (
-      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <View 
+        key={`subcat-${navigation.subcategory}`} 
+        style={[styles.container, { backgroundColor: theme.colors.background }]} 
+        collapsable={false}
+        needsOffscreenAlphaCompositing={true}
+      >
         <DoodleBackground />
         <View style={styles.header}>
           <IconButton
             icon="arrow-left"
             size={24}
             onPress={() => {
-              setNavigation({ state: 'category', category: navigation.category });
+              setNavigationFluid({ state: 'category', category: navigation.category });
               setShowIgnoredOnly(false); // Reset ignored filter when going back
             }}
           />
@@ -1275,15 +1661,15 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
           />
         ) : (
           <ScrollView
+            key="items-scroll"
             style={styles.scrollView}
-            contentContainerStyle={{ paddingBottom: 110 }}
+            contentContainerStyle={{ paddingBottom: 120, padding: 16 }}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
             onScroll={handleScroll}
             scrollEventThrottle={16}
+            removeClippedSubviews={false} // Disable clipping to prevent shadow artifacts during removal
           >
-            <View style={styles.itemsList}>
-              {items.map(item => renderItemRow(item))}
-            </View>
+            {items.map(item => renderItemRow(item))}
           </ScrollView>
         )}
       </View>
@@ -1423,7 +1809,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
           icon="magnify"
           style={[styles.fab, { backgroundColor: theme.colors.surface, bottom: 190, zIndex: 90 }]}
           color={theme.colors.onSurface}
-          onPress={() => setIsSearchVisible(true)}
+          onPress={openSearch}
           small
         />
         {/* Shopping Cart FAB */}
@@ -1523,138 +1909,94 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
   };
 
   const renderSearchOverlay = () => {
-    
+    if (!isSearchVisible) return null;
+
     const onHandlerStateChange = (event: any) => {
       if (event.nativeEvent.state === State.END) {
-        // If dragged down more than 60px, close
-        if (event.nativeEvent.translationY > 60) {
-          setIsSearchVisible(false);
-          setSearchQuery('');
+        if (event.nativeEvent.translationY > 80) {
+          closeSearch();
+        } else {
+          // Snap back if not dragged enough
+          Animated.spring(sheetTranslateY, { toValue: 0, useNativeDriver: true }).start();
         }
       }
     };
 
     return (
       <Portal>
-        {isSearchVisible && (
-          <Animated.View style={[
-            StyleSheet.absoluteFill,
-            { zIndex: 1000, backgroundColor: 'transparent' }
-          ]}>
-            <View style={{ flex: 1, backgroundColor: 'transparent' }}>
-              <GestureHandlerRootView style={{ flex: 1 }}>
-                <KeyboardAvoidingView 
-                  behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                  style={{ flex: 1 }}
+        <Animated.View style={[StyleSheet.absoluteFill, { zIndex: 1000, opacity: searchOpacity }]}>
+          <TouchableOpacity 
+            style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]} 
+            activeOpacity={1} 
+            onPress={closeSearch}
+          />
+          <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+            <GestureHandlerRootView style={{ height: '94%' }}>
+             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+              <Animated.View style={{ 
+                flex: 1, 
+                backgroundColor: theme.colors.elevation?.level1 || theme.colors.surface, 
+                borderTopLeftRadius: 28, 
+                borderTopRightRadius: 28,
+                transform: [{ translateY: sheetTranslateY }],
+                ...commonStyles.shadow,
+                elevation: 16, // Reduced from 24 to minimize Android residue
+                overflow: 'hidden' // Important for clipping clean edges
+              }}>
+                <PanGestureHandler
+                  onGestureEvent={Animated.event([{ nativeEvent: { translationY: sheetTranslateY } }], { useNativeDriver: true })}
+                  onHandlerStateChange={onHandlerStateChange}
+                  activeOffsetY={[-10, 10]}
                 >
-                  <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-                    {/* Backdrop */}
-                    <TouchableOpacity 
-                      style={StyleSheet.absoluteFill} 
-                      activeOpacity={1} 
-                      onPress={() => {
-                        setIsSearchVisible(false);
-                        setSearchQuery('');
-                      }}
-                    >
-                      <Animated.View style={{ 
-                        flex: 1, 
-                        backgroundColor: 'rgba(0,0,0,0.5)',
-                        opacity: isSearchVisible ? 1 : 0 
-                      }} />
-                    </TouchableOpacity>
-
-                    {/* Bottom Sheet */}
-                    <View style={{ 
-                      height: '92%', 
-                      backgroundColor: theme.colors.elevation?.level1 || theme.colors.surface, 
-                      borderTopLeftRadius: 28, 
-                      borderTopRightRadius: 28,
-                      ...commonStyles.shadow,
-                      elevation: 24,
-                    }}>
-                      <PanGestureHandler
-                        onHandlerStateChange={onHandlerStateChange}
-                        activeOffsetY={10}
-                      >
-                        <View style={{ backgroundColor: 'transparent' }}>
-                          {/* Drag Handle - Increased hit area */}
-                          <View style={{ alignItems: 'center', paddingVertical: 22, width: '100%' }}>
-                            <View style={{ width: 40, height: 5, borderRadius: 3, backgroundColor: theme.colors.onSurfaceVariant, opacity: 0.4 }} />
-                          </View>
-
-                          {/* Header */}
-                          <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 8 }}>
-                            <Searchbar
-                              key={isSearchVisible ? 'search-active' : 'search-inactive'}
-                              ref={searchInputRef}
-                              placeholder="Search and update..."
-                              onChangeText={setSearchQuery}
-                              value={searchQuery}
-                              style={[
-                                styles.searchBar, 
-                                { flex: 1, backgroundColor: theme.dark ? theme.colors.elevation?.level3 : theme.colors.surfaceVariant }
-                              ]}
-                              inputStyle={{ minHeight: 0 }} 
-                              iconColor={theme.colors.onSurfaceVariant}
-                              placeholderTextColor={theme.colors.onSurfaceVariant}
-                              elevation={0}
-                              autoFocus={true}
-                            />
-                            <IconButton 
-                              icon="close-circle-outline" 
-                              size={28}
-                              onPress={() => { setIsSearchVisible(false); setSearchQuery(''); }}
-                              style={{ marginLeft: 8 }}
-                            />
-                          </View>
-                        </View>
-                      </PanGestureHandler>
-                    
-                    <View style={{flex: 1}}>
-                      {isSearching ? (
+                  <View>
+                    <View style={{ alignItems: 'center', paddingVertical: 18, width: '100%' }}>
+                      <View style={{ width: 40, height: 5, borderRadius: 3, backgroundColor: theme.colors.onSurfaceVariant, opacity: 0.3 }} />
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 8 }}>
+                      <Searchbar
+                        ref={searchInputRef}
+                        placeholder="Search items..."
+                        onChangeText={setSearchQuery}
+                        value={searchQuery}
+                        style={[styles.searchBar, { flex: 1, backgroundColor: theme.dark ? theme.colors.elevation?.level3 : theme.colors.surfaceVariant }]}
+                        elevation={0}
+                      />
+                      <IconButton icon="close-circle-outline" size={24} onPress={closeSearch} style={{ marginLeft: 4 }} />
+                    </View>
+                  </View>
+                </PanGestureHandler>
+                
+                <GHScrollView contentContainerStyle={{ padding: 16, paddingBottom: 120 }} keyboardShouldPersistTaps="handled">
+                  {isSearching ? (
                             <View style={{ padding: 32, alignItems: 'center' }}>
                               <ActivityIndicator size="large" color={theme.colors.primary} />
                               <Text style={{ marginTop: 12, color: theme.colors.onSurfaceVariant }}>Searching...</Text>
                             </View>
                           ) : (
-                            <GHScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }} keyboardShouldPersistTaps="handled">
-                              {searchQuery.trim() ? (
-                                  <>
-                                      <Text style={{ marginVertical: 8, marginLeft: 4, color: theme.colors.onSurfaceVariant }}>
-                                        Found {searchResults.length} items
-                                      </Text>
-                                      {searchResults.map(item => renderItemRow(item, true))}
-                                      {searchResults.length === 0 && (
-                                        <View style={{ alignItems: 'center', marginTop: 32 }}>
-                                          <Icon name="magnify-remove-outline" size={48} color={theme.colors.onSurfaceVariant} />
-                                          <Text style={{ marginTop: 8, color: theme.colors.onSurfaceVariant }}>No items found</Text>
-                                        </View>
-                                      )}
-                                  </>
-                              ) : (
-                                  <View style={{ alignItems: 'center', marginTop: 32, opacity: 0.5 }}>
-                                      <Icon name="keyboard-outline" size={48} color={theme.colors.onSurfaceVariant} />
-                                      <Text style={{ marginTop: 8, color: theme.colors.onSurfaceVariant }}>Type to search...</Text>
-                                    </View>
-                              )}
-                            </GHScrollView>
-                          )}
-                    </View>
-                  </View>
-                </View>
-              </KeyboardAvoidingView>
+                    searchQuery.trim() ? (
+                      <>
+                        <Text style={{ marginVertical: 8, color: theme.colors.onSurfaceVariant }}>Found {searchResults.length} results</Text>
+                        {searchResults.map(item => renderItemRow(item, true))}
+                      </>
+                    ) : (
+                      <View style={{ alignItems: 'center', marginTop: 60, opacity: 0.3 }}>
+                        <Icon name="magnify" size={64} color={theme.colors.onSurfaceVariant} />
+                        <Text style={{ marginTop: 12 }}>Search your inventory</Text>
+                      </View>
+                    )
+                  )}
+                </GHScrollView>
+              </Animated.View>
+             </KeyboardAvoidingView>
             </GestureHandlerRootView>
           </View>
-          </Animated.View>
-        )}
+        </Animated.View>
       </Portal>
     );
   };
 
   return (
     <GestureHandlerRootView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <DoodleBackground />
       {navigation.state === 'home' && renderHomeScreen()}
       {navigation.state === 'category' && renderCategoryScreen()}
       {navigation.state === 'subcategory' && renderSubcategoryScreen()}
@@ -1688,297 +2030,5 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  statsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    padding: 16,
-    marginBottom: 16,
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statLabel: {
-    fontSize: 12,
-    marginBottom: 4,
-  },
-  statValue: {
-    fontSize: 22,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  categoriesGrid: {
-    padding: 16,
-  },
-  categoryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  categoryCard: {
-    minHeight: 180,
-    borderRadius: 32,
-    ...commonStyles.shadow,
-  },
-  categoryCardContent: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-  },
-  categoryIcon: {
-    marginBottom: 16,
-  },
-  categoryTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  categoryStats: {
-    alignItems: 'center',
-  },
-  categoryStatsText: {
-    fontSize: 12,
-    marginBottom: 2,
-  },
-  subcategoriesList: {
-    padding: 16,
-  },
-  subcategoryCard: {
-    marginVertical: 8,
-    marginHorizontal: 4,
-    borderRadius: 24,
-    ...commonStyles.shadow,
-  },
-  addSubCard: {
-    borderStyle: 'dashed',
-    borderWidth: 1,
-    elevation: 0,
-    backgroundColor: 'transparent',
-  },
-  subcategoryContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-  },
-  iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  subcategoryInfo: {
-    flex: 1,
-  },
-  subcategoryTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  subcategoryStats: {
-    fontSize: 12,
-    marginBottom: 2,
-  },
-  itemsList: {
-    padding: 16,
-  },
-  itemCard: {
-    marginVertical: 8,
-    marginHorizontal: 4,
-    borderRadius: 24,
-    ...commonStyles.shadow,
-  },
-  itemHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  itemTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    flex: 1,
-  },
-  itemActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  itemPercentage: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  stockSliderContainer: {
-    marginBottom: 8,
-  },
-  stockLabel: {
-    fontSize: 12,
-    marginBottom: 8,
-  },
-  stockControls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  stockValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginRight: 12,
-    minWidth: 40,
-  },
-  sliderContainer: {
-    flex: 1,
-    height: 40,
-    justifyContent: 'center',
-  },
-  sliderTrack: {
-    height: 12, // Slightly thicker
-    borderRadius: 6,
-    position: 'relative',
-    borderWidth: 1, // Added border for visibility
-    borderColor: 'rgba(0,0,0,0.05)',
-  },
-  sliderProgress: {
-    height: 12,
-    borderRadius: 6,
-    position: 'absolute',
-    left: 0,
-    top: -1, // Adjust for border
-  },
-  sliderThumb: {
-    width: 28, // Slightly larger
-    height: 28,
-    borderRadius: 14,
-    position: 'absolute',
-    top: -9,
-    marginLeft: -14,
-    ...commonStyles.shadow,
-    borderWidth: 3,
-    borderColor: '#fff',
-    elevation: 4,
-  },
-  progressContainer: {
-    flex: 1,
-    marginHorizontal: 8,
-  },
-  progressBar: {
-    height: 6,
-    borderRadius: 3,
-  },
-  lowStockWarning: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  lowStockText: {
-    fontSize: 12,
-    marginLeft: 4,
-  },
-  // New compact styles
-  compactItemContent: {
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-  },
-  itemHeaderCompact: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  stockControlsCompact: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  quantityButton: {
-    margin: 0,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-  },
-  sliderWrapper: {
-    flex: 1,
-    marginHorizontal: 4,
-  },
-  lowStockWarningCompact: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 6,
-  },
-  lowStockTextCompact: {
-    fontSize: 11,
-    marginLeft: 4,
-  },
-  // Swipe action styles
-  swipeAction: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: 80,
-    marginVertical: 8,
-    // Add margin to match card indentation so it blends
-  },
-  deleteAction: {
-    backgroundColor: '#FF3B30',
-    borderTopRightRadius: 24,
-    borderBottomRightRadius: 24,
-    marginRight: 4,
-    marginLeft: -20, // Overlap with card to hide gap
-    paddingLeft: 20, // Center icon
-    width: 100, // 80 visible + 20 overlap
-  },
-  editAction: {
-    backgroundColor: '#007AFF',
-    borderTopLeftRadius: 24,
-    borderBottomLeftRadius: 24,
-    marginLeft: 4,
-    marginRight: -20, // Overlap with card
-    paddingRight: 20, // Center icon
-    width: 100, // 80 visible + 20 overlap
-  },
-  swipeActionButton: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: '100%',
-  },
-  swipeActionText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-    marginTop: 4,
-  },
-  fab: {
-    position: 'absolute',
-    margin: 20,
-    right: 0,
-    bottom: 120,
-    borderRadius: 28,
-  },
-  searchBar: {
-    borderRadius: 16,
-    backgroundColor: '#fff', 
-    // Removed fixed height to allow auto-sizing and better alignment
-  },
-});
 
 export default InventoryScreen;

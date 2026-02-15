@@ -51,6 +51,10 @@ export class SettingsManager {
         this.scheduleInventoryReminders();
       }
 
+      if (this.settings.isHealthAlertsEnabled) {
+        this.scheduleHealthNotification();
+      }
+
       this.notifyListeners();
     } catch (error) {
       console.error('❌ Error loading settings:', error);
@@ -75,6 +79,7 @@ export class SettingsManager {
     const now = new Date();
     const morning = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 9, 0);
     const evening = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 18, 0);
+    const healthTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 10, 0);
 
     return {
       themeMode: 'system',
@@ -92,6 +97,7 @@ export class SettingsManager {
         [InventoryCategory.PERSONAL_CARE]: 30,
       },
       isHealthAlertsEnabled: true,
+      healthAlertTime: healthTime,
       securityLockTimeout: SecurityLockTimeout.IMMEDIATELY,
     };
   }
@@ -272,7 +278,7 @@ export class SettingsManager {
       handleNotification: async () => ({
         shouldShowAlert: true,
         shouldPlaySound: true,
-        shouldSetBadge: true,
+        shouldSetBadge: false,
       }),
     });
   }
@@ -311,12 +317,32 @@ export class SettingsManager {
   async toggleHealthAlerts(): Promise<void> {
     this.settings.isHealthAlertsEnabled = !this.settings.isHealthAlertsEnabled;
     
-    if (this.settings.isInventoryReminderEnabled) {
-      await this.scheduleInventoryReminders();
+    if (this.settings.isHealthAlertsEnabled) {
+      const hasPermission = await this.requestNotificationPermission();
+      if (hasPermission) {
+        await this.scheduleHealthNotification();
+        console.log('💚 Health notifications enabled');
+      } else {
+        this.settings.isHealthAlertsEnabled = false;
+        console.log('❌ Notification permission denied for health alerts');
+      }
+    } else {
+      await this.cancelHealthNotification();
+      console.log('💔 Health notifications disabled');
     }
     
     await this.saveSettings();
-    console.log(`🔔 Health alerts ${this.settings.isHealthAlertsEnabled ? 'enabled' : 'disabled'}`);
+  }
+
+  async updateHealthAlertTime(time: Date): Promise<void> {
+    this.settings.healthAlertTime = time;
+    
+    if (this.settings.isHealthAlertsEnabled) {
+      await this.scheduleHealthNotification();
+    }
+    
+    await this.saveSettings();
+    console.log(`⏰ Health alert time updated: ${time.toLocaleTimeString()}`);
   }
 
   async updateReminderTime1(time: Date): Promise<void> {
@@ -356,10 +382,16 @@ export class SettingsManager {
 
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync('default', {
-        name: 'default',
+        name: 'Inventory Reminders',
         importance: Notifications.AndroidImportance.MAX,
         vibrationPattern: [0, 250, 250, 250],
         lightColor: '#FF231F7C',
+      });
+      await Notifications.setNotificationChannelAsync('health', {
+        name: 'Health Alerts',
+        importance: Notifications.AndroidImportance.HIGH,
+        vibrationPattern: [0, 200, 100, 200],
+        lightColor: '#34D399',
       });
     }
 
@@ -367,19 +399,21 @@ export class SettingsManager {
   }
 
   private async scheduleInventoryReminders(): Promise<void> {
-    // Cancel existing notifications
+    // Cancel existing inventory notifications
     await this.cancelInventoryReminders();
     
     // Schedule first reminder
     await this.scheduleDailyReminder(
+      'inv-1',
       this.settings.reminderTime1, 
       'Time to check your inventory!',
-      this.getFreshnessSummary()
+      this.getInventoryReminderBody()
     );
     
     // Schedule second reminder only if enabled
     if (this.settings.isSecondReminderEnabled) {
       await this.scheduleDailyReminder(
+        'inv-2',
         this.settings.reminderTime2,
         'Evening inventory check!',
         'Any items running low today? Update your list now.'
@@ -389,8 +423,9 @@ export class SettingsManager {
     console.log(`✅ Reminders scheduled`);
   }
 
-  private async scheduleDailyReminder(time: Date, title: string, body: string): Promise<void> {
+  private async scheduleDailyReminder(identifier: string, time: Date, title: string, body: string): Promise<void> {
     await Notifications.scheduleNotificationAsync({
+      identifier,
       content: {
         title,
         body,
@@ -405,44 +440,175 @@ export class SettingsManager {
   }
 
   async sendTestNotification(): Promise<void> {
-    const summary = this.getFreshnessSummary();
+    const body = this.getInventoryReminderBody();
     await Notifications.scheduleNotificationAsync({
       content: {
         title: "Inventory Check 🔔",
-        body: summary || "Inventory reminders are working correctly!",
-        data: { data: 'test' },
+        body,
+        data: { type: 'reminder' },
       },
       trigger: null, // Send immediately
     });
   }
 
-  private getFreshnessSummary(): string {
-    const thresholds = this.settings.activityThresholds;
-    
-    if (!this.settings.isHealthAlertsEnabled) {
-      return 'Stay on top of your supplies and restock low items.';
+  async sendTestHealthNotification(): Promise<void> {
+    const summary = this.getHealthSummary();
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: summary.title,
+        body: summary.body,
+        data: { type: 'health' },
+        ...(Platform.OS === 'android' ? { channelId: 'health' } : {}),
+      },
+      trigger: null, // Send immediately
+    });
+  }
+
+  private getInventoryReminderBody(): string {
+    const items = inventoryManager.getInventoryItems();
+
+    if (items.length === 0) {
+      return 'Start adding items to track your home inventory!';
     }
 
-    const staleItems = inventoryManager.getStaleItemsByThreshold(thresholds);
-    
-    if (staleItems.length === 0) {
-      return 'Stay on top of your supplies and restock low items.';
+    const lowCount = items.filter(i => i.quantity <= 0.25).length;
+    const outOfStock = items.filter(i => i.quantity === 0).length;
+
+    // Items not updated in 3+ days — simple staleness check
+    const now = new Date();
+    const needUpdateCount = items.filter(i => {
+      const diff = Math.floor((now.getTime() - new Date(i.lastUpdated).getTime()) / (1000 * 60 * 60 * 24));
+      return diff >= 3;
+    }).length;
+
+    const parts: string[] = [];
+
+    if (outOfStock > 0) {
+      parts.push(`${outOfStock} out of stock`);
+    } else if (lowCount > 0) {
+      parts.push(`${lowCount} running low`);
     }
 
-    const categories = new Set(staleItems.map(item => {
-      const config = inventoryManager.getSubcategoryConfig(item.subcategory);
-      return config?.category;
-    }).filter(Boolean));
+    if (needUpdateCount > 0) {
+      parts.push(`${needUpdateCount} need a status update`);
+    }
 
-    const staleCount = staleItems.length;
-    const categoryNames = Array.from(categories).join(', ');
-    
-    return `${staleCount} items in ${categoryNames} need a status update. Please check them today!`;
+    if (parts.length > 0) {
+      return `${parts.join(', ')}. Update your inventory to keep it accurate!`;
+    }
+
+    return `All ${items.length} items are up to date. Tap to review your stock levels.`;
   }
 
   private async cancelInventoryReminders(): Promise<void> {
-    await Notifications.cancelAllScheduledNotificationsAsync();
-    console.log('🗑️ All notifications cancelled');
+    // Cancel only inventory reminder notifications (identifiers starting with 'inv-')
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    for (const notif of scheduled) {
+      if (notif.identifier.startsWith('inv-')) {
+        await Notifications.cancelScheduledNotificationAsync(notif.identifier);
+      }
+    }
+    console.log('🗑️ Inventory reminders cancelled');
+  }
+
+  // MARK: - Health Notifications (separate system)
+  private async scheduleHealthNotification(): Promise<void> {
+    await this.cancelHealthNotification();
+
+    const time = new Date(this.settings.healthAlertTime);
+    const hour = time.getHours();
+    
+    // Only schedule if between 8 AM and 10 PM
+    if (hour < 8 || hour >= 22) {
+      console.log('⚠️ Health alert time outside allowed window (8 AM - 10 PM), adjusting to 10 AM');
+      time.setHours(10, 0, 0, 0);
+    }
+
+    const summary = this.getHealthSummary();
+
+    await Notifications.scheduleNotificationAsync({
+      identifier: 'health-daily',
+      content: {
+        title: summary.title,
+        body: summary.body,
+        sound: true,
+        ...(Platform.OS === 'android' ? { channelId: 'health' } : {}),
+      },
+      trigger: {
+        hour: time.getHours(),
+        minute: time.getMinutes(),
+        repeats: true,
+      },
+    });
+
+    console.log(`💚 Health notification scheduled at ${this.formatTime(time)}`);
+  }
+
+  private async cancelHealthNotification(): Promise<void> {
+    try {
+      await Notifications.cancelScheduledNotificationAsync('health-daily');
+    } catch {
+      // May not exist yet, ignore
+    }
+    console.log('🗑️ Health notification cancelled');
+  }
+
+  private getHealthSummary(): { title: string; body: string } {
+    const thresholds = this.settings.activityThresholds;
+    const items = inventoryManager.getInventoryItems();
+    
+    if (items.length === 0) {
+      return {
+        title: '🏠 Inventory Health',
+        body: 'Start adding items to get health insights!',
+      };
+    }
+
+    const staleItems = inventoryManager.getStaleItemsByThreshold(thresholds);
+    const lowStockItems = items.filter(i => i.quantity <= 0.25);
+    const criticalItems = items.filter(i => i.quantity === 0);
+
+    // Build smart title
+    let title = '🏠 Inventory Health';
+    if (criticalItems.length > 0) {
+      title = `🚨 ${criticalItems.length} Item${criticalItems.length > 1 ? 's' : ''} Out of Stock!`;
+    } else if (staleItems.length > 0 && lowStockItems.length > 0) {
+      title = `⚠️ ${staleItems.length} Stale · ${lowStockItems.length} Low Stock`;
+    } else if (staleItems.length > 0) {
+      title = `⚠️ ${staleItems.length} Item${staleItems.length > 1 ? 's' : ''} Need Review`;
+    } else if (lowStockItems.length > 0) {
+      title = `📦 ${lowStockItems.length} Item${lowStockItems.length > 1 ? 's' : ''} Running Low`;
+    } else {
+      title = '✅ Inventory Looking Good!';
+    }
+
+    // Build smart body
+    const parts: string[] = [];
+
+    if (criticalItems.length > 0) {
+      const names = criticalItems.slice(0, 3).map(i => i.name).join(', ');
+      parts.push(`Out of stock: ${names}${criticalItems.length > 3 ? ` +${criticalItems.length - 3} more` : ''}`);
+    }
+
+    if (staleItems.length > 0 && criticalItems.length === 0) {
+      const categories = new Set(staleItems.map(item => {
+        const config = inventoryManager.getSubcategoryConfig(item.subcategory);
+        return config?.category;
+      }).filter(Boolean));
+      parts.push(`${staleItems.length} items in ${Array.from(categories).join(', ')} haven't been updated`);
+    }
+
+    if (lowStockItems.length > 0 && criticalItems.length === 0) {
+      const names = lowStockItems.slice(0, 3).map(i => `${i.name} (${Math.round(i.quantity * 100)}%)`).join(', ');
+      parts.push(`Low: ${names}${lowStockItems.length > 3 ? ` +${lowStockItems.length - 3} more` : ''}`);
+    }
+
+    if (parts.length === 0) {
+      const avgStock = Math.round((items.reduce((s, i) => s + i.quantity, 0) / items.length) * 100);
+      parts.push(`All ${items.length} items are up to date. Average stock: ${avgStock}%`);
+    }
+
+    return { title, body: parts.join(' · ') };
   }
 
   private formatTime(date: Date): string {
@@ -494,6 +660,37 @@ export class SettingsManager {
     this.settings = this.getDefaultSettings();
     await this.saveSettings();
     console.log('🔄 Settings reset to defaults');
+  }
+
+  async importSettings(data: any): Promise<void> {
+    if (!data) return;
+    
+    // Validate schema roughly by checking keys or just merge carefully
+    const defaultSettings = this.getDefaultSettings();
+    
+    // Merge imported data with defaults to ensure all keys exist
+    this.settings = {
+        ...defaultSettings,
+        ...data,
+        // Restore dates if they are strings
+        reminderTime1: data.reminderTime1 ? new Date(data.reminderTime1) : defaultSettings.reminderTime1,
+        reminderTime2: data.reminderTime2 ? new Date(data.reminderTime2) : defaultSettings.reminderTime2,
+        healthAlertTime: data.healthAlertTime ? new Date(data.healthAlertTime) : defaultSettings.healthAlertTime,
+        // Ensure critical flags are respected or reset if needed (e.g. auth)
+        isAuthenticated: false, 
+    };
+
+    if (this.settings.isInventoryReminderEnabled) {
+        this.scheduleInventoryReminders();
+    }
+    
+    if (this.settings.isHealthAlertsEnabled) {
+        this.scheduleHealthNotification();
+    }
+
+    await this.saveSettings();
+    console.log('📥 Settings imported successfully');
+    this.notifyListeners();
   }
 }
 
