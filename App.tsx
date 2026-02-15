@@ -15,6 +15,7 @@ import InsightsScreen from './src/screens/InsightsScreen';
 import NotesScreen from './src/screens/NotesScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import NoteDetailScreen from './src/screens/NoteDetailScreen';
+import SplashScreen from './src/screens/SplashScreen';
 
 import NotificationSettingsScreen from './src/screens/NotificationSettingsScreen';
 import { useColorScheme } from 'react-native';
@@ -36,6 +37,7 @@ const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isSecurityEnabled, setIsSecurityEnabled] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [showSplashScreen, setShowSplashScreen] = useState(true);
 
 
 
@@ -104,6 +106,11 @@ const App: React.FC = () => {
     }
   };
 
+  const handleSplashFinish = () => {
+    setShowSplashScreen(false);
+  };
+
+
   const handleAuthenticate = async () => {
     const success = await settingsManager.authenticateUser();
     setIsAuthenticated(success);
@@ -113,16 +120,9 @@ const App: React.FC = () => {
   const isDark = themeMode === 'system' ? systemColorScheme === 'dark' : themeMode === 'dark';
   const theme = isDark ? darkTheme : lightTheme;
 
-  // Show loading screen while initializing
-  if (isLoading) {
-    return (
-      <PaperProvider theme={theme}>
-        <StatusBar
-          barStyle={isDark ? 'light-content' : 'dark-content'}
-          backgroundColor={theme.colors.surface}
-        />
-      </PaperProvider>
-    );
+  // Show splash screen while initializing or during animation
+  if (showSplashScreen) {
+    return <SplashScreen onAnimationFinish={handleSplashFinish} />;
   }
 
   // Show authentication screen if security is enabled but not authenticated

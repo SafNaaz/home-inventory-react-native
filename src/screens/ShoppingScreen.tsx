@@ -7,6 +7,7 @@ import {
   LayoutAnimation,
   Platform,
   UIManager,
+  ActivityIndicator,
 } from 'react-native';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -29,6 +30,7 @@ import {
   Snackbar,
 } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 
 import { inventoryManager } from '../managers/InventoryManager';
 import { settingsManager } from '../managers/SettingsManager';
@@ -39,6 +41,7 @@ import DoodleBackground from '../components/DoodleBackground';
 
 const ShoppingScreen: React.FC = () => {
   const theme = useTheme();
+  const navigation = useNavigation();
   const [shoppingList, setShoppingList] = useState<ShoppingListItem[]>([]);
   const [shoppingState, setShoppingState] = useState<ShoppingState>(ShoppingState.EMPTY);
   const [refreshing, setRefreshing] = useState(false);
@@ -59,6 +62,8 @@ const ShoppingScreen: React.FC = () => {
   const [allItems, setAllItems] = useState<InventoryItem[]>([]);
   const [itemSearchQuery, setItemSearchQuery] = useState('');
   const [filteredAllItems, setFilteredAllItems] = useState<InventoryItem[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [isSearchingItems, setIsSearchingItems] = useState(false);
 
   useEffect(() => {
     // Load initial data
@@ -180,24 +185,38 @@ const ShoppingScreen: React.FC = () => {
   };
 
   const handleOpenSearchItemsDialog = () => {
-    const all = inventoryManager.getInventoryItems();
-    const available = all.filter(item => 
-      !shoppingList.some(sl => sl.inventoryItemId === item.id)
-    );
-    setAllItems(available);
-    setFilteredAllItems(available);
-    setItemSearchQuery('');
-    setSearchItemsDialogVisible(true);
+    setSearchLoading(true);
+    // Use timeout to allow UI to update with spinner before heavy processing/rendering
+    setTimeout(() => {
+        const all = inventoryManager.getInventoryItems();
+        const available = all.filter(item => 
+          !shoppingList.some(sl => sl.inventoryItemId === item.id)
+        );
+        setAllItems(available);
+        setFilteredAllItems(available);
+        setItemSearchQuery('');
+        setSearchItemsDialogVisible(true);
+        // Clean up loading state slightly after dialog opens to ensure smooth transition
+        requestAnimationFrame(() => {
+          setSearchLoading(false);
+        });
+    }, 100);
   };
 
   useEffect(() => {
     if (!itemSearchQuery.trim()) {
       setFilteredAllItems(allItems);
+      setIsSearchingItems(false);
     } else {
-      const filtered = allItems.filter(item => 
-        item.name.toLowerCase().includes(itemSearchQuery.toLowerCase())
-      );
-      setFilteredAllItems(filtered);
+      setIsSearchingItems(true);
+      const timer = setTimeout(() => {
+        const filtered = allItems.filter(item => 
+          item.name.toLowerCase().includes(itemSearchQuery.toLowerCase())
+        );
+        setFilteredAllItems(filtered);
+        setIsSearchingItems(false);
+      }, 500); // Debounce
+      return () => clearTimeout(timer);
     }
   }, [itemSearchQuery, allItems]);
 
@@ -377,9 +396,11 @@ const ShoppingScreen: React.FC = () => {
         onPress={handleOpenSearchItemsDialog}
         style={{ marginTop: 0 }}
         textColor={theme.colors.primary}
-        icon="magnify"
+        icon={searchLoading ? undefined : "magnify"}
+        loading={searchLoading}
+        disabled={searchLoading}
       >
-        Search & Add from all items
+        {searchLoading ? "Loading Items..." : "Search & Add from all items"}
       </Button>
     </View>
   );
@@ -442,7 +463,9 @@ const ShoppingScreen: React.FC = () => {
             style={styles.secondaryActionButton}
             textColor={theme.colors.primary}
             labelStyle={{ fontSize: 11 }}
-            icon="magnify"
+            icon={searchLoading ? undefined : "magnify"}
+            loading={searchLoading}
+            disabled={searchLoading}
           >
             Search
           </Button>
@@ -589,7 +612,9 @@ const ShoppingScreen: React.FC = () => {
               style={styles.secondaryActionButton}
               textColor={theme.colors.primary}
               labelStyle={{ fontSize: 11 }}
-              icon="magnify"
+              icon={searchLoading ? undefined : "magnify"}
+              loading={searchLoading}
+              disabled={searchLoading}
             >
               Search
             </Button>
@@ -710,18 +735,31 @@ const ShoppingScreen: React.FC = () => {
       {/* Search and Add Dialog */}
       <Portal>
         <Dialog visible={searchItemsDialogVisible} onDismiss={() => setSearchItemsDialogVisible(false)} style={{ maxHeight: '80%' }}>
-          <Dialog.Title>Search & Add Any Item</Dialog.Title>
           <Dialog.Content>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <Title>Search & Add Item</Title>
+              <IconButton icon="close" size={24} onPress={() => setSearchItemsDialogVisible(false)} />
+            </View>
             <TextInput
               label="Search items..."
               value={itemSearchQuery}
-              onChangeText={setItemSearchQuery}
+              onChangeText={(text) => {
+                setItemSearchQuery(text);
+                if (text.trim().length > 0) {
+                  setIsSearchingItems(true);
+                }
+              }}
               mode="outlined"
               style={{ marginBottom: 8 }}
               right={<TextInput.Icon icon="magnify" />}
+              autoFocus
             />
-            <ScrollView style={{ maxHeight: 300 }}>
-              {filteredAllItems.length > 0 ? (
+            <ScrollView style={{ maxHeight: 300 }} keyboardShouldPersistTaps="handled">
+              {isSearchingItems ? (
+                <View style={{ padding: 20, alignItems: 'center' }}>
+                  <ActivityIndicator size="small" color={theme.colors.primary} />
+                </View>
+              ) : filteredAllItems.length > 0 ? (
                 filteredAllItems.map(item => (
                   <List.Item
                     key={item.id}
@@ -738,9 +776,7 @@ const ShoppingScreen: React.FC = () => {
               )}
             </ScrollView>
           </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setSearchItemsDialogVisible(false)}>Close</Button>
-          </Dialog.Actions>
+          {/* Actions removed as Close is now in header */}
         </Dialog>
       </Portal>
       {/* Complete Shopping Dialog */}

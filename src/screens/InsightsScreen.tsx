@@ -236,24 +236,7 @@ const EmptyState: React.FC<{
 
 // ─── Quick Stat Tile ───────────────────────────────────────────────────────────
 
-const StatTile: React.FC<{
-  icon: string;
-  label: string;
-  value: string;
-  color: string;
-  theme: any;
-}> = ({ icon, label, value, color, theme }) => (
-  <Surface
-    style={[styles.statTile, { backgroundColor: theme.dark ? theme.colors.surface : '#FFFFFF' }]}
-    elevation={theme.dark ? 1 : 2}
-  >
-    <View style={[styles.statTileIcon, { backgroundColor: color + '15' }]}>
-      <Icon name={icon as any} size={18} color={color} />
-    </View>
-    <Text style={[styles.statTileValue, { color: theme.colors.onSurface }]}>{value}</Text>
-    <Text style={[styles.statTileLabel, { color: theme.colors.onSurfaceVariant }]}>{label}</Text>
-  </Surface>
-);
+
 
 // ─── Main Screen ───────────────────────────────────────────────────────────────
 
@@ -264,6 +247,7 @@ const InsightsScreen: React.FC = () => {
 
   // Expand/collapse state for each section
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
+
 
   const toggleSection = (key: string) => {
     toggleAnimation();
@@ -303,6 +287,8 @@ const InsightsScreen: React.FC = () => {
     staleItems.forEach(item => {
       const config = inventoryManager.getSubcategoryConfig(item.subcategory);
       if (!config) return;
+      if (item.quantity === 0) return;
+      
       const category = config.category;
       const catConfig = CATEGORY_CONFIG[category as InventoryCategory];
       if (!grouped[category]) {
@@ -1017,52 +1003,7 @@ const InsightsScreen: React.FC = () => {
     );
   };
 
-  const renderQuickStatsSection = () => {
-    const mostActiveName = quickStats.mostActiveCat ? quickStats.mostActiveCat[0] : '—';
-    const oldestDays = quickStats.oldest ? daysSince(quickStats.oldest.lastUpdated) : 0;
 
-    return (
-      <View style={styles.sectionContainer}>
-        <SectionHeader
-          icon="lightning-bolt"
-          title="Quick Stats"
-          subtitle="At-a-glance summary of your inventory"
-          iconColor={theme.dark ? '#38BDF8' : '#0EA5E9'}
-          theme={theme}
-        />
-        <View style={styles.statsGrid}>
-          <StatTile
-            icon="cart-arrow-down"
-            label="Total Restocks"
-            value={`${quickStats.totalRestocks}`}
-            color={theme.dark ? '#34D399' : '#10B981'}
-            theme={theme}
-          />
-          <StatTile
-            icon="gauge"
-            label="Avg Stock Level"
-            value={`${quickStats.avgStock}%`}
-            color={theme.dark ? '#38BDF8' : '#0EA5E9'}
-            theme={theme}
-          />
-          <StatTile
-            icon="star-circle"
-            label="Most Active"
-            value={mostActiveName}
-            color={theme.dark ? '#FBBF24' : '#F59E0B'}
-            theme={theme}
-          />
-          <StatTile
-            icon="calendar-clock"
-            label="Oldest Unchanged"
-            value={oldestDays === 0 ? 'Today' : `${oldestDays}d`}
-            color={theme.dark ? '#F472B6' : '#EC4899'}
-            theme={theme}
-          />
-        </View>
-      </View>
-    );
-  };
 
   // ── Main Render ──
 
@@ -1136,7 +1077,7 @@ const InsightsScreen: React.FC = () => {
         {renderCategoryHealthSection()}
         {renderNeverRestockedSection()}
         {renderMonthlySummarySection()}
-        {renderQuickStatsSection()}
+
 
         <View style={{ height: 20 }} />
       </ScrollView>
@@ -1263,6 +1204,14 @@ const styles = StyleSheet.create({
   countBadgeText: {
     fontSize: 12,
     fontWeight: '800',
+  },
+  sectionActionBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
   },
 
   // Card
