@@ -189,7 +189,7 @@ const SliderControl: React.FC<{
     <View style={styles.sliderContainer}>
       <View
         ref={trackRef}
-        style={[styles.sliderTrack, { backgroundColor: trackColor }]}
+        style={[styles.sliderTrack, { backgroundColor: trackColor, opacity: 0.8 }]}
         onLayout={(e) => {
           const w = e.nativeEvent.layout.width;
           trackWidth.current = w || 200;
@@ -222,9 +222,10 @@ interface ItemRowProps {
   onDelete: (item: InventoryItem) => void;
   onEdit: (item: InventoryItem) => void;
   onToggleIgnore: (item: InventoryItem) => void;
+  isSearch?: boolean;
 }
 
-const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, onUpdate, onDelete, onEdit, onToggleIgnore }: ItemRowProps) => {
+const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, onUpdate, onDelete, onEdit, onToggleIgnore, isSearch }: ItemRowProps) => {
   const stockColor = getStockColor(item.quantity, theme.dark);
 
   const swipeableRef = useRef<Swipeable>(null);
@@ -291,6 +292,81 @@ const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, on
     );
   };
 
+  const card = (
+    <Card style={styles.itemCard}>
+      <Card.Content style={styles.compactItemContent}>
+        <View style={styles.itemHeaderCompact}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
+            {!isSearch && (
+              <Checkbox.Android
+                status={item.isIgnored ? 'checked' : 'unchecked'}
+                onPress={() => onToggleIgnore(item)}
+                color={theme.colors.error}
+                uncheckedColor={theme.colors.onSurfaceVariant}
+              />
+            )}
+            <Text 
+              style={[
+                styles.itemTitle, 
+                { 
+                  color: theme.colors.onSurface,
+                  textDecorationLine: item.isIgnored ? 'line-through' : 'none',
+                  opacity: item.isIgnored ? 0.5 : 1,
+                  marginLeft: isSearch ? 4 : 0
+                }
+              ]}
+              numberOfLines={2}
+            >
+              {item.name}
+            </Text>
+          </View>
+          <Text style={[styles.itemPercentage, { color: stockColor }]}>
+            {Math.round(item.quantity * 100)}%
+          </Text>
+        </View>
+
+        <View style={styles.stockControlsCompact}>
+          <IconButton
+            icon="minus"
+            size={20}
+            iconColor={theme.colors.primary}
+            style={styles.quantityButton}
+            onPress={() => onDecrement(item)}
+          />
+          <View style={styles.sliderWrapper}>
+            <SliderControl
+              initialValue={item.quantity}
+              onComplete={(q) => onUpdate(item, q)}
+              trackColor={theme.colors.outline}
+              progressColor={stockColor}
+              thumbColor={theme.colors.primary}
+            />
+          </View>
+          <IconButton
+            icon="plus"
+            size={20}
+            iconColor={theme.colors.primary}
+            style={styles.quantityButton}
+            onPress={() => onIncrement(item)}
+          />
+        </View>
+
+        {item.quantity <= 0.25 && (
+          <View style={styles.lowStockWarningCompact}>
+            <Icon name="alert-circle" size={14} color={theme.colors.error} />
+            <Text style={[styles.lowStockTextCompact, { color: theme.colors.error }]}>
+              Low stock
+            </Text>
+          </View>
+        )}
+      </Card.Content>
+    </Card>
+  );
+
+  if (isSearch) {
+    return card;
+  }
+
   return (
     <Swipeable
       ref={swipeableRef}
@@ -303,71 +379,7 @@ const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, on
       containerStyle={{ overflow: 'visible' }}
       childrenContainerStyle={{ overflow: 'visible' }}
     >
-      <Card style={styles.itemCard}>
-        <Card.Content style={styles.compactItemContent}>
-          <View style={styles.itemHeaderCompact}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
-              <Checkbox.Android
-                status={item.isIgnored ? 'checked' : 'unchecked'}
-                onPress={() => onToggleIgnore(item)}
-                color={theme.colors.error}
-                uncheckedColor={theme.colors.onSurfaceVariant}
-              />
-              <Text 
-                style={[
-                  styles.itemTitle, 
-                  { 
-                    color: theme.colors.onSurface,
-                    textDecorationLine: item.isIgnored ? 'line-through' : 'none',
-                    opacity: item.isIgnored ? 0.5 : 1
-                  }
-                ]}
-                numberOfLines={2}
-              >
-                {item.name}
-              </Text>
-            </View>
-            <Text style={[styles.itemPercentage, { color: stockColor }]}>
-              {Math.round(item.quantity * 100)}%
-            </Text>
-          </View>
-
-          <View style={styles.stockControlsCompact}>
-            <IconButton
-              icon="minus"
-              size={20}
-              iconColor={theme.colors.primary}
-              style={styles.quantityButton}
-              onPress={() => onDecrement(item)}
-            />
-            <View style={styles.sliderWrapper}>
-              <SliderControl
-                initialValue={item.quantity}
-                onComplete={(q) => onUpdate(item, q)}
-                trackColor={theme.colors.outline}
-                progressColor={stockColor}
-                thumbColor={theme.colors.primary}
-              />
-            </View>
-            <IconButton
-              icon="plus"
-              size={20}
-              iconColor={theme.colors.primary}
-              style={styles.quantityButton}
-              onPress={() => onIncrement(item)}
-            />
-          </View>
-
-          {item.quantity <= 0.25 && (
-            <View style={styles.lowStockWarningCompact}>
-              <Icon name="alert-circle" size={14} color={theme.colors.error} />
-              <Text style={[styles.lowStockTextCompact, { color: theme.colors.error }]}>
-                Low stock
-              </Text>
-            </View>
-          )}
-        </Card.Content>
-      </Card>
+      {card}
     </Swipeable>
   );
 });
@@ -902,7 +914,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
     }
   };
 
-  const renderItemRow = (item: InventoryItem) => {
+  const renderItemRow = (item: InventoryItem, isSearch: boolean = false) => {
     return (
       <InventoryItemRow
         key={item.id}
@@ -914,6 +926,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
         onDelete={confirmDelete}
         onEdit={confirmEdit}
         onToggleIgnore={handleToggleIgnore}
+        isSearch={isSearch}
       />
     );
   };
@@ -1269,7 +1282,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
             scrollEventThrottle={16}
           >
             <View style={styles.itemsList}>
-              {items.map(renderItemRow)}
+              {items.map(item => renderItemRow(item))}
             </View>
           </ScrollView>
         )}
@@ -1522,115 +1535,120 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
     };
 
     return (
-      <Modal
-        visible={isSearchVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => {
-          setIsSearchVisible(false);
-          setSearchQuery('');
-        }}
-      >
-        <GestureHandlerRootView style={{ flex: 1 }}>
-          <KeyboardAvoidingView 
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            style={{ flex: 1 }}
-          >
-            <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-              {/* Backdrop */}
-              <TouchableOpacity 
-                style={StyleSheet.absoluteFill} 
-                activeOpacity={1} 
-                onPress={() => {
-                  setIsSearchVisible(false);
-                  setSearchQuery('');
-                }}
-              >
-                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }} />
-              </TouchableOpacity>
-
-              {/* Bottom Sheet */}
-              <View style={{ 
-                height: '92%', 
-                backgroundColor: theme.colors.elevation?.level1 || theme.colors.surface, 
-                borderTopLeftRadius: 28, 
-                borderTopRightRadius: 28,
-                ...commonStyles.shadow,
-                elevation: 24,
-              }}>
-                <PanGestureHandler
-                  onHandlerStateChange={onHandlerStateChange}
-                  activeOffsetY={10}
+      <Portal>
+        {isSearchVisible && (
+          <Animated.View style={[
+            StyleSheet.absoluteFill,
+            { zIndex: 1000, backgroundColor: 'transparent' }
+          ]}>
+            <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+              <GestureHandlerRootView style={{ flex: 1 }}>
+                <KeyboardAvoidingView 
+                  behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                  style={{ flex: 1 }}
                 >
-                  <View style={{ backgroundColor: 'transparent' }}>
-                    {/* Drag Handle - Increased hit area */}
-                    <View style={{ alignItems: 'center', paddingVertical: 22, width: '100%' }}>
-                      <View style={{ width: 40, height: 5, borderRadius: 3, backgroundColor: theme.colors.onSurfaceVariant, opacity: 0.4 }} />
-                    </View>
+                  <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+                    {/* Backdrop */}
+                    <TouchableOpacity 
+                      style={StyleSheet.absoluteFill} 
+                      activeOpacity={1} 
+                      onPress={() => {
+                        setIsSearchVisible(false);
+                        setSearchQuery('');
+                      }}
+                    >
+                      <Animated.View style={{ 
+                        flex: 1, 
+                        backgroundColor: 'rgba(0,0,0,0.5)',
+                        opacity: isSearchVisible ? 1 : 0 
+                      }} />
+                    </TouchableOpacity>
 
-                    {/* Header */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 8 }}>
-                      <Searchbar
-                        key={isSearchVisible ? 'search-active' : 'search-inactive'}
-                        ref={searchInputRef}
-                        placeholder="Search and update..."
-                        onChangeText={setSearchQuery}
-                        value={searchQuery}
-                        style={[
-                          styles.searchBar, 
-                          { flex: 1, backgroundColor: theme.dark ? theme.colors.elevation?.level3 : theme.colors.surfaceVariant }
-                        ]}
-                        inputStyle={{ minHeight: 0 }} 
-                        iconColor={theme.colors.onSurfaceVariant}
-                        placeholderTextColor={theme.colors.onSurfaceVariant}
-                        elevation={0}
-                        autoFocus={true}
-                      />
-                      <IconButton 
-                        icon="close-circle-outline" 
-                        size={28}
-                        onPress={() => { setIsSearchVisible(false); setSearchQuery(''); }}
-                        style={{ marginLeft: 8 }}
-                      />
+                    {/* Bottom Sheet */}
+                    <View style={{ 
+                      height: '92%', 
+                      backgroundColor: theme.colors.elevation?.level1 || theme.colors.surface, 
+                      borderTopLeftRadius: 28, 
+                      borderTopRightRadius: 28,
+                      ...commonStyles.shadow,
+                      elevation: 24,
+                    }}>
+                      <PanGestureHandler
+                        onHandlerStateChange={onHandlerStateChange}
+                        activeOffsetY={10}
+                      >
+                        <View style={{ backgroundColor: 'transparent' }}>
+                          {/* Drag Handle - Increased hit area */}
+                          <View style={{ alignItems: 'center', paddingVertical: 22, width: '100%' }}>
+                            <View style={{ width: 40, height: 5, borderRadius: 3, backgroundColor: theme.colors.onSurfaceVariant, opacity: 0.4 }} />
+                          </View>
+
+                          {/* Header */}
+                          <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 8 }}>
+                            <Searchbar
+                              key={isSearchVisible ? 'search-active' : 'search-inactive'}
+                              ref={searchInputRef}
+                              placeholder="Search and update..."
+                              onChangeText={setSearchQuery}
+                              value={searchQuery}
+                              style={[
+                                styles.searchBar, 
+                                { flex: 1, backgroundColor: theme.dark ? theme.colors.elevation?.level3 : theme.colors.surfaceVariant }
+                              ]}
+                              inputStyle={{ minHeight: 0 }} 
+                              iconColor={theme.colors.onSurfaceVariant}
+                              placeholderTextColor={theme.colors.onSurfaceVariant}
+                              elevation={0}
+                              autoFocus={true}
+                            />
+                            <IconButton 
+                              icon="close-circle-outline" 
+                              size={28}
+                              onPress={() => { setIsSearchVisible(false); setSearchQuery(''); }}
+                              style={{ marginLeft: 8 }}
+                            />
+                          </View>
+                        </View>
+                      </PanGestureHandler>
+                    
+                    <View style={{flex: 1}}>
+                      {isSearching ? (
+                            <View style={{ padding: 32, alignItems: 'center' }}>
+                              <ActivityIndicator size="large" color={theme.colors.primary} />
+                              <Text style={{ marginTop: 12, color: theme.colors.onSurfaceVariant }}>Searching...</Text>
+                            </View>
+                          ) : (
+                            <GHScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }} keyboardShouldPersistTaps="handled">
+                              {searchQuery.trim() ? (
+                                  <>
+                                      <Text style={{ marginVertical: 8, marginLeft: 4, color: theme.colors.onSurfaceVariant }}>
+                                        Found {searchResults.length} items
+                                      </Text>
+                                      {searchResults.map(item => renderItemRow(item, true))}
+                                      {searchResults.length === 0 && (
+                                        <View style={{ alignItems: 'center', marginTop: 32 }}>
+                                          <Icon name="magnify-remove-outline" size={48} color={theme.colors.onSurfaceVariant} />
+                                          <Text style={{ marginTop: 8, color: theme.colors.onSurfaceVariant }}>No items found</Text>
+                                        </View>
+                                      )}
+                                  </>
+                              ) : (
+                                  <View style={{ alignItems: 'center', marginTop: 32, opacity: 0.5 }}>
+                                      <Icon name="keyboard-outline" size={48} color={theme.colors.onSurfaceVariant} />
+                                      <Text style={{ marginTop: 8, color: theme.colors.onSurfaceVariant }}>Type to search...</Text>
+                                    </View>
+                              )}
+                            </GHScrollView>
+                          )}
                     </View>
                   </View>
-                </PanGestureHandler>
-              
-              <View style={{flex: 1}}>
-                {isSearching ? (
-                      <View style={{ padding: 32, alignItems: 'center' }}>
-                        <ActivityIndicator size="large" color={theme.colors.primary} />
-                        <Text style={{ marginTop: 12, color: theme.colors.onSurfaceVariant }}>Searching...</Text>
-                      </View>
-                    ) : (
-                      <GHScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }} keyboardShouldPersistTaps="handled">
-                        {searchQuery.trim() ? (
-                            <>
-                                <Text style={{ marginVertical: 8, marginLeft: 4, color: theme.colors.onSurfaceVariant }}>
-                                  Found {searchResults.length} items
-                                </Text>
-                                {searchResults.map(renderItemRow)}
-                                {searchResults.length === 0 && (
-                                  <View style={{ alignItems: 'center', marginTop: 32 }}>
-                                    <Icon name="magnify-remove-outline" size={48} color={theme.colors.onSurfaceVariant} />
-                                    <Text style={{ marginTop: 8, color: theme.colors.onSurfaceVariant }}>No items found</Text>
-                                  </View>
-                                )}
-                            </>
-                        ) : (
-                            <View style={{ alignItems: 'center', marginTop: 32, opacity: 0.5 }}>
-                                <Icon name="keyboard-outline" size={48} color={theme.colors.onSurfaceVariant} />
-                                <Text style={{ marginTop: 8, color: theme.colors.onSurfaceVariant }}>Type to search...</Text>
-                              </View>
-                        )}
-                      </GHScrollView>
-                    )}
-              </View>
-            </View>
+                </View>
+              </KeyboardAvoidingView>
+            </GestureHandlerRootView>
           </View>
-        </KeyboardAvoidingView>
-      </GestureHandlerRootView>
-    </Modal>
+          </Animated.View>
+        )}
+      </Portal>
     );
   };
 
@@ -1834,27 +1852,30 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   sliderTrack: {
-    height: 10,
-    borderRadius: 5,
+    height: 12, // Slightly thicker
+    borderRadius: 6,
     position: 'relative',
+    borderWidth: 1, // Added border for visibility
+    borderColor: 'rgba(0,0,0,0.05)',
   },
   sliderProgress: {
-    height: 10,
-    borderRadius: 5,
+    height: 12,
+    borderRadius: 6,
     position: 'absolute',
     left: 0,
-    top: 0,
+    top: -1, // Adjust for border
   },
   sliderThumb: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 28, // Slightly larger
+    height: 28,
+    borderRadius: 14,
     position: 'absolute',
-    top: -7,
-    marginLeft: -12,
+    top: -9,
+    marginLeft: -14,
     ...commonStyles.shadow,
-    borderWidth: 2,
+    borderWidth: 3,
     borderColor: '#fff',
+    elevation: 4,
   },
   progressContainer: {
     flex: 1,
