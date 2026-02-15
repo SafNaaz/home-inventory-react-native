@@ -394,7 +394,6 @@ const SliderControl: React.FC<{
   const [value, setValue] = useState<number>(initialValue);
   const [dragging, setDragging] = useState(false);
   const trackWidth = useRef<number>(200);
-  const trackRef = useRef<any>(null);
 
   useEffect(() => {
     if (!dragging) setValue(initialValue);
@@ -402,114 +401,60 @@ const SliderControl: React.FC<{
 
   const clamp = (v: number) => Math.max(0, Math.min(1, v));
 
-  const handleMove = (nativeEvent: any, gestureState?: any) => {
+  const onGestureEvent = (event: any) => {
+    const { x } = event.nativeEvent;
     const w = trackWidth.current || 200;
-
-    // Prefer pageX + measure for reliable global coords
-    const pageX = nativeEvent.pageX ?? gestureState?.moveX;
-
-    if (pageX != null && trackRef.current && trackRef.current.measure) {
-      trackRef.current.measure((fx: number, fy: number, width: number, height: number, px: number, py: number) => {
-        const pct = clamp((pageX - px) / (width || w));
-        setValue(pct);
-      });
-      return;
-    }
-
-    // Fallback to locationX
-    const locationX = nativeEvent.locationX ?? gestureState?.x0 ?? 0;
-    const pct = clamp(locationX / w);
+    const pct = clamp(x / w);
     setValue(pct);
   };
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (e, gs) => Math.abs(gs.dx) > Math.abs(gs.dy) && Math.abs(gs.dx) > 10,
-      onPanResponderGrant: (e, gs) => {
-        setDragging(true);
-      },
-      onPanResponderMove: (e, gs) => handleMove(e.nativeEvent, gs),
-      onPanResponderRelease: (e, gs) => {
-        // compute final percentage from event and track position to avoid stale coords
-        const computeFinalPct = (): Promise<number> => {
-          return new Promise((resolve) => {
-            const pageX = e.nativeEvent.pageX ?? gs?.moveX;
-            if (pageX != null && trackRef.current && trackRef.current.measure) {
-              trackRef.current.measure((fx: number, fy: number, width: number, height: number, px: number, py: number) => {
-                const pct = clamp((pageX - px) / (width || trackWidth.current));
-                resolve(pct);
-              });
-              return;
-            }
-            const locationX = e.nativeEvent.locationX ?? gs?.moveX ?? 0;
-            resolve(clamp(locationX / trackWidth.current));
-          });
-        };
-
-        computeFinalPct().then((finalPct) => {
-          setValue(finalPct);
-          const result: any = onComplete(finalPct);
-          if (result && typeof result.then === 'function') {
-            result.then(() => setDragging(false)).catch(() => setDragging(false));
-          } else {
-            setDragging(false);
-          }
-        });
-      },
-      onPanResponderTerminate: (e, gs) => {
-        const computeFinalPct = (): Promise<number> => {
-          return new Promise((resolve) => {
-            const pageX = e.nativeEvent.pageX ?? gs?.moveX;
-            if (pageX != null && trackRef.current && trackRef.current.measure) {
-              trackRef.current.measure((fx: number, fy: number, width: number, height: number, px: number, py: number) => {
-                const pct = clamp((pageX - px) / (width || trackWidth.current));
-                resolve(pct);
-              });
-              return;
-            }
-            const locationX = e.nativeEvent.locationX ?? gs?.moveX ?? 0;
-            resolve(clamp(locationX / trackWidth.current));
-          });
-        };
-
-        computeFinalPct().then((finalPct) => {
-          setValue(finalPct);
-          const result: any = onComplete(finalPct);
-          if (result && typeof result.then === 'function') {
-            result.then(() => setDragging(false)).catch(() => setDragging(false));
-          } else {
-            setDragging(false);
-          }
-        });
-      },
-    })
-  ).current;
+  const onHandlerStateChange = (event: any) => {
+    if (event.nativeEvent.state === State.ACTIVE) {
+      setDragging(true);
+    } else if (event.nativeEvent.state === State.END || event.nativeEvent.state === State.CANCELLED) {
+      const { x } = event.nativeEvent;
+      const w = trackWidth.current || 200;
+      const finalPct = clamp(x / w);
+      
+      // Ensure we submit the final value
+      setValue(finalPct);
+      setDragging(false);
+      onComplete(finalPct);
+    } else if (event.nativeEvent.state === State.FAILED) {
+      setDragging(false);
+      setValue(initialValue);
+    }
+  };
 
   return (
     <View style={styles.sliderContainer}>
-      <View
-        ref={trackRef}
-        style={[styles.sliderTrack, { backgroundColor: trackColor, opacity: 0.8 }]}
-        onLayout={(e) => {
-          const w = e.nativeEvent.layout.width;
-          trackWidth.current = w || 200;
-        }}
-        {...panResponder.panHandlers}
+      <PanGestureHandler
+        onGestureEvent={onGestureEvent}
+        onHandlerStateChange={onHandlerStateChange}
+        activeOffsetX={[-10, 10]}
+        failOffsetY={[-10, 10]}
       >
         <View
-          style={[
-            styles.sliderProgress,
-            { width: `${value * 100}%`, backgroundColor: progressColor },
-          ]}
-        />
-        <View
-          style={[
-            styles.sliderThumb,
-            { left: `${value * 100}%`, backgroundColor: thumbColor },
-          ]}
-        />
-      </View>
+          style={[styles.sliderTrack, { backgroundColor: trackColor, opacity: 0.8 }]}
+          onLayout={(e) => {
+            const w = e.nativeEvent.layout.width;
+            trackWidth.current = w || 200;
+          }}
+        >
+          <View
+            style={[
+              styles.sliderProgress,
+              { width: `${value * 100}%`, backgroundColor: progressColor },
+            ]}
+          />
+          <View
+            style={[
+              styles.sliderThumb,
+              { left: `${value * 100}%`, backgroundColor: thumbColor },
+            ]}
+          />
+        </View>
+      </PanGestureHandler>
     </View>
   );
 };
@@ -733,6 +678,11 @@ const InventoryScreen: React.FC = () => {
   const itemsRef = useRef(inventoryItems);
   const sheetTranslateY = useRef(new Animated.Value(0)).current;
   const searchInputRef = useRef<RNTextInput>(null);
+  const isSearchVisibleRef = useRef(isSearchVisible);
+
+  useEffect(() => {
+    isSearchVisibleRef.current = isSearchVisible;
+  }, [isSearchVisible]);
 
   const handleScroll = useCallback((event: any) => {
     if (navigation.state === 'home') return; // Only for subcat/items as requested
@@ -787,7 +737,8 @@ const InventoryScreen: React.FC = () => {
 
     // Handle Android back button
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (isSearchVisible) {
+      // Use ref to check visibility without stale closures
+      if (isSearchVisibleRef.current) {
         closeSearch();
         return true;
       }
@@ -813,7 +764,7 @@ const InventoryScreen: React.FC = () => {
       unsubscribeSettings();
       backHandler.remove();
     };
-  }, [navigation]);
+  }, [navigation]); // Only depend on navigation, back handler uses refs for other dynamic state
 
   const setNavigationFluid = (newNav: NavigationContext | ((prev: NavigationContext) => NavigationContext)) => {
     Keyboard.dismiss();
@@ -1947,6 +1898,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
                     <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 8 }}>
                       <Searchbar
                         ref={searchInputRef}
+                        autoFocus={true}
                         placeholder="Search items..."
                         onChangeText={setSearchQuery}
                         value={searchQuery}

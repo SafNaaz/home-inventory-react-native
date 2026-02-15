@@ -30,6 +30,7 @@ import {
   Snackbar,
 } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 
 import { inventoryManager } from '../managers/InventoryManager';
 import { settingsManager } from '../managers/SettingsManager';
@@ -40,6 +41,7 @@ import DoodleBackground from '../components/DoodleBackground';
 
 const ShoppingScreen: React.FC = () => {
   const theme = useTheme();
+  const navigation = useNavigation();
   const [shoppingList, setShoppingList] = useState<ShoppingListItem[]>([]);
   const [shoppingState, setShoppingState] = useState<ShoppingState>(ShoppingState.EMPTY);
   const [refreshing, setRefreshing] = useState(false);
@@ -733,8 +735,11 @@ const ShoppingScreen: React.FC = () => {
       {/* Search and Add Dialog */}
       <Portal>
         <Dialog visible={searchItemsDialogVisible} onDismiss={() => setSearchItemsDialogVisible(false)} style={{ maxHeight: '80%' }}>
-          <Dialog.Title>Search & Add Any Item</Dialog.Title>
           <Dialog.Content>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <Title>Search & Add Item</Title>
+              <IconButton icon="close" size={24} onPress={() => setSearchItemsDialogVisible(false)} />
+            </View>
             <TextInput
               label="Search items..."
               value={itemSearchQuery}
@@ -747,8 +752,9 @@ const ShoppingScreen: React.FC = () => {
               mode="outlined"
               style={{ marginBottom: 8 }}
               right={<TextInput.Icon icon="magnify" />}
+              autoFocus
             />
-            <ScrollView style={{ maxHeight: 300 }}>
+            <ScrollView style={{ maxHeight: 300 }} keyboardShouldPersistTaps="handled">
               {isSearchingItems ? (
                 <View style={{ padding: 20, alignItems: 'center' }}>
                   <ActivityIndicator size="small" color={theme.colors.primary} />
@@ -770,9 +776,7 @@ const ShoppingScreen: React.FC = () => {
               )}
             </ScrollView>
           </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setSearchItemsDialogVisible(false)}>Close</Button>
-          </Dialog.Actions>
+          {/* Actions removed as Close is now in header */}
         </Dialog>
       </Portal>
       {/* Complete Shopping Dialog */}
