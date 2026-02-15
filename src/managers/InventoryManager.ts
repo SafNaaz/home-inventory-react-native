@@ -847,8 +847,24 @@ export class InventoryManager {
     if (!Array.isArray(data.hiddenBuiltinSubs)) { 
         const importedSubcategories = new Set(this.inventoryItems.map(i => i.subcategory));
         
-        // Remove from hidden list if it is used by an imported item
-        this.hiddenBuiltinSubs = this.hiddenBuiltinSubs.filter(sub => !importedSubcategories.has(sub));
+        // Ensure we don't unhide built-ins that have custom overrides
+        const customSubNames = new Set(this.customSubcategories.map(c => c.name));
+        
+        // Remove from hidden list ONLY if:
+        // 1. It is used by an imported item
+        // 2. AND it is NOT overridden by a custom subcategory
+        this.hiddenBuiltinSubs = this.hiddenBuiltinSubs.filter(sub => {
+            const isUsed = importedSubcategories.has(sub);
+            const isOverridden = customSubNames.has(sub);
+            
+            // If used and not overridden, unhide it (return false)
+            if (isUsed && !isOverridden) {
+                return false; 
+            }
+            
+            // Otherwise keep it hidden (return true)
+            return true;
+        });
     }
 
     if (Array.isArray(data.shoppingList)) {
