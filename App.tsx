@@ -229,14 +229,7 @@ const App: React.FC = () => {
           options={({ navigation }) => ({
             title: 'Inventory',
             headerRight: () => (
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 12, gap: 4 }}>
-                <IconButton
-                  icon={settingsManager.isInventoryReminderEnabled() ? "bell" : "bell-outline"}
-                  size={22}
-                  iconColor={settingsManager.isInventoryReminderEnabled() ? theme.colors.primary : theme.colors.onSurfaceVariant}
-                  onPress={() => navigation.navigate('NotificationSettings')}
-                  style={{ margin: 0, backgroundColor: theme.colors.surfaceVariant }}
-                />
+              <View style={{ marginRight: 16 }}>
                 <IconButton
                   icon="cog"
                   size={22}
