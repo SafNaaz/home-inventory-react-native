@@ -17,6 +17,7 @@ import {
   KeyboardAvoidingView,
   Keyboard,
   InteractionManager,
+  Alert,
 } from 'react-native';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -121,11 +122,10 @@ const SliderControl: React.FC<{
 
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (e, gs) => Math.abs(gs.dx) > Math.abs(gs.dy) && Math.abs(gs.dx) > 10,
       onPanResponderGrant: (e, gs) => {
         setDragging(true);
-        handleMove(e.nativeEvent, gs);
       },
       onPanResponderMove: (e, gs) => handleMove(e.nativeEvent, gs),
       onPanResponderRelease: (e, gs) => {
@@ -298,6 +298,7 @@ const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, on
       renderLeftActions={renderLeftActions}
       overshootRight={false}
       overshootLeft={false}
+      activeOffsetX={[-50, 50]}
       containerStyle={{ overflow: 'visible' }}
       childrenContainerStyle={{ overflow: 'visible' }}
     >
@@ -309,6 +310,7 @@ const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, on
                 status={item.isIgnored ? 'checked' : 'unchecked'}
                 onPress={() => onToggleIgnore(item)}
                 color={theme.colors.error}
+                uncheckedColor={theme.colors.onSurfaceVariant}
               />
               <Text 
                 style={[
@@ -398,6 +400,49 @@ const InventoryScreen: React.FC = () => {
   const [searchResults, setSearchResults] = useState<InventoryItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isSearchVisible, setIsSearchVisible] = useState(false);
+  const [isFabVisible, setIsFabVisible] = useState(true);
+  const [hidingItem, setHidingItem] = useState<InventoryItem | null>(null);
+  const lastScrollY = useRef(0);
+
+  const handleScroll = useCallback((event: any) => {
+    if (navigation.state === 'home') return; // Only for subcat/items as requested
+
+    const currentScrollY = event.nativeEvent.contentOffset.y;
+    if (currentScrollY <= 0) {
+      setIsFabVisible(true);
+      return;
+    }
+
+    const diff = currentScrollY - lastScrollY.current;
+    if (Math.abs(diff) < 5) return;
+
+    if (diff > 20 && isFabVisible) {
+      setIsFabVisible(false);
+      // Attempt to hide bottom tabs
+      navigationObj.getParent()?.setOptions({
+        tabBarStyle: { display: 'none' }
+      });
+    } else if (diff < -20 && !isFabVisible) {
+      setIsFabVisible(true);
+      // Restore bottom tabs - using the same style as in App.tsx
+      navigationObj.getParent()?.setOptions({
+        tabBarStyle: {
+          backgroundColor: theme.colors.surface,
+          borderTopWidth: 0,
+          height: 65,
+          paddingBottom: 10,
+          paddingTop: 10,
+          position: 'absolute',
+          bottom: 20,
+          left: 20,
+          right: 20,
+          borderRadius: 32,
+          elevation: 8,
+        }
+      });
+    }
+    lastScrollY.current = currentScrollY;
+  }, [isFabVisible, navigation.state, theme]);
 
   useEffect(() => {
     loadInventoryData();
@@ -572,14 +617,21 @@ const InventoryScreen: React.FC = () => {
     return subItems.filter(item => !item.isIgnored);
   };
 
-  const handleToggleIgnore = useCallback(async (item: InventoryItem) => {
+  const handleToggleIgnore = useCallback((item: InventoryItem) => {
+    setHidingItem(item);
+  }, []);
+
+  const onConfirmToggleIgnore = async () => {
+    if (!hidingItem) return;
     try {
-      await inventoryManager.toggleItemIgnore(item.id);
+      await inventoryManager.toggleItemIgnore(hidingItem.id);
+      setHidingItem(null);
     } catch (err: any) {
       setSnackbarMessage(err.message);
       setSnackbarVisible(true);
+      setHidingItem(null);
     }
-  }, []);
+  };
 
   const handleQuantityUpdate = useCallback(async (item: InventoryItem, newQuantity: number) => {
     pendingUpdatesRef.current[item.id] = newQuantity;
@@ -781,6 +833,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
       renderLeftActions={renderLeftActions}
       overshootRight={false}
       overshootLeft={false}
+      activeOffsetX={[-50, 50]}
       containerStyle={{ overflow: 'visible' }}
       childrenContainerStyle={{ overflow: 'visible' }}
     >
@@ -796,9 +849,19 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
             <Title style={[styles.subcategoryTitle, { color: theme.colors.onSurface }]}>
               {subName}
             </Title>
-            <Text style={[styles.subcategoryStats, { color: theme.colors.onSurfaceVariant }]}>
-              {activeCount} active{hiddenCount > 0 ? `, ${hiddenCount} hidden` : ''}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={[styles.subcategoryStats, { color: theme.colors.onSurfaceVariant }]}>
+                {activeCount} active
+              </Text>
+              {hiddenCount > 0 && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 8 }}>
+                  <Icon name="eye-off-outline" size={14} color={theme.colors.onSurfaceVariant} style={{ marginRight: 4 }} />
+                  <Text style={[styles.subcategoryStats, { color: theme.colors.onSurfaceVariant }]}>
+                    {hiddenCount}
+                  </Text>
+                </View>
+              )}
+            </View>
             {lowStockCount > 0 && (
               <Text style={[styles.subcategoryStats, { color: theme.colors.error, fontWeight: '600' }]}>
                 {lowStockCount} need restocking
@@ -938,6 +1001,8 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
           contentContainerStyle={{ paddingBottom: 110 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           keyboardShouldPersistTaps="handled"
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
         >
           {renderStatsHeader()}
           <View style={styles.categoriesGrid}>
@@ -1043,6 +1108,8 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
             style={styles.scrollView}
             contentContainerStyle={{ paddingBottom: 110 }}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+            onScroll={handleScroll}
+            scrollEventThrottle={16}
           >
             <View style={styles.subcategoriesList}>
               {subcategories.map(subName => {
@@ -1147,19 +1214,36 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
               onPress={() => setIsReordering(!isReordering)}
             />
             {!isReordering && (
-              <>
-                <IconButton
-                  icon={showIgnoredOnly ? "eye-off" : "eye-off-outline"}
-                  size={24}
-                  iconColor={showIgnoredOnly ? theme.colors.error : theme.colors.onSurfaceVariant}
-                  onPress={() => setShowIgnoredOnly(!showIgnoredOnly)}
-                />
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <IconButton
+                    icon={showIgnoredOnly ? "eye-off" : "eye-off-outline"}
+                    size={24}
+                    iconColor={showIgnoredOnly ? theme.colors.error : theme.colors.onSurfaceVariant}
+                    onPress={() => setShowIgnoredOnly(!showIgnoredOnly)}
+                    style={{ marginRight: -4 }}
+                  />
+                  {(() => {
+                    const subItems = inventoryItems.filter(it => it.subcategory === navigation.subcategory);
+                    const hiddenCount = subItems.filter(it => it.isIgnored).length;
+                    return hiddenCount > 0 ? (
+                      <Text style={{ 
+                        fontSize: 12, 
+                        color: showIgnoredOnly ? theme.colors.error : theme.colors.onSurfaceVariant,
+                        fontWeight: '600',
+                        marginRight: 4
+                      }}>
+                        {hiddenCount}
+                      </Text>
+                    ) : null;
+                  })()}
+                </View>
                 <IconButton
                   icon="plus"
                   size={24}
                   onPress={() => setShowingAddDialog(true)}
                 />
-              </>
+              </View>
             )}
           </View>
         </View>
@@ -1180,6 +1264,8 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
             style={styles.scrollView}
             contentContainerStyle={{ paddingBottom: 110 }}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+            onScroll={handleScroll}
+            scrollEventThrottle={16}
           >
             <View style={styles.itemsList}>
               {items.map(renderItemRow)}
@@ -1315,6 +1401,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
   );
 
   const renderFloatingActionButton = () => {
+    if (!isFabVisible) return null;
     return (
       <>
         {/* Search FAB - always visible, positioned above shopping FAB */}
@@ -1392,6 +1479,34 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
   );
 
 
+
+  const renderHideConfirmDialog = () => {
+    if (!hidingItem) return null;
+    const action = hidingItem.isIgnored ? 'Unhide' : 'Hide';
+    const message = hidingItem.isIgnored
+      ? `Are you sure you want to unhide "${hidingItem.name}"? It will appear in your active inventory and restocking alerts.`
+      : `Are you sure you want to hide "${hidingItem.name}"? It will no longer appear in your active inventory or restocking alerts.`;
+    
+    return (
+      <Portal>
+        <Dialog visible={!!hidingItem} onDismiss={() => setHidingItem(null)}>
+          <Dialog.Title>{action} Item</Dialog.Title>
+          <Dialog.Content>
+            <Text style={{ color: theme.colors.onSurface }}>{message}</Text>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setHidingItem(null)}>Cancel</Button>
+            <Button 
+              onPress={onConfirmToggleIgnore} 
+              textColor={hidingItem.isIgnored ? theme.colors.primary : theme.colors.error}
+            >
+              {action}
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
+    );
+  };
 
   const renderSearchOverlay = () => {
     
@@ -1535,6 +1650,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
       {renderSuccessDialog()}
       {renderSubAddDialog()}
       {renderSubDeleteConfirmDialog()}
+      {renderHideConfirmDialog()}
       <Portal>
         <Snackbar
           visible={snackbarVisible}
