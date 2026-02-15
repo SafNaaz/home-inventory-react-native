@@ -59,6 +59,7 @@ const ShoppingScreen: React.FC = () => {
   const [allItems, setAllItems] = useState<InventoryItem[]>([]);
   const [itemSearchQuery, setItemSearchQuery] = useState('');
   const [filteredAllItems, setFilteredAllItems] = useState<InventoryItem[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
 
   useEffect(() => {
     // Load initial data
@@ -180,14 +181,22 @@ const ShoppingScreen: React.FC = () => {
   };
 
   const handleOpenSearchItemsDialog = () => {
-    const all = inventoryManager.getInventoryItems();
-    const available = all.filter(item => 
-      !shoppingList.some(sl => sl.inventoryItemId === item.id)
-    );
-    setAllItems(available);
-    setFilteredAllItems(available);
-    setItemSearchQuery('');
-    setSearchItemsDialogVisible(true);
+    setSearchLoading(true);
+    // Use timeout to allow UI to update with spinner before heavy processing/rendering
+    setTimeout(() => {
+        const all = inventoryManager.getInventoryItems();
+        const available = all.filter(item => 
+          !shoppingList.some(sl => sl.inventoryItemId === item.id)
+        );
+        setAllItems(available);
+        setFilteredAllItems(available);
+        setItemSearchQuery('');
+        setSearchItemsDialogVisible(true);
+        // Clean up loading state slightly after dialog opens to ensure smooth transition
+        requestAnimationFrame(() => {
+          setSearchLoading(false);
+        });
+    }, 100);
   };
 
   useEffect(() => {
@@ -377,9 +386,11 @@ const ShoppingScreen: React.FC = () => {
         onPress={handleOpenSearchItemsDialog}
         style={{ marginTop: 0 }}
         textColor={theme.colors.primary}
-        icon="magnify"
+        icon={searchLoading ? undefined : "magnify"}
+        loading={searchLoading}
+        disabled={searchLoading}
       >
-        Search & Add from all items
+        {searchLoading ? "Loading Items..." : "Search & Add from all items"}
       </Button>
     </View>
   );
@@ -442,7 +453,9 @@ const ShoppingScreen: React.FC = () => {
             style={styles.secondaryActionButton}
             textColor={theme.colors.primary}
             labelStyle={{ fontSize: 11 }}
-            icon="magnify"
+            icon={searchLoading ? undefined : "magnify"}
+            loading={searchLoading}
+            disabled={searchLoading}
           >
             Search
           </Button>
@@ -589,7 +602,9 @@ const ShoppingScreen: React.FC = () => {
               style={styles.secondaryActionButton}
               textColor={theme.colors.primary}
               labelStyle={{ fontSize: 11 }}
-              icon="magnify"
+              icon={searchLoading ? undefined : "magnify"}
+              loading={searchLoading}
+              disabled={searchLoading}
             >
               Search
             </Button>
