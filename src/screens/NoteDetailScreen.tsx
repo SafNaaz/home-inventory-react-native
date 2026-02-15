@@ -2,7 +2,7 @@ import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from
 import { View, StyleSheet, ScrollView, BackHandler, Alert, KeyboardAvoidingView, Platform, TouchableOpacity, Dimensions, Animated, TextInput as RNTextInput } from 'react-native';
 import { useTheme, Button, IconButton, Text, Portal, Dialog, Checkbox } from 'react-native-paper';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { notesManager } from '../managers/NotesManager';
 import { Note } from '../models/Types';
 import DoodleBackground from '../components/DoodleBackground';

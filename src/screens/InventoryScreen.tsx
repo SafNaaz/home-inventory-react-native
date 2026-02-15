@@ -18,6 +18,7 @@ import {
   Keyboard,
   InteractionManager,
   Alert,
+  TextInput as RNTextInput,
 } from 'react-native';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -920,7 +921,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
   // Search Effect
   const itemsRef = useRef(inventoryItems);
   const sheetTranslateY = useRef(new Animated.Value(0)).current;
-  const searchInputRef = useRef<TextInput>(null);
+  const searchInputRef = useRef<RNTextInput>(null);
 
   useEffect(() => { itemsRef.current = inventoryItems; }, [inventoryItems]);
 
