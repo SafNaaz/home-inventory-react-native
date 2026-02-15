@@ -34,7 +34,7 @@ import { inventoryManager } from '../managers/InventoryManager';
 import { settingsManager } from '../managers/SettingsManager';
 import { ShoppingListItem, ShoppingState, InventoryItem, InventoryCategory } from '../models/Types';
 import { getCategoryConfig, getSubcategoryConfig } from '../constants/CategoryConfig';
-import { commonStyles } from '../themes/AppTheme';
+import { commonStyles, getCategoryColor } from '../themes/AppTheme';
 import DoodleBackground from '../components/DoodleBackground';
 
 const ShoppingScreen: React.FC = () => {
@@ -55,6 +55,10 @@ const ShoppingScreen: React.FC = () => {
   const [ignoredItemsDialogVisible, setIgnoredItemsDialogVisible] = useState(false);
   const [ignoredItems, setIgnoredItems] = useState<InventoryItem[]>([]);
   const [selectedIgnoredIds, setSelectedIgnoredIds] = useState<Set<string>>(new Set());
+  const [searchItemsDialogVisible, setSearchItemsDialogVisible] = useState(false);
+  const [allItems, setAllItems] = useState<InventoryItem[]>([]);
+  const [itemSearchQuery, setItemSearchQuery] = useState('');
+  const [filteredAllItems, setFilteredAllItems] = useState<InventoryItem[]>([]);
 
   useEffect(() => {
     // Load initial data
@@ -173,12 +177,35 @@ const ShoppingScreen: React.FC = () => {
     
     await inventoryManager.addIgnoredItemsToShoppingList(Array.from(selectedIgnoredIds));
     setIgnoredItemsDialogVisible(false);
-    
-    // If we were empty, we are now generating.
-    // The listener will update the state, but we can also force a refresh if needed.
-    // InventoryManager.addIgnoredItemsToShoppingList handles state update to GENERATING if it was EMPTY.
-    // However, if we are in empty state, we might need to handle the transition UX if not auto-handled.
-    // The listener loadShoppingData should handle it.
+  };
+
+  const handleOpenSearchItemsDialog = () => {
+    const all = inventoryManager.getInventoryItems();
+    const available = all.filter(item => 
+      !shoppingList.some(sl => sl.inventoryItemId === item.id)
+    );
+    setAllItems(available);
+    setFilteredAllItems(available);
+    setItemSearchQuery('');
+    setSearchItemsDialogVisible(true);
+  };
+
+  useEffect(() => {
+    if (!itemSearchQuery.trim()) {
+      setFilteredAllItems(allItems);
+    } else {
+      const filtered = allItems.filter(item => 
+        item.name.toLowerCase().includes(itemSearchQuery.toLowerCase())
+      );
+      setFilteredAllItems(filtered);
+    }
+  }, [itemSearchQuery, allItems]);
+
+  const handleAddAnyItem = async (item: InventoryItem) => {
+    await inventoryManager.addIgnoredItemsToShoppingList([item.id]); 
+    setSearchItemsDialogVisible(false);
+    setSnackbarMessage(`Added ${item.name} to list`);
+    setSnackbarVisible(true);
   };
 
   const getStateDescription = (): string => {
@@ -230,6 +257,8 @@ const ShoppingScreen: React.FC = () => {
                    <Checkbox
                      status={item.isChecked ? 'checked' : 'unchecked'}
                      onPress={() => canToggle && handleToggleItem(item)}
+                     color={theme.colors.primary}
+                     uncheckedColor={theme.colors.onSurfaceVariant}
                    />
                 ) : null}
                 {/* Always show icon if not temporary (or minimal icon for temp) */}
@@ -237,7 +266,7 @@ const ShoppingScreen: React.FC = () => {
                      <Icon 
                         name={(subConfig ? subConfig.icon : (item.isTemporary ? "tag-outline" : "package-variant")) as any} 
                         size={20} 
-                        color={subConfig ? subConfig.color : theme.colors.onSurfaceVariant}
+                        color={subConfig ? (getCategoryColor(subConfig.category, theme.dark)) : theme.colors.onSurfaceVariant}
                      />
                 </View>
             </View>
@@ -304,10 +333,10 @@ const ShoppingScreen: React.FC = () => {
                               <Icon 
                                 name={(config ? config.icon : 'tag-multiple') as any} 
                                 size={20} 
-                                color={config ? config.color : theme.colors.secondary} 
+                                color={config ? getCategoryColor(catKey as InventoryCategory, theme.dark) : theme.colors.secondary} 
                                 style={{ marginRight: 8 }}
                               />
-                              <Text style={[styles.categoryTitle, { color: config ? config.color : theme.colors.secondary }]}>
+                              <Text style={[styles.categoryTitle, { color: config ? getCategoryColor(catKey as InventoryCategory, theme.dark) : theme.colors.secondary }]}>
                                   {isMisc ? 'Miscellaneous' : catKey.charAt(0).toUpperCase() + catKey.slice(1).toLowerCase().replace('_', ' ')}
                               </Text>
                           </View>
@@ -338,10 +367,19 @@ const ShoppingScreen: React.FC = () => {
       <Button
         mode="text"
         onPress={handleOpenIgnoredItemsDialog}
-        style={{ marginTop: 16 }}
+        style={{ marginTop: 8 }}
         textColor={theme.colors.secondary}
       >
-        Add Ignored Items
+        Add from hidden items
+      </Button>
+      <Button
+        mode="text"
+        onPress={handleOpenSearchItemsDialog}
+        style={{ marginTop: 0 }}
+        textColor={theme.colors.primary}
+        icon="magnify"
+      >
+        Search & Add from all items
       </Button>
     </View>
   );
@@ -394,13 +432,25 @@ const ShoppingScreen: React.FC = () => {
             onPress={handleOpenIgnoredItemsDialog}
             style={styles.secondaryActionButton}
             textColor={theme.colors.secondary}
+            labelStyle={{ fontSize: 11 }}
           >
-            Add Ignored
+            Hidden
+          </Button>
+          <Button
+            mode="outlined"
+            onPress={handleOpenSearchItemsDialog}
+            style={styles.secondaryActionButton}
+            textColor={theme.colors.primary}
+            labelStyle={{ fontSize: 11 }}
+            icon="magnify"
+          >
+            Search
           </Button>
           <Button
             mode="outlined"
             onPress={handleCancelShopping}
             style={styles.secondaryActionButton}
+            labelStyle={{ fontSize: 11 }}
           >
             Cancel
           </Button>
@@ -458,6 +508,12 @@ const ShoppingScreen: React.FC = () => {
           Cancel
         </Button>
       </View>
+      <FAB
+        icon="plus"
+        style={[styles.fab, { backgroundColor: theme.colors.primary }]}
+        color={theme.dark ? '#000' : '#fff'}
+        onPress={() => setAddItemDialogVisible(true)}
+      />
     </View>
   );
 
@@ -523,21 +579,39 @@ const ShoppingScreen: React.FC = () => {
               onPress={handleOpenIgnoredItemsDialog}
               style={styles.secondaryActionButton}
               textColor={theme.colors.secondary}
+              labelStyle={{ fontSize: 11 }}
             >
-              Add Ignored
+              Hidden
+            </Button>
+            <Button
+              mode="text"
+              onPress={handleOpenSearchItemsDialog}
+              style={styles.secondaryActionButton}
+              textColor={theme.colors.primary}
+              labelStyle={{ fontSize: 11 }}
+              icon="magnify"
+            >
+              Search
             </Button>
             <Button
               mode="outlined"
               onPress={handleCancelShopping}
               style={styles.secondaryActionButton}
+              labelStyle={{ fontSize: 11 }}
             >
               Cancel
             </Button>
           </View>
         </View>
-      </View>
-    );
-  };
+      <FAB
+        icon="plus"
+        style={[styles.fab, { backgroundColor: theme.colors.primary }]}
+        color={theme.dark ? '#000' : '#fff'}
+        onPress={() => setAddItemDialogVisible(true)}
+      />
+    </View>
+  );
+};
 
   const renderAddItemDialog = () => (
     <Portal>
@@ -596,7 +670,7 @@ const ShoppingScreen: React.FC = () => {
   const renderIgnoredItemsDialog = () => (
     <Portal>
       <Dialog visible={ignoredItemsDialogVisible} onDismiss={() => setIgnoredItemsDialogVisible(false)} style={{ maxHeight: '80%' }}>
-        <Dialog.Title>Add Ignored Items</Dialog.Title>
+        <Dialog.Title>Add from Hidden Items</Dialog.Title>
         <Dialog.Content>
           {ignoredItems.length > 0 ? (
              <ScrollView style={{ maxHeight: 300 }}>
@@ -609,6 +683,8 @@ const ShoppingScreen: React.FC = () => {
                    <Checkbox
                      status={selectedIgnoredIds.has(item.id) ? 'checked' : 'unchecked'}
                      onPress={() => toggleIgnoredItemSelection(item.id)}
+                     color={theme.colors.primary}
+                     uncheckedColor={theme.colors.onSurfaceVariant}
                    />
                  )}
                  onPress={() => toggleIgnoredItemSelection(item.id)}
@@ -630,6 +706,43 @@ const ShoppingScreen: React.FC = () => {
   const renderConfirmDialogs = () => (
     <Portal>
       {renderIgnoredItemsDialog()}
+      
+      {/* Search and Add Dialog */}
+      <Portal>
+        <Dialog visible={searchItemsDialogVisible} onDismiss={() => setSearchItemsDialogVisible(false)} style={{ maxHeight: '80%' }}>
+          <Dialog.Title>Search & Add Any Item</Dialog.Title>
+          <Dialog.Content>
+            <TextInput
+              label="Search items..."
+              value={itemSearchQuery}
+              onChangeText={setItemSearchQuery}
+              mode="outlined"
+              style={{ marginBottom: 8 }}
+              right={<TextInput.Icon icon="magnify" />}
+            />
+            <ScrollView style={{ maxHeight: 300 }}>
+              {filteredAllItems.length > 0 ? (
+                filteredAllItems.map(item => (
+                  <List.Item
+                    key={item.id}
+                    title={item.name}
+                    description={`${item.subcategory} • ${Math.round(item.quantity * 100)}% stock`}
+                    onPress={() => handleAddAnyItem(item)}
+                    right={() => <IconButton icon="plus-circle-outline" />}
+                  />
+                ))
+              ) : (
+                <Text style={{ textAlign: 'center', marginTop: 16, color: theme.colors.onSurfaceVariant }}>
+                  No items found
+                </Text>
+              )}
+            </ScrollView>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setSearchItemsDialogVisible(false)}>Close</Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
       {/* Complete Shopping Dialog */}
       <Dialog visible={completeConfirmVisible} onDismiss={() => setCompleteConfirmVisible(false)}>
         <Dialog.Title>Complete Shopping</Dialog.Title>
@@ -723,6 +836,7 @@ const ShoppingScreen: React.FC = () => {
     return (
       <>
         {renderListReadyState()}
+        {renderAddItemDialog()}
         {renderConfirmDialogs()}
         <Snackbar
           visible={snackbarVisible}
@@ -737,6 +851,7 @@ const ShoppingScreen: React.FC = () => {
     return (
       <>
         {renderShoppingState()}
+        {renderAddItemDialog()}
         {renderConfirmDialogs()}
         <Snackbar
           visible={snackbarVisible}
