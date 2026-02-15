@@ -270,7 +270,7 @@ const InsightsScreen: React.FC = () => {
   }, []);
 
   const loadInventoryData = () => {
-    const items = inventoryManager.getInventoryItems();
+    const items = inventoryManager.getVisibleInventoryItems();
     setInventoryItems(items);
   };
 

@@ -88,8 +88,17 @@ export class InventoryManager {
     return [...this.inventoryItems];
   }
 
+  getVisibleInventoryItems(): InventoryItem[] {
+    return this.inventoryItems.filter(item => {
+        return this.isSubcategoryVisible(item.subcategory);
+    });
+  }
+
   getItemsForCategory(category: InventoryCategory): InventoryItem[] {
     return this.inventoryItems.filter(item => {
+      // Check visibility first
+      if (!this.isSubcategoryVisible(item.subcategory)) return false;
+
       const config = this.getSubcategoryConfigInternal(item.subcategory);
       return config?.category === category;
     });
@@ -188,6 +197,22 @@ export class InventoryManager {
     });
 
     return builtinConflict;
+  }
+
+  isSubcategoryVisible(subcategory: string): boolean {
+    // 1. If it's a custom subcategory, it's visible
+    const custom = this.customSubcategories.some(c => c.name === subcategory || c.id === subcategory);
+    if (custom) return true;
+
+    // 2. If it's a built-in, check if it's hidden
+    if (SUBCATEGORY_CONFIG[subcategory]) {
+        return !this.hiddenBuiltinSubs.includes(subcategory);
+    }
+
+    // 3. Fallback for unknown: assume visible unless explicitly hidden?
+    // Actually, if it's unknown and not custom, it might be a legacy or glitch.
+    // But for safety, we return true so we don't lose data, unless it matches a known hidden format?
+    return true;
   }
 
   async addCustomItem(name: string, subcategory: InventorySubcategory): Promise<void> {
@@ -671,17 +696,18 @@ export class InventoryManager {
   }
 
   getLowStockItemsCount(): number {
-    return this.inventoryItems.filter(item => item.quantity <= 0.25).length;
+    return this.getVisibleInventoryItems().filter(item => item.quantity <= 0.25).length;
   }
 
   getAverageStockLevel(): number {
-    if (this.inventoryItems.length === 0) return 0;
-    const totalStock = this.inventoryItems.reduce((sum, item) => sum + item.quantity, 0);
-    return totalStock / this.inventoryItems.length;
+    const visibleItems = this.getVisibleInventoryItems();
+    if (visibleItems.length === 0) return 0;
+    const totalStock = visibleItems.reduce((sum, item) => sum + item.quantity, 0);
+    return totalStock / visibleItems.length;
   }
 
   getItemsNeedingAttention(): InventoryItem[] {
-    return this.inventoryItems
+    return this.getVisibleInventoryItems()
       .filter(item => item.quantity <= 0.25)
       .sort((a, b) => a.quantity - b.quantity);
   }

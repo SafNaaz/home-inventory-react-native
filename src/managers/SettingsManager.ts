@@ -465,7 +465,7 @@ export class SettingsManager {
   }
 
   private getInventoryReminderBody(): string {
-    const items = inventoryManager.getInventoryItems();
+    const items = inventoryManager.getVisibleInventoryItems();
 
     if (items.length === 0) {
       return 'Start adding items to track your home inventory!';
@@ -555,7 +555,7 @@ export class SettingsManager {
 
   private getHealthSummary(): { title: string; body: string } {
     const thresholds = this.settings.activityThresholds;
-    const items = inventoryManager.getInventoryItems();
+    const items = inventoryManager.getVisibleInventoryItems();
     
     if (items.length === 0) {
       return {

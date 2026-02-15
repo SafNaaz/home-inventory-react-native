@@ -870,7 +870,7 @@ const InventoryScreen: React.FC = () => {
   }, [navigationObj, theme]);
 
   const loadInventoryData = () => {
-    const items = inventoryManager.getInventoryItems().map(it => {
+    const items = inventoryManager.getVisibleInventoryItems().map(it => {
       const pending = pendingUpdatesRef.current[it.id];
       if (pending !== undefined) {
         return { ...it, quantity: pending };
