@@ -22,6 +22,10 @@ import {
 } from 'react-native-paper';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import * as Clipboard from 'expo-clipboard';
+import * as DocumentPicker from 'expo-document-picker';
 
 import { settingsManager } from '../managers/SettingsManager';
 import { inventoryManager } from '../managers/InventoryManager';
@@ -40,7 +44,9 @@ const SettingsScreen: React.FC = () => {
   const [timePickerType, setTimePickerType] = useState<'time1' | 'time2'>('time1');
   const [resetDialogVisible, setResetDialogVisible] = useState(false);
   const [exportDialogVisible, setExportDialogVisible] = useState(false);
+  const [importDialogVisible, setImportDialogVisible] = useState(false);
   const [exportData, setExportData] = useState('');
+  const [importDataText, setImportDataText] = useState('');
   const [clearAllConfirmVisible, setClearAllConfirmVisible] = useState(false);
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
@@ -148,17 +154,13 @@ const SettingsScreen: React.FC = () => {
   const handleExportData = async () => {
     try {
       const notesData = notesManager.exportNotesToJSON();
-      const inventoryStats = {
-        totalItems: inventoryManager.getTotalItems(),
-        lowStockItems: inventoryManager.getLowStockItemsCount(),
-        averageStockLevel: inventoryManager.getAverageStockLevel(),
-        activeCategories: inventoryManager.getActiveCategoriesCount(),
-      };
-
+      const inventoryData = inventoryManager.getExportData();
+      
       const exportData = {
+        version: 1,
         exportDate: new Date().toISOString(),
         notes: JSON.parse(notesData),
-        inventoryStats,
+        inventory: inventoryData,
         settings: settingsManager.getSettings(),
       };
 
@@ -166,6 +168,93 @@ const SettingsScreen: React.FC = () => {
       setExportDialogVisible(true);
     } catch (error) {
       setErrorMessage('Failed to export data. Please try again.');
+      setErrorAlertVisible(true);
+    }
+  };
+
+  const shareDataAsFile = async () => {
+    try {
+        const fileName = `inventory_backup_${new Date().toISOString().split('T')[0]}.json`;
+        const fileUri = FileSystem.documentDirectory + fileName;
+        
+        await FileSystem.writeAsStringAsync(fileUri, exportData);
+        
+        if (await Sharing.isAvailableAsync()) {
+            await Sharing.shareAsync(fileUri);
+        } else {
+            setSnackbarMessage('Sharing is not available on this device');
+            setSnackbarVisible(true);
+        }
+    } catch (error) {
+        setErrorMessage('Failed to share file.');
+        setErrorAlertVisible(true);
+    }
+  };
+
+  const handleImportData = () => {
+    setImportDataText('');
+    setImportDialogVisible(true);
+  };
+
+  const pickDocument = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'application/json',
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled) {
+        return;
+      }
+
+      const fileUri = result.assets[0].uri;
+      const fileContent = await FileSystem.readAsStringAsync(fileUri);
+      
+      setImportDataText(fileContent);
+      // Optional: Auto-import or just fill the text box? 
+      // User might want to review, so filling text box is safer.
+      setSnackbarMessage('File loaded successfully.');
+      setSnackbarVisible(true);
+    } catch (err) {
+      setErrorMessage('Failed to read the file.');
+      setErrorAlertVisible(true);
+    }
+  };
+
+  const confirmImportData = async () => {
+    try {
+      setImportDialogVisible(false);
+      const parsed = JSON.parse(importDataText);
+
+      // Basic structure validation
+      if (!parsed || typeof parsed !== 'object' || !parsed.inventory) {
+        throw new Error('Invalid backup file structure. Missing "inventory" data.');
+      }
+      
+      // Clear existing data first
+      await Promise.all([
+        inventoryManager.clearAllData(),
+        notesManager.clearAllNotes(),
+      ]);
+
+      // Import new data
+      if (parsed.inventory) {
+        await inventoryManager.importData(parsed.inventory);
+      }
+      
+      if (parsed.notes) {
+        // NotesManager expects a JSON string structure
+        await notesManager.importNotesFromJSON(JSON.stringify(parsed.notes));
+      }
+      
+      if (parsed.settings) {
+        await settingsManager.importSettings(parsed.settings);
+      }
+
+      setSnackbarMessage('Data imported and restored successfully.');
+      setSnackbarVisible(true);
+    } catch (error) {
+      setErrorMessage('Failed to import data. Invalid format.');
       setErrorAlertVisible(true);
     }
   };
@@ -357,11 +446,20 @@ const SettingsScreen: React.FC = () => {
         />
         
         <List.Item
-          title="Reset to Sample Data"
-          description="Replace inventory with sample items"
-          left={() => <Icon name="refresh" size={24} color={theme.colors.onSurface} />}
-          onPress={handleResetToDefaults}
+          title="Import Data"
+          description="Restore your data from backup"
+          left={() => <Icon name="import" size={24} color={theme.colors.onSurface} />}
+          onPress={handleImportData}
         />
+        
+        {__DEV__ && (
+          <List.Item
+            title="Reset to Sample Data"
+            description="Replace inventory with sample items"
+            left={() => <Icon name="refresh" size={24} color={theme.colors.onSurface} />}
+            onPress={handleResetToDefaults}
+          />
+        )}
         
         <List.Item
           title="Clear All Data"
@@ -442,28 +540,84 @@ const SettingsScreen: React.FC = () => {
     <Portal>
       <Dialog visible={exportDialogVisible} onDismiss={() => setExportDialogVisible(false)}>
         <Dialog.Title>Export Data</Dialog.Title>
-        <Dialog.ScrollArea style={styles.exportScrollArea}>
-          <ScrollView>
-            <TextInput
-              value={exportData}
-              multiline
-              numberOfLines={10}
-              mode="outlined"
-              editable={false}
-              style={styles.exportTextInput}
-            />
-          </ScrollView>
-        </Dialog.ScrollArea>
+        <Dialog.Content>
+            <Paragraph style={{marginBottom: 10}}>
+                Copy the text below to save your backup.
+            </Paragraph>
+            <Dialog.ScrollArea style={styles.exportScrollArea}>
+            <ScrollView>
+                <TextInput
+                value={exportData}
+                multiline
+                numberOfLines={10}
+                mode="outlined"
+                editable={false}
+                style={styles.exportTextInput}
+                />
+            </ScrollView>
+            </Dialog.ScrollArea>
+        </Dialog.Content>
         <Dialog.Actions>
           <Button onPress={() => setExportDialogVisible(false)}>Close</Button>
           <Button 
-            onPress={() => {
-              setSnackbarMessage('Copy the text above to save your data.');
+            onPress={async () => {
+              await Clipboard.setStringAsync(exportData);
+              setSnackbarMessage('Data copied to clipboard!');
               setSnackbarVisible(true);
             }}
-            mode="contained"
+            style={{marginRight: 8}}
           >
-            Share
+            Copy
+          </Button>
+          <Button 
+            onPress={shareDataAsFile}
+            mode="contained"
+            icon="share-variant"
+          >
+            Share File
+          </Button>
+        </Dialog.Actions>
+      </Dialog>
+    </Portal>
+  );
+
+  const renderImportDialog = () => (
+    <Portal>
+      <Dialog visible={importDialogVisible} onDismiss={() => setImportDialogVisible(false)}>
+        <Dialog.Title>Import Data</Dialog.Title>
+        <Dialog.Content>
+            <Paragraph style={{marginBottom: 10}}>
+                Paste your backup data below. This will replace all current data.
+            </Paragraph>
+            <Dialog.ScrollArea style={styles.exportScrollArea}>
+            <ScrollView>
+                <TextInput
+                value={importDataText}
+                onChangeText={setImportDataText}
+                multiline
+                numberOfLines={10}
+                placeholder="Paste JSON data here..."
+                mode="outlined"
+                style={styles.exportTextInput}
+                />
+            </ScrollView>
+            </Dialog.ScrollArea>
+        </Dialog.Content>
+        <Dialog.Actions>
+          <Button onPress={() => setImportDialogVisible(false)}>Cancel</Button>
+          <Button 
+            onPress={pickDocument}
+            icon="file-document-outline"
+            style={{marginRight: 8}}
+          >
+            File
+          </Button>
+          <Button 
+            onPress={confirmImportData}
+            mode="contained"
+            disabled={!importDataText.trim()}
+          >
+            Import
           </Button>
         </Dialog.Actions>
       </Dialog>
@@ -499,6 +653,7 @@ const SettingsScreen: React.FC = () => {
       {renderLockTimeoutDialog()}
       {renderResetDialog()}
       {renderExportDialog()}
+      {renderImportDialog()}
 
       {/* Clear All Confirmation Dialog */}
       <Portal>

@@ -661,6 +661,37 @@ export class SettingsManager {
     await this.saveSettings();
     console.log('🔄 Settings reset to defaults');
   }
+
+  async importSettings(data: any): Promise<void> {
+    if (!data) return;
+    
+    // Validate schema roughly by checking keys or just merge carefully
+    const defaultSettings = this.getDefaultSettings();
+    
+    // Merge imported data with defaults to ensure all keys exist
+    this.settings = {
+        ...defaultSettings,
+        ...data,
+        // Restore dates if they are strings
+        reminderTime1: data.reminderTime1 ? new Date(data.reminderTime1) : defaultSettings.reminderTime1,
+        reminderTime2: data.reminderTime2 ? new Date(data.reminderTime2) : defaultSettings.reminderTime2,
+        healthAlertTime: data.healthAlertTime ? new Date(data.healthAlertTime) : defaultSettings.healthAlertTime,
+        // Ensure critical flags are respected or reset if needed (e.g. auth)
+        isAuthenticated: false, 
+    };
+
+    if (this.settings.isInventoryReminderEnabled) {
+        this.scheduleInventoryReminders();
+    }
+    
+    if (this.settings.isHealthAlertsEnabled) {
+        this.scheduleHealthNotification();
+    }
+
+    await this.saveSettings();
+    console.log('📥 Settings imported successfully');
+    this.notifyListeners();
+  }
 }
 
 // Export singleton instance

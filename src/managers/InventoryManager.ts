@@ -749,12 +749,100 @@ export class InventoryManager {
   async clearAllData(): Promise<void> {
     this.inventoryItems = [];
     this.shoppingList = [];
-    this.shoppingState = ShoppingState.EMPTY;
-    
+    this.customSubcategories = [];
+    // Hide ALL built-in subcategories to start fresh
+    this.hiddenBuiltinSubs = Object.keys(SUBCATEGORY_CONFIG);
     this.subcategoryOrder = {};
     
-    await StorageService.clearAllData();
-    console.log('🗑️ All inventory data cleared');
+    await Promise.all([
+      StorageService.clearAllData(),
+      StorageService.saveCustomSubcategories([]),
+      StorageService.saveHiddenBuiltinSubs(this.hiddenBuiltinSubs),
+      StorageService.saveSubcategoryOrder({}),
+    ]);
+    
+    console.log('🗑️ All inventory data cleared and built-in subcategories hidden');
+    this.notifyListeners();
+  }
+
+  getExportData() {
+    // Enrich items with resolved category names for readability/portability
+    const enrichedItems = this.inventoryItems.map(item => {
+        const config = this.getSubcategoryConfigInternal(item.subcategory);
+        return {
+            ...item,
+            _category: config?.category || 'Unknown',
+            _subcategoryName: item.subcategory, // Just for clarity as it's the key
+        };
+    });
+
+    return {
+      inventoryItems: enrichedItems,
+      customSubcategories: this.customSubcategories,
+      // hiddenBuiltinSubs excluded as per request (user wants to start fresh or manages visibility differently)
+      shoppingList: this.shoppingList,
+      subcategoryOrder: this.subcategoryOrder,
+    };
+  }
+
+  async importData(data: any): Promise<void> {
+    if (!data) return;
+
+    // 1. Update In-Memory State
+    if (Array.isArray(data.inventoryItems)) {
+        // Restore dates
+        this.inventoryItems = data.inventoryItems.map((item: any) => ({
+            ...item,
+            lastUpdated: new Date(item.lastUpdated),
+            purchaseHistory: item.purchaseHistory?.map((d: string) => new Date(d)) || []
+        }));
+    }
+    
+    if (Array.isArray(data.customSubcategories)) {
+        this.customSubcategories = data.customSubcategories;
+    } else {
+        // Reset to empty if not provided, to ensure clean state
+        this.customSubcategories = [];
+    }
+
+    if (Array.isArray(data.hiddenBuiltinSubs)) {
+        this.hiddenBuiltinSubs = data.hiddenBuiltinSubs;
+    } else {
+        // If not provided in export (which we just removed), it means user wants CLEAN state.
+        // So we should HIDE ALL built-in subs by default, just like "Clear All Data".
+        // Otherwise they will all show up because empty hidden list = all visible.
+        this.hiddenBuiltinSubs = Object.keys(SUBCATEGORY_CONFIG);
+    }
+
+    // Intelligent Unhide:
+    // Since we default to hiding EVERYTHING if hiddenBuiltinSubs is missing,
+    // we must ensure that subcategories containing the imported items are REVEALED.
+    // Otherwise the user will see items but no tabs for them (or worse, items hidden).
+    if (!Array.isArray(data.hiddenBuiltinSubs)) { 
+        const importedSubcategories = new Set(this.inventoryItems.map(i => i.subcategory));
+        
+        // Remove from hidden list if it is used by an imported item
+        this.hiddenBuiltinSubs = this.hiddenBuiltinSubs.filter(sub => !importedSubcategories.has(sub));
+    }
+
+    if (Array.isArray(data.shoppingList)) {
+        this.shoppingList = data.shoppingList;
+    }
+    
+    if (data.subcategoryOrder) {
+        this.subcategoryOrder = data.subcategoryOrder;
+    }
+
+    // 2. Persist to Storage
+    await Promise.all([
+        StorageService.saveInventoryItems(this.inventoryItems),
+        StorageService.saveCustomSubcategories(this.customSubcategories),
+        StorageService.saveHiddenBuiltinSubs(this.hiddenBuiltinSubs),
+        StorageService.saveShoppingList(this.shoppingList),
+        StorageService.saveSubcategoryOrder(this.subcategoryOrder),
+    ]);
+
+    console.log('📥 Data imported successfully');
     this.notifyListeners();
   }
 
@@ -780,7 +868,13 @@ export class InventoryManager {
     });
     
     this.inventoryItems = sampleItems;
-    await StorageService.saveInventoryItems(this.inventoryItems);
+    // Since we are resetting to defaults, we want all built-in categories to be visible
+    this.hiddenBuiltinSubs = []; 
+    
+    await Promise.all([
+      StorageService.saveInventoryItems(this.inventoryItems),
+      StorageService.saveHiddenBuiltinSubs(this.hiddenBuiltinSubs),
+    ]);
     
     console.log(`🔄 Reset to defaults with ${sampleItems.length} sample items`);
     this.notifyListeners();
