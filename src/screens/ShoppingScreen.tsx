@@ -118,9 +118,21 @@ const ShoppingScreen: React.FC = () => {
   };
 
   const onConfirmComplete = async () => {
-    setCompleteConfirmVisible(false);
-    await inventoryManager.completeAndRestoreShopping();
-    setShowSuccessDialog(true);
+    setCompleteConfirmVisible(false); // Close confirm dialog immediately
+    try {
+      // 1. Give time for confirm dialog to close animation
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // 2. Perform the logic (will trigger state update to EMPTY)
+      await inventoryManager.completeAndRestoreShopping();
+
+      // 3. Show success dialog AFTER the state has settled and View re-rendered
+      setTimeout(() => {
+        setShowSuccessDialog(true);
+      }, 500); 
+    } catch (e) {
+      console.error('Error completing shopping:', e);
+    }
   };
 
   const handleCancelShopping = async () => {
@@ -866,10 +878,12 @@ const ShoppingScreen: React.FC = () => {
       </Dialog>
 
       {/* Inventory Updated Success Dialog */}
-      <Dialog visible={showSuccessDialog} onDismiss={() => setShowSuccessDialog(false)}>
-        <Dialog.Title>Inventory Updated</Dialog.Title>
+      <Dialog visible={showSuccessDialog} onDismiss={() => setShowSuccessDialog(false)} dismissable={false}>
+        <Dialog.Title>Shopping Complete</Dialog.Title>
         <Dialog.Content>
-          <Text style={{ color: theme.colors.onSurface }}>Your inventory has been successfully updated with the purchased items.</Text>
+          <Text style={{ color: theme.colors.onSurface }}>
+            All purchased items have been restocked to 100% and updated in your inventory.
+          </Text>
         </Dialog.Content>
         <Dialog.Actions>
           <Button onPress={() => setShowSuccessDialog(false)}>Great!</Button>
@@ -879,68 +893,36 @@ const ShoppingScreen: React.FC = () => {
   );
 
   // Render based on current state
-  if (shoppingState === ShoppingState.EMPTY) {
-    return (
-      <>
-        {renderEmptyState()}
-        {renderConfirmDialogs()}
-        <Snackbar
-          visible={snackbarVisible}
-          onDismiss={() => setSnackbarVisible(false)}
-          duration={3000}
-        >
-          {snackbarMessage}
-        </Snackbar>
-      </>
-    );
-  } else if (shoppingState === ShoppingState.GENERATING) {
-    return (
-      <>
-        {renderGeneratingState()}
-        {renderAddItemDialog()}
-        {renderConfirmDialogs()}
-        <Snackbar
-          visible={snackbarVisible}
-          onDismiss={() => setSnackbarVisible(false)}
-          duration={3000}
-        >
-          {snackbarMessage}
-        </Snackbar>
-      </>
-    );
-  } else if (shoppingState === ShoppingState.LIST_READY) {
-    return (
-      <>
-        {renderListReadyState()}
-        {renderAddItemDialog()}
-        {renderConfirmDialogs()}
-        <Snackbar
-          visible={snackbarVisible}
-          onDismiss={() => setSnackbarVisible(false)}
-          duration={3000}
-        >
-          {snackbarMessage}
-        </Snackbar>
-      </>
-    );
-  } else if (shoppingState === ShoppingState.SHOPPING) {
-    return (
-      <>
-        {renderShoppingState()}
-        {renderAddItemDialog()}
-        {renderConfirmDialogs()}
-        <Snackbar
-          visible={snackbarVisible}
-          onDismiss={() => setSnackbarVisible(false)}
-          duration={3000}
-        >
-          {snackbarMessage}
-        </Snackbar>
-      </>
-    );
-  }
+  // Render content based on current state
+  const renderContent = () => {
+    switch (shoppingState) {
+      case ShoppingState.EMPTY:
+        return renderEmptyState();
+      case ShoppingState.GENERATING:
+        return renderGeneratingState();
+      case ShoppingState.LIST_READY:
+        return renderListReadyState();
+      case ShoppingState.SHOPPING:
+        return renderShoppingState();
+      default:
+        return <View />;
+    }
+  };
 
-  return <View />;
+  return (
+    <>
+      {renderContent()}
+      {shoppingState !== ShoppingState.EMPTY && renderAddItemDialog()}
+      {renderConfirmDialogs()}
+      <Snackbar
+        visible={snackbarVisible}
+        onDismiss={() => setSnackbarVisible(false)}
+        duration={3000}
+      >
+        {snackbarMessage}
+      </Snackbar>
+    </>
+  );
 };
 
 const styles = StyleSheet.create({

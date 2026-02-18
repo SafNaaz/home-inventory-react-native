@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import { View, StyleSheet, ScrollView, BackHandler, KeyboardAvoidingView, Platform, TouchableOpacity, Dimensions, Animated, TextInput as RNTextInput, Keyboard, Alert } from 'react-native';
-import { useTheme, Button, IconButton, Text, Portal, Dialog } from 'react-native-paper';
+import { useTheme, Button, IconButton, Text, Portal, Dialog, Snackbar } from 'react-native-paper';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { notesManager } from '../managers/NotesManager';
@@ -157,11 +157,15 @@ const NoteDetailScreen: React.FC = () => {
 
   const scrollViewRef = useRef<ScrollView>(null);
   const inputRefs = useRef<any[]>([]);
+  const titleInputRef = useRef<RNTextInput>(null);
   const sideMenuOpacity = useRef(new Animated.Value(0.2)).current;
   const scrollTimeout = useRef<any>(null);
   const lineYPositions = useRef<Record<number, number>>({});
   const pendingFocusRef = useRef<number | null>(null);
   const [unsavedDialogVisible, setUnsavedDialogVisible] = useState(false);
+  const [duplicateConfirmVisible, setDuplicateConfirmVisible] = useState(false);
+  const [snackbarVisible, setSnackbarVisible] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
   const pendingActionRef = useRef<any>(null); // For storing navigation action or callback
 
   // Refs to avoid stale closures in effects that shouldn't re-run on every keystroke
@@ -233,6 +237,9 @@ const NoteDetailScreen: React.FC = () => {
       headerTitle: isViewMode ? 'View' : (isNew ? 'New Note' : 'Edit'),
       headerRight: () => (
         <View style={headerRightStyle}>
+          {isViewMode && (
+             <IconButton icon="content-duplicate" iconColor={theme.colors.primary} onPress={handleDuplicate} />
+          )}
           {!isViewMode && !isNew && (
             <IconButton icon="delete" iconColor={theme.colors.error} onPress={() => setDeleteConfirmVisible(true)} />
           )}
@@ -344,10 +351,17 @@ const NoteDetailScreen: React.FC = () => {
     setUnsavedDialogVisible(false);
     const action = pendingActionRef.current;
     
+    // CRITICAL: Prevent beforeRemove from firing again by setting view mode
+    isViewModeRef.current = true;
+    setIsViewMode(true);
+
     if (isNewRef.current) {
-      await notesManager.deleteNote(noteId);
+      // Check if it exists before trying to delete to avoid errors
+      if (notesManager.getNote(noteId)) {
+        await notesManager.deleteNote(noteId);
+      }
     } else {
-      // Revert changes
+      // Revert changes in local state (optional since we are leaving, but good for cleanup)
       const n = noteRef.current;
       if (n) {
         setTitle(n.title || '');
@@ -358,11 +372,7 @@ const NoteDetailScreen: React.FC = () => {
     if (action?.type === 'navigation') {
       navigation.dispatch(action.action);
     } else if (action?.type === 'hardware_back') {
-       if (isNewRef.current) {
-         navigation.goBack();
-       } else {
-         setIsViewMode(true);
-       }
+       navigation.goBack();
     }
     pendingActionRef.current = null;
   };
@@ -383,6 +393,19 @@ const NoteDetailScreen: React.FC = () => {
     }
     pendingActionRef.current = null;
   };
+
+  const handleDuplicate = useCallback(() => {
+    setDuplicateConfirmVisible(true);
+  }, []);
+
+  const onConfirmDuplicate = useCallback(async () => {
+    setDuplicateConfirmVisible(false);
+    const newNote = await notesManager.duplicateNote(noteId);
+    if (newNote) {
+      setSnackbarMessage('Note duplicated successfully');
+      setSnackbarVisible(true);
+    }
+  }, [noteId]);
 
   const handleDelete = useCallback(async () => {
     await notesManager.deleteNote(noteId);
@@ -451,11 +474,38 @@ const NoteDetailScreen: React.FC = () => {
       const safeContent = typeof prev === 'string' ? prev : '';
       const lines = safeContent.split('\n');
       const line = lines[index];
-      if ((line === '' || line === BULLET_PREFIX || line === CHECKBOX_PREFIX || line === CHECKED_PREFIX) && lines.length > 2) {
-        lines.splice(index, 1);
-        // Set pending focus for previous line
-        pendingFocusRef.current = index - 1;
-        return lines.join('\n');
+      
+      // If line is empty or just a prefix, delete it
+      if ((line === '' || line === BULLET_PREFIX || line === CHECKBOX_PREFIX || line === CHECKED_PREFIX) && lines.length > 0) {
+        
+        // Prevent keyboard dismissal by focusing previous element BEFORE render update
+        if (index > 0) {
+           inputRefs.current[index - 1]?.focus();
+           
+           // Ensure we scroll to it if needed? 
+           // Usually focus handles it, or auto-scroll logic handles it.
+        } else {
+           // If index is 0, focus title
+           titleInputRef.current?.focus();
+        }
+
+        // Now remove the line
+        // Special case: if it is the only line, we might just clear it?
+        // Code below requires lines.length > 2 to delete?
+        // Original code: && lines.length > 2. 
+        // This prevented deleting the last remaining line?
+        // If I have 1 line, I can't delete it?
+        // If I have 2 lines, I can delete one.
+        if (lines.length > 1) {
+            lines.splice(index, 1);
+            return lines.join('\n');
+        } else if (lines.length === 1) {
+            // If only 1 line, just clear it?
+            // User did not ask for this but "deleting lines".
+            // If I delete the last line, I might want an empty line or just title?
+            // Let's stick to creating empty line if it's the last one.
+            return '';
+        }
       }
       return prev;
     });
@@ -556,6 +606,7 @@ const NoteDetailScreen: React.FC = () => {
           >
             <View style={styles.titleSection}>
               <RNTextInput
+                ref={titleInputRef}
                 placeholder="Title"
                 value={title || ''}
                 onChangeText={setTitle}
@@ -636,7 +687,30 @@ const NoteDetailScreen: React.FC = () => {
             <Button onPress={handleUnsavedSave}>Save & Exit</Button>
           </Dialog.Actions>
         </Dialog>
+
+        <Dialog visible={duplicateConfirmVisible} onDismiss={() => setDuplicateConfirmVisible(false)}>
+          <Dialog.Title>Duplicate Note</Dialog.Title>
+          <Dialog.Content>
+            <Text variant="bodyMedium">Are you sure you want to duplicate this note?</Text>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setDuplicateConfirmVisible(false)}>Cancel</Button>
+            <Button onPress={onConfirmDuplicate}>Duplicate</Button>
+          </Dialog.Actions>
+        </Dialog>
       </Portal>
+
+      <Snackbar
+        visible={snackbarVisible}
+        onDismiss={() => setSnackbarVisible(false)}
+        duration={3000}
+        action={{
+          label: 'Close',
+          onPress: () => setSnackbarVisible(false),
+        }}
+      >
+        {snackbarMessage}
+      </Snackbar>
     </View>
   );
 };
