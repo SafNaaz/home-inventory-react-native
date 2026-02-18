@@ -1479,6 +1479,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
             onScroll={handleScroll}
             scrollEventThrottle={16}
             removeClippedSubviews={true}
+            contentContainerStyle={{ paddingBottom: 180 }}
           >
             <View style={styles.subcategoriesList}>
               {subcategories.map(subName => {
@@ -1637,7 +1638,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
           <ScrollView
             key="items-scroll"
             style={styles.scrollView}
-            contentContainerStyle={{ paddingBottom: 120, padding: 16 }}
+            contentContainerStyle={{ paddingBottom: 180, padding: 16 }}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
             onScroll={handleScroll}
             scrollEventThrottle={16}
