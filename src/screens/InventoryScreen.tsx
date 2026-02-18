@@ -684,27 +684,58 @@ const InventoryScreen: React.FC = () => {
     isSearchVisibleRef.current = isSearchVisible;
   }, [isSearchVisible]);
 
-  const handleScroll = useCallback((event: any) => {
-    if (navigation.state === 'home') return; // Only for subcat/items as requested
+  const fabAnimation = useRef(new Animated.Value(1)).current;
 
+  const handleScroll = useCallback((event: any) => {
     const currentScrollY = event.nativeEvent.contentOffset.y;
     if (currentScrollY <= 0) {
-      setIsFabVisible(true);
+      if (!isFabVisible) {
+        setIsFabVisible(true);
+        Animated.spring(fabAnimation, {
+          toValue: 1,
+          useNativeDriver: true,
+          tension: 40,
+          friction: 7
+        }).start();
+        // Restore tabs
+        navigationObj.getParent()?.setOptions({
+          tabBarStyle: {
+            backgroundColor: theme.colors.surface,
+            borderTopWidth: 0,
+            height: 65,
+            paddingBottom: 10,
+            paddingTop: 10,
+            position: 'absolute',
+            bottom: 20,
+            left: 20,
+            right: 20,
+            borderRadius: 32,
+            elevation: 8,
+          }
+        });
+      }
       return;
     }
 
     const diff = currentScrollY - lastScrollY.current;
-    if (Math.abs(diff) < 5) return;
+    if (Math.abs(diff) < 5) return; // Ignore small noise
 
     if (diff > 20 && isFabVisible) {
       setIsFabVisible(false);
-      // Attempt to hide bottom tabs
-      navigationObj.getParent()?.setOptions({
-        tabBarStyle: { display: 'none' }
-      });
+      Animated.timing(fabAnimation, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true
+      }).start();
+      navigationObj.getParent()?.setOptions({ tabBarStyle: { display: 'none' } });
     } else if (diff < -20 && !isFabVisible) {
       setIsFabVisible(true);
-      // Restore bottom tabs - using the same style as in App.tsx
+      Animated.spring(fabAnimation, {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 40,
+        friction: 7
+      }).start();
       navigationObj.getParent()?.setOptions({
         tabBarStyle: {
           backgroundColor: theme.colors.surface,
@@ -721,8 +752,9 @@ const InventoryScreen: React.FC = () => {
         }
       });
     }
+    
     lastScrollY.current = currentScrollY;
-  }, [isFabVisible, navigation.state, theme]);
+  }, [isFabVisible, theme, fabAnimation]);
 
   useEffect(() => {
     loadInventoryData();
@@ -1443,7 +1475,6 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
         ) : (
           <ScrollView
             style={styles.scrollView}
-            contentContainerStyle={{ paddingBottom: 110 }}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
             onScroll={handleScroll}
             scrollEventThrottle={16}
@@ -1744,13 +1775,32 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
   );
 
   const renderFloatingActionButton = () => {
-    if (!isFabVisible) return null;
+    const scale = fabAnimation;
+    const translateY = fabAnimation.interpolate({
+        inputRange: [0, 1],
+        outputRange: [100, 0]
+    });
+
     return (
-      <>
+      <Animated.View 
+        style={{ 
+            position: 'absolute', 
+            right: fabDims.right, 
+            bottom: fabDims.bottom,
+            alignItems: 'center',
+            transform: [{ translateY }, { scale }]
+        }}
+        pointerEvents={isFabVisible ? 'auto' : 'none'}
+      >
         {/* Search FAB - always visible, positioned above shopping FAB */}
         <FAB
           icon="magnify"
-          style={[styles.fab, { backgroundColor: theme.colors.surface, bottom: tabBarDims.height + tabBarDims.bottomOffset + 68, zIndex: 90 }]}
+          style={{ 
+            backgroundColor: theme.colors.surface, 
+            marginBottom: 12, 
+            borderRadius: 28,
+            elevation: 4
+          }}
           color={theme.colors.onSurface}
           onPress={openSearch}
           small
@@ -1758,11 +1808,15 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
         {/* Shopping Cart FAB */}
         <FAB
           icon="auto-fix"
-          style={[styles.fab, { backgroundColor: theme.colors.primary }]}
+          style={{ 
+            backgroundColor: theme.colors.primary, 
+            borderRadius: 28,
+            elevation: 4
+          }}
           color={theme.dark ? '#000' : '#fff'}
           onPress={handleStartShopping}
         />
-      </>
+      </Animated.View>
     );
   };
   const renderSubAddDialog = () => (
