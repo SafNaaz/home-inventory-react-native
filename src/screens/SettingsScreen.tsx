@@ -480,13 +480,13 @@ const SettingsScreen: React.FC = () => {
         
         <List.Item
           title="HiHome"
-          description="Version 7.2.0"
+          description="Version 8.0.0"
           left={() => <Icon name="information-outline" size={24} color={theme.colors.onSurface} />}
         />
         
         <List.Item
           title="Features"
-          description="Home Inventory tracking, shopping lists, notes, and more"
+          description="Home Inventory tracking, shopping lists, notes, and insights.."
           left={() => <Icon name="feature-search-outline" size={24} color={theme.colors.onSurface} />}
         />
         
