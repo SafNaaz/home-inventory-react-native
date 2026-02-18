@@ -681,6 +681,75 @@ const EditItemInput = ({ initialValue, onSave, onCancel }: { initialValue: strin
   );
 };
 
+const SubcategoryInput = ({ 
+  initialName, 
+  initialIcon, 
+  availableIcons, 
+  onSave, 
+  onCancel, 
+  saveLabel,
+  theme 
+}: { 
+  initialName: string, 
+  initialIcon: string, 
+  availableIcons: string[], 
+  onSave: (name: string, icon: string) => void, 
+  onCancel: () => void,
+  saveLabel: string,
+  theme: any
+}) => {
+  const [icon, setIcon] = useState(initialIcon);
+  const [isValid, setIsValid] = useState(!!initialName.trim());
+  const nameRef = useRef(initialName);
+
+  const handleChangeText = (text: string) => {
+    nameRef.current = text;
+    setIsValid(!!text.trim());
+  };
+
+  const handleSave = () => {
+    if (nameRef.current.trim()) {
+      onSave(nameRef.current.trim(), icon);
+    }
+  };
+
+  return (
+    <>
+      <TextInput
+        label="Type Name"
+        defaultValue={initialName}
+        onChangeText={handleChangeText}
+        mode="outlined"
+        style={{ marginBottom: 16 }}
+        onSubmitEditing={handleSave}
+        returnKeyType="done"
+        key={initialName} 
+        autoFocus={true}
+      />
+      <Text style={{ marginBottom: 8, color: theme.colors.onSurface }}>Select Icon:</Text>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+        {availableIcons.map(ic => (
+          <IconButton
+            key={ic}
+            icon={ic}
+            mode={icon === ic ? 'contained' : 'outlined'}
+            onPress={() => setIcon(ic)}
+            size={24}
+            iconColor={icon === ic ? theme.colors.onPrimary : theme.colors.primary}
+            containerColor={icon === ic ? theme.colors.primary : undefined}
+          />
+        ))}
+      </View>
+       <Dialog.Actions style={{ paddingHorizontal: 0, marginTop: 10 }}>
+          <Button onPress={onCancel}>Cancel</Button>
+          <Button onPress={handleSave} disabled={!isValid}>
+            {saveLabel}
+          </Button>
+        </Dialog.Actions>
+    </>
+  );
+};
+
 
 
 const InventoryScreen: React.FC = () => {
@@ -921,9 +990,10 @@ const InventoryScreen: React.FC = () => {
     });
   };
 
-  const handleAddSubcategory = async () => {
+  const handleAddSubcategory = async (nameInput: string, iconInput: string) => {
     try {
-      if (!newSubName.trim() || !newSubIcon || !navigation.category) return;
+      if (!nameInput.trim() || !navigation.category) return;
+      // Icon input might be empty if we allow defaults? But let's assume valid.
 
       if (editingSubId) {
         if (editingSubId.startsWith('builtin:')) {
@@ -931,16 +1001,16 @@ const InventoryScreen: React.FC = () => {
           // Promote builtin to custom (migrates items)
           await inventoryManager.promoteBuiltinToCustom(
             builtinName,
-            newSubName,
-            newSubIcon,
+            nameInput,
+            iconInput,
             theme.colors.primary,
             navigation.category
           );
         } else {
-          await inventoryManager.updateSubcategory(editingSubId, newSubName, newSubIcon, theme.colors.primary);
+          await inventoryManager.updateSubcategory(editingSubId, nameInput, iconInput, theme.colors.primary);
         }
       } else {
-        await inventoryManager.addCustomSubcategory(newSubName, newSubIcon, theme.colors.primary, navigation.category);
+        await inventoryManager.addCustomSubcategory(nameInput, iconInput, theme.colors.primary, navigation.category);
       }
 
       setShowingSubAddDialog(false);
@@ -1941,36 +2011,16 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
       <Dialog visible={showingSubAddDialog} onDismiss={() => setShowingSubAddDialog(false)}>
         <Dialog.Title>{editingSubId ? 'Edit Type' : 'Add New Type'}</Dialog.Title>
         <Dialog.Content>
-          <TextInput
-            label="Type Name"
-            value={newSubName}
-            onChangeText={setNewSubName}
-            mode="outlined"
-            style={{ marginBottom: 16 }}
-            onSubmitEditing={handleAddSubcategory}
-            returnKeyType="done"
+          <SubcategoryInput
+            initialName={newSubName}
+            initialIcon={newSubIcon}
+            availableIcons={navigation.category ? CATEGORY_ICONS[navigation.category] : []}
+            onSave={handleAddSubcategory}
+            onCancel={() => setShowingSubAddDialog(false)}
+            saveLabel={editingSubId ? 'Save' : 'Add'}
+            theme={theme}
           />
-          <Text style={{ marginBottom: 8, color: theme.colors.onSurface }}>Select Icon:</Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            {navigation.category && CATEGORY_ICONS[navigation.category].map(icon => (
-              <IconButton
-                key={icon}
-                icon={icon}
-                mode={newSubIcon === icon ? 'contained' : 'outlined'}
-                onPress={() => setNewSubIcon(icon)}
-                size={24}
-                iconColor={newSubIcon === icon ? theme.colors.onPrimary : theme.colors.primary}
-                containerColor={newSubIcon === icon ? theme.colors.primary : undefined}
-              />
-            ))}
-          </View>
         </Dialog.Content>
-        <Dialog.Actions>
-          <Button onPress={() => setShowingSubAddDialog(false)}>Cancel</Button>
-          <Button onPress={handleAddSubcategory} disabled={!newSubName.trim()}>
-            {editingSubId ? 'Save' : 'Add'}
-          </Button>
-        </Dialog.Actions>
       </Dialog>
     </Portal>
   );
