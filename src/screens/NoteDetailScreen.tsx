@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
-import { View, StyleSheet, ScrollView, BackHandler, KeyboardAvoidingView, Platform, TouchableOpacity, Dimensions, Animated, TextInput as RNTextInput, Keyboard, Alert } from 'react-native';
+import { View, StyleSheet, ScrollView, BackHandler, KeyboardAvoidingView, Platform, TouchableOpacity, Dimensions, Animated, TextInput as RNTextInput, Keyboard, Alert, Share } from 'react-native';
 import { useTheme, Button, IconButton, Text, Portal, Dialog, Snackbar } from 'react-native-paper';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { notesManager } from '../managers/NotesManager';
 import { Note } from '../models/Types';
 import DoodleBackground from '../components/DoodleBackground';
+import * as Clipboard from 'expo-clipboard';
 
 // Define constants outside to avoid re-creation and dependency issues
 const BULLET_PREFIX = '\u2022 '; 
@@ -238,7 +239,11 @@ const NoteDetailScreen: React.FC = () => {
       headerRight: () => (
         <View style={headerRightStyle}>
           {isViewMode && (
+            <>
+             <IconButton icon="share-variant" iconColor={theme.colors.primary} onPress={handleShare} />
+             <IconButton icon="content-copy" iconColor={theme.colors.primary} onPress={handleCopy} />
              <IconButton icon="content-duplicate" iconColor={theme.colors.primary} onPress={handleDuplicate} />
+            </>
           )}
           {!isViewMode && !isNew && (
             <IconButton icon="delete" iconColor={theme.colors.error} onPress={() => setDeleteConfirmVisible(true)} />
@@ -411,6 +416,34 @@ const NoteDetailScreen: React.FC = () => {
     await notesManager.deleteNote(noteId);
     navigation.goBack();
   }, [noteId]);
+
+  const handleCopy = useCallback(async () => {
+    const titleText = titleRef.current || 'Untitled';
+    const contentText = contentRef.current || '';
+    
+    // Format text specifically for sharing/clipboard
+    const formattedText = `${titleText}\n\n${contentText}`;
+    
+    await Clipboard.setStringAsync(formattedText);
+    setSnackbarMessage('Note copied to clipboard');
+    setSnackbarVisible(true);
+  }, []);
+
+  const handleShare = useCallback(async () => {
+    const titleText = titleRef.current || 'Untitled';
+    const contentText = contentRef.current || '';
+    const formattedText = `${titleText}\n\n${contentText}`;
+
+    try {
+      await Share.share({
+        message: formattedText,
+        title: titleText, // Android only
+      });
+    } catch (error: any) {
+      setSnackbarMessage('Error sharing note');
+      setSnackbarVisible(true);
+    }
+  }, []);
 
   // ─── Editor Callbacks (stable) ────────────────────────────────────
   const showMenu = useCallback(() => {
