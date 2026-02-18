@@ -469,10 +469,14 @@ interface ItemRowProps {
   onEdit: (item: InventoryItem) => void;
   onToggleIgnore: (item: InventoryItem) => void;
   isSearch?: boolean;
+  // Explicit props to force re-render on mutation
+  name: string;
+  quantity: number;
+  isIgnored: boolean;
 }
 
-const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, onUpdate, onDelete, onEdit, onToggleIgnore, isSearch }: ItemRowProps) => {
-  const stockColor = getStockColor(item.quantity, theme.dark);
+const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, onUpdate, onDelete, onEdit, onToggleIgnore, isSearch, name, quantity, isIgnored }: ItemRowProps) => {
+  const stockColor = getStockColor(quantity, theme.dark);
 
   const swipeableRef = useRef<Swipeable>(null);
 
@@ -1368,6 +1372,9 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
         onEdit={confirmEdit}
         onToggleIgnore={handleToggleIgnore}
         isSearch={isSearch}
+        name={item.name}
+        quantity={item.quantity}
+        isIgnored={item.isIgnored}
       />
     );
   };
