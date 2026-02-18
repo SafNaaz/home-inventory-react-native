@@ -473,9 +473,10 @@ interface ItemRowProps {
   name: string;
   quantity: number;
   isIgnored: boolean;
+  categoryName?: string;
 }
 
-const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, onUpdate, onDelete, onEdit, onToggleIgnore, isSearch, name, quantity, isIgnored }: ItemRowProps) => {
+const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, onUpdate, onDelete, onEdit, onToggleIgnore, isSearch, name, quantity, isIgnored, categoryName }: ItemRowProps) => {
   const stockColor = getStockColor(quantity, theme.dark);
 
   const swipeableRef = useRef<Swipeable>(null);
@@ -566,20 +567,39 @@ const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, on
                 uncheckedColor={theme.colors.onSurfaceVariant}
               />
             )}
-            <Text 
-              style={[
-                styles.itemTitle, 
-                { 
-                  color: theme.colors.onSurface,
-                  textDecorationLine: 'none',
-                  opacity: item.isIgnored ? 0.5 : 1,
-                  marginLeft: isSearch ? 4 : 0
-                }
-              ]}
-              numberOfLines={2}
-            >
-              {item.name}
-            </Text>
+            <View style={{ flex: 1, marginLeft: isSearch ? 4 : 0 }}>
+              <Text 
+                style={[
+                  styles.itemTitle, 
+                  { 
+                    color: theme.colors.onSurface,
+                    textDecorationLine: 'none',
+                    opacity: item.isIgnored ? 0.5 : 1,
+                  }
+                ]}
+                numberOfLines={isSearch ? 1 : 2}
+              >
+                {item.name}
+              </Text>
+              {isSearch && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                  {item.isIgnored && (
+                    <View style={{ 
+                      backgroundColor: theme.colors.error + '15', // 15 = roughly 8% opacity for subtle background
+                      paddingHorizontal: 6, 
+                      paddingVertical: 2, 
+                      borderRadius: 4, 
+                      marginRight: 6 
+                    }}>
+                      <Text style={{ fontSize: 10, color: theme.colors.error, fontWeight: '700' }}>HIDDEN</Text>
+                    </View>
+                  )}
+                  <Text style={{ fontSize: 12, color: theme.colors.onSurfaceVariant }} numberOfLines={1}>
+                    {categoryName} • {item.subcategory}
+                  </Text>
+                </View>
+              )}
+            </View>
           </View>
           <Text style={[styles.itemPercentage, { color: stockColor }]}>
             {Math.round(item.quantity * 100)}%
@@ -1360,6 +1380,12 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
   };
 
   const renderItemRow = (item: InventoryItem, isSearch: boolean = false) => {
+    let categoryName = '';
+    if (isSearch) {
+      const config = inventoryManager.getSubcategoryConfig(item.subcategory);
+      categoryName = config?.category || '';
+    }
+    
     return (
       <InventoryItemRow
         key={item.id}
@@ -1375,6 +1401,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
         name={item.name}
         quantity={item.quantity}
         isIgnored={item.isIgnored}
+        categoryName={categoryName}
       />
     );
   };
