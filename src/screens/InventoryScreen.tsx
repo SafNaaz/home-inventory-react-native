@@ -642,6 +642,46 @@ const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, on
     </Swipeable>
   );
 });
+const EditItemInput = ({ initialValue, onSave, onCancel }: { initialValue: string, onSave: (val: string) => void, onCancel: () => void }) => {
+  const [isValid, setIsValid] = useState(!!initialValue.trim());
+  const textRef = useRef(initialValue);
+
+  // Update ref when typing, update valid state
+  const handleChangeText = (text: string) => {
+    textRef.current = text;
+    setIsValid(!!text.trim());
+  };
+
+  const handleSave = () => {
+    if (textRef.current.trim()) {
+      onSave(textRef.current.trim());
+    }
+  };
+
+  return (
+    <>
+      <TextInput
+        label="Item Name"
+        defaultValue={initialValue}
+        onChangeText={handleChangeText}
+        mode="outlined"
+        onSubmitEditing={handleSave}
+        returnKeyType="done"
+        autoFocus={true}
+        key={initialValue} // Force remount if initial value changes (e.g. reused component instance)
+      />
+      
+      <Dialog.Actions style={{ paddingHorizontal: 0, marginTop: 10 }}>
+        <Button onPress={onCancel}>Cancel</Button>
+        <Button onPress={handleSave} disabled={!isValid}>
+          Save
+        </Button>
+      </Dialog.Actions>
+    </>
+  );
+};
+
+
 
 const InventoryScreen: React.FC = () => {
   const theme = useTheme();
@@ -1013,11 +1053,11 @@ const InventoryScreen: React.FC = () => {
     }
   };
 
-  const handleEditItem = async () => {
+  const handleEditItem = async (id: string, name: string) => {
     try {
-      if (!editingItem || !editedName.trim()) return;
+      if (!name.trim()) return;
       
-      await inventoryManager.updateItemName(editingItem.id, editedName.trim());
+      await inventoryManager.updateItemName(id, name.trim());
       setEditingItem(null);
       setEditedName('');
     } catch (err: any) {
@@ -1676,29 +1716,53 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
     </Portal>
   );
 
-  const renderEditItemDialog = () => (
-    <Portal>
-      <Dialog visible={!!editingItem} onDismiss={() => setEditingItem(null)}>
-        <Dialog.Title>Edit Item</Dialog.Title>
-        <Dialog.Content>
-          <TextInput
-            label="Item Name"
-            value={editedName}
-            onChangeText={setEditedName}
-            mode="outlined"
-            onSubmitEditing={handleEditItem}
-            returnKeyType="done"
-          />
-        </Dialog.Content>
-        <Dialog.Actions>
-          <Button onPress={() => setEditingItem(null)}>Cancel</Button>
-          <Button onPress={handleEditItem} disabled={!editedName.trim()}>
-            Save
-          </Button>
-        </Dialog.Actions>
-      </Dialog>
-    </Portal>
-  );
+
+
+  const renderEditItemDialog = () => {
+    // We use a ref and uncontrolled input to prevent cursor jumping issues during typing
+    // caused by re-renders of the parent component.
+    const editNameRef = useRef('');
+    
+    // We need a wrapper component to hold the ref and logic, 
+    // ensuring it persists across parent re-renders but resets on new item.
+    // However, since we are inside the parent render function, we can't define a component here.
+    // We can use a key on the TextInput to force a reset when the item changes.
+    // But we need to capture the text for saving.
+    
+    // Better approach: Use a variable that persists current text if the ID matches?
+    // No, simplest is: Uncontrolled with callback updating a Ref that is stored in the Parent (InventoryScreen).
+    // Let's create a Ref in InventoryScreen scope? 
+    // Actually, `editedName` STATE causes the re-render loop.
+    // If we remove `editedName` FROM STATE and use a Ref, NO RE-RENDER happens on typing!
+    
+    // So, I will remove `editedName` state usage from `TextInput`.
+    // I will use `newItemName` style but with a Ref.
+    
+    // Wait, `InventoryScreen` has `editedName` State.
+    // I should change `editedName` to NOT be state, but just a variable/ref?
+    // But I need to know if "Save" button is disabled (empty string).
+    // So I need state for "isSaveEnabled".
+    
+    return (
+      <Portal>
+        <Dialog visible={!!editingItem} onDismiss={() => setEditingItem(null)}>
+          <Dialog.Title>Edit Item</Dialog.Title>
+          <Dialog.Content>
+             {/* We use an internal component or just a key-ed TextInput to reset state */}
+             <EditItemInput 
+                initialValue={editingItem?.name || ''} 
+                onSave={(newName) => {
+                   if (editingItem) {
+                     handleEditItem(editingItem.id, newName);
+                   }
+                }}
+                onCancel={() => setEditingItem(null)}
+             />
+          </Dialog.Content>
+        </Dialog>
+      </Portal>
+    );
+  };
 
   const renderDeleteConfirmDialog = () => (
     <Portal>
@@ -1782,42 +1846,94 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
         outputRange: [100, 0]
     });
 
+    const onFabGestureEvent = (event: any) => {
+      const { translationY } = event.nativeEvent;
+      if (translationY > 20 && isFabVisible) {
+        // Swipe Down -> Hide
+        setIsFabVisible(false);
+        Animated.timing(fabAnimation, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true
+        }).start();
+        navigationObj.getParent()?.setOptions({ tabBarStyle: { display: 'none' } });
+      } else if (translationY < -20 && !isFabVisible) {
+        // Swipe Up -> Show
+        setIsFabVisible(true);
+        Animated.spring(fabAnimation, {
+          toValue: 1,
+          useNativeDriver: true,
+          tension: 40,
+          friction: 7
+        }).start();
+        navigationObj.getParent()?.setOptions({
+          tabBarStyle: {
+            backgroundColor: theme.colors.surface,
+            borderTopWidth: 0,
+            height: 65,
+            paddingBottom: 10,
+            paddingTop: 10,
+            position: 'absolute',
+            bottom: 20,
+            left: 20,
+            right: 20,
+            borderRadius: 32,
+            elevation: 8,
+          }
+        });
+      }
+    };
+
     return (
-      <Animated.View 
-        style={{ 
-            position: 'absolute', 
-            right: fabDims.right, 
-            bottom: fabDims.bottom,
-            alignItems: 'center',
-            transform: [{ translateY }, { scale }]
-        }}
-        pointerEvents={isFabVisible ? 'auto' : 'none'}
-      >
-        {/* Search FAB - always visible, positioned above shopping FAB */}
-        <FAB
-          icon="magnify"
+      <PanGestureHandler onGestureEvent={onFabGestureEvent} activeOffsetY={[-10, 10]}>
+        <View 
           style={{ 
-            backgroundColor: theme.colors.surface, 
-            marginBottom: 12, 
-            borderRadius: 28,
-            elevation: 4
+              position: 'absolute', 
+              right: fabDims.right - 10, // Extend hit area slightly
+              bottom: fabDims.bottom - 10,
+              width: 80, // Fixed width hit area
+              height: 160, // Fixed height hit area covering both FABs positions
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              paddingRight: 10, // Compensate for right offset
+              paddingBottom: 10,
+              zIndex: 90, // Ensure it's above content but below dialogs
+              // backgroundColor: 'rgba(255,0,0,0.2)', // Debug color
           }}
-          color={theme.colors.onSurface}
-          onPress={openSearch}
-          small
-        />
-        {/* Shopping Cart FAB */}
-        <FAB
-          icon="auto-fix"
-          style={{ 
-            backgroundColor: theme.colors.primary, 
-            borderRadius: 28,
-            elevation: 4
-          }}
-          color={theme.dark ? '#000' : '#fff'}
-          onPress={handleStartShopping}
-        />
-      </Animated.View>
+        >
+          <Animated.View 
+            style={{ 
+                alignItems: 'center',
+                transform: [{ translateY }, { scale }]
+            }}
+          >
+            {/* Search FAB */}
+            <FAB
+              icon="magnify"
+              style={{ 
+                backgroundColor: theme.colors.surface, 
+                marginBottom: 12, 
+                borderRadius: 28,
+                elevation: 4
+              }}
+              color={theme.colors.onSurface}
+              onPress={openSearch}
+              small
+            />
+            {/* Shopping Cart FAB */}
+            <FAB
+              icon="auto-fix"
+              style={{ 
+                backgroundColor: theme.colors.primary, 
+                borderRadius: 28,
+                elevation: 4
+              }}
+              color={theme.dark ? '#000' : '#fff'}
+              onPress={handleStartShopping}
+            />
+          </Animated.View>
+        </View>
+      </PanGestureHandler>
     );
   };
   const renderSubAddDialog = () => (
@@ -1994,11 +2110,18 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
     );
   };
 
+  const mainContent = React.useMemo(() => {
+    // Return the appropriate screen content based on navigation state
+    // We memoize this to prevent re-rendering the heavy list when dialogs (like edit item) update state
+    if (navigation.state === 'home') return renderHomeScreen();
+    if (navigation.state === 'category') return renderCategoryScreen();
+    if (navigation.state === 'subcategory') return renderSubcategoryScreen();
+    return null;
+  }, [navigation.state, navigation.category, navigation.subcategory, inventoryItems, refreshing, isReordering, theme, searchQuery, isSearchVisible, showIgnoredOnly, isFabVisible]);
+
   return (
     <GestureHandlerRootView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      {navigation.state === 'home' && renderHomeScreen()}
-      {navigation.state === 'category' && renderCategoryScreen()}
-      {navigation.state === 'subcategory' && renderSubcategoryScreen()}
+      {mainContent}
 
       {renderSearchOverlay()}
 
