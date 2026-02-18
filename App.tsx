@@ -7,6 +7,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Provider as PaperProvider, IconButton, Title, Paragraph, Button } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { StatusBar, Alert, View, StyleSheet, AppState } from 'react-native';
+import { tabBar as tabBarDims, fontSize, spacing, iconSize } from './src/themes/Responsive';
 
 // Screens
 import InventoryScreen from './src/screens/InventoryScreen';
@@ -189,21 +190,21 @@ const App: React.FC = () => {
           tabBarInactiveTintColor: theme.colors.onSurfaceVariant,
           tabBarShowLabel: true,
           tabBarLabelStyle: {
-            fontSize: 12,
+            fontSize: fontSize.xs,
             fontWeight: '600',
-            marginBottom: 4,
+            marginBottom: 2,
           },
           tabBarStyle: {
             backgroundColor: theme.colors.surface,
             borderTopWidth: 0,
-            height: 65,
-            paddingBottom: 10,
-            paddingTop: 10,
+            height: tabBarDims.height,
+            paddingBottom: 8,
+            paddingTop: 8,
             position: 'absolute',
-            bottom: 20,
-            left: 20,
-            right: 20,
-            borderRadius: 32,
+            bottom: tabBarDims.bottomOffset,
+            left: tabBarDims.sideOffset,
+            right: tabBarDims.sideOffset,
+            borderRadius: tabBarDims.borderRadius,
             ...commonStyles.shadow,
             elevation: 8,
           },
@@ -216,7 +217,7 @@ const App: React.FC = () => {
           headerTitleAlign: 'center',
           headerTitleStyle: {
             fontWeight: '800',
-            fontSize: 22,
+            fontSize: fontSize.xl,
             color: theme.colors.onBackground,
             letterSpacing: -0.5,
           },

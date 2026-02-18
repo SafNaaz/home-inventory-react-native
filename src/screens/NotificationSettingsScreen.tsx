@@ -23,6 +23,7 @@ import { settingsManager } from '../managers/SettingsManager';
 import { InventoryCategory } from '../models/Types';
 import { CATEGORY_CONFIG } from '../constants/CategoryConfig';
 import DoodleBackground from '../components/DoodleBackground';
+import { fontSize as fs, spacing as sp, radius as r, screen } from '../themes/Responsive';
 
 const NotificationSettingsScreen: React.FC = () => {
   const theme = useTheme();
@@ -315,65 +316,65 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   section: {
-    padding: 16,
-    marginBottom: 8,
+    padding: sp.base,
+    marginBottom: sp.sm,
   },
   sectionTitle: {
-    fontSize: 22,
+    fontSize: screen.isSmall ? fs.xl : fs.h3,
     fontWeight: '800',
-    marginBottom: 8,
+    marginBottom: 6,
     letterSpacing: -0.5,
   },
   sectionDescription: {
-    fontSize: 14,
-    lineHeight: 22,
+    fontSize: fs.sm,
+    lineHeight: 20,
     opacity: 0.8,
   },
   infoCard: {
     flexDirection: 'row',
-    padding: 20,
-    borderRadius: 24,
+    padding: sp.base,
+    borderRadius: r.xxl,
     alignItems: 'flex-start',
   },
   infoContent: {
     flex: 1,
-    marginLeft: 16,
+    marginLeft: sp.base,
   },
   infoTitle: {
-    fontSize: 18,
+    fontSize: fs.lg,
     fontWeight: '700',
-    marginBottom: 6,
+    marginBottom: 5,
   },
   infoDescription: {
-    fontSize: 14,
-    lineHeight: 22,
+    fontSize: fs.sm,
+    lineHeight: 20,
     opacity: 0.8,
   },
   testButton: {
-    marginTop: 12,
-    borderRadius: 16,
+    marginTop: sp.sm,
+    borderRadius: r.lg,
   },
   thresholdItem: {
-    padding: 16,
-    paddingBottom: 24,
+    padding: sp.base,
+    paddingBottom: sp.xl,
   },
   thresholdHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: sp.base,
   },
   thresholdTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: sp.sm,
   },
   thresholdLabel: {
-    fontSize: 16,
+    fontSize: fs.base,
     fontWeight: '600',
   },
   thresholdValue: {
-    fontSize: 14,
+    fontSize: fs.sm,
     fontWeight: '700',
   },
   slider: {

@@ -22,6 +22,7 @@ import { InventoryItem, InventoryCategory } from '../models/Types';
 import { CATEGORY_CONFIG, getAllCategories } from '../constants/CategoryConfig';
 import { commonStyles } from '../themes/AppTheme';
 import DoodleBackground from '../components/DoodleBackground';
+import { tabBar as tabBarDims, fontSize as fs, spacing as sp, radius as r, screen } from '../themes/Responsive';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -1090,20 +1091,20 @@ const InsightsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingBottom: 85,
+    paddingBottom: tabBarDims.height + tabBarDims.bottomOffset,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
+    paddingHorizontal: sp.base,
+    paddingTop: sp.sm,
   },
 
   // Hero
   heroCard: {
-    padding: 24,
-    borderRadius: 28,
+    padding: sp.base,
+    borderRadius: r.xxl,
     marginBottom: 8,
     ...commonStyles.shadow,
   },
@@ -1111,27 +1112,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: screen.isSmall ? 16 : 20,
   },
   heroTextWrap: {
     flex: 1,
   },
   heroLabel: {
-    fontSize: 13,
+    fontSize: fs.xs,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginBottom: 4,
+    marginBottom: 3,
   },
   heroValue: {
-    fontSize: 28,
+    fontSize: screen.isSmall ? fs.h2 : fs.h1,
     fontWeight: '900',
     letterSpacing: -0.5,
   },
   heroIconWrap: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: screen.isSmall ? 48 : 56,
+    height: screen.isSmall ? 48 : 56,
+    borderRadius: screen.isSmall ? 24 : 28,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1145,11 +1146,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   heroStatValue: {
-    fontSize: 22,
+    fontSize: screen.isSmall ? fs.xl : fs.h3,
     fontWeight: '800',
   },
   heroStatLabel: {
-    fontSize: 11,
+    fontSize: fs.xs,
     fontWeight: '600',
     textTransform: 'uppercase',
     marginTop: 2,
@@ -1157,26 +1158,26 @@ const styles = StyleSheet.create({
   },
   heroStatDivider: {
     width: 1,
-    height: 30,
+    height: 28,
   },
 
   // Section
   sectionContainer: {
-    marginTop: 24,
+    marginTop: screen.isSmall ? 16 : 20,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: sp.sm,
     paddingHorizontal: 4,
   },
   sectionIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: sp.sm,
   },
   sectionHeaderText: {
     flex: 1,
@@ -1184,20 +1185,20 @@ const styles = StyleSheet.create({
   sectionTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: fs.lg,
     fontWeight: '800',
     letterSpacing: -0.3,
   },
   sectionSubtitle: {
-    fontSize: 12,
+    fontSize: fs.xs,
     fontWeight: '500',
     marginTop: 1,
   },
   countBadge: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: 10,
   },
@@ -1299,11 +1300,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   staleItemName: {
-    fontSize: 14,
+    fontSize: fs.md,
     fontWeight: '600',
   },
   staleItemMeta: {
-    fontSize: 11,
+    fontSize: fs.xs,
     fontWeight: '500',
     marginTop: 2,
   },
@@ -1337,29 +1338,29 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   rankNumber: {
-    fontSize: 14,
+    fontSize: fs.md,
     fontWeight: '800',
   },
   rankedInfo: {
     flex: 1,
   },
   rankedItemName: {
-    fontSize: 14,
+    fontSize: fs.md,
     fontWeight: '600',
   },
   rankedItemMeta: {
-    fontSize: 11,
+    fontSize: fs.xs,
     fontWeight: '500',
     marginTop: 2,
   },
   metricBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: 10,
-    marginLeft: 8,
+    marginLeft: 6,
   },
   metricText: {
-    fontSize: 13,
+    fontSize: fs.sm,
     fontWeight: '800',
   },
 
@@ -1424,11 +1425,11 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   catHealthName: {
-    fontSize: 14,
+    fontSize: fs.md,
     fontWeight: '700',
   },
   catHealthItemCount: {
-    fontSize: 11,
+    fontSize: fs.xs,
     fontWeight: '500',
   },
   catHealthBar: {
@@ -1451,7 +1452,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   catHealthBadgeText: {
-    fontSize: 10,
+    fontSize: fs.xs,
     fontWeight: '700',
   },
 
@@ -1476,14 +1477,14 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   chartLegendText: {
-    fontSize: 11,
+    fontSize: fs.xs,
     fontWeight: '600',
   },
   chartContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
-    height: 130,
+    height: screen.isSmall ? 110 : 130,
     paddingHorizontal: 4,
   },
   chartBarGroup: {
@@ -1498,7 +1499,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   chartBarValueText: {
-    fontSize: 10,
+    fontSize: fs.xs,
     fontWeight: '800',
   },
   chartBarsWrap: {
@@ -1512,8 +1513,8 @@ const styles = StyleSheet.create({
     minHeight: 2,
   },
   chartLabel: {
-    fontSize: 11,
-    marginTop: 6,
+    fontSize: fs.xs,
+    marginTop: 5,
   },
 
   // Monthly insights
@@ -1539,12 +1540,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   monthlyInsightLabel: {
-    fontSize: 11,
+    fontSize: fs.xs,
     fontWeight: '600',
     marginBottom: 1,
   },
   monthlyInsightValue: {
-    fontSize: 13,
+    fontSize: fs.sm,
     fontWeight: '700',
   },
   monthlyDivider: {
@@ -1573,26 +1574,26 @@ const styles = StyleSheet.create({
   statTile: {
     flex: 1,
     minWidth: '45%',
-    padding: 16,
-    borderRadius: 20,
+    padding: screen.isSmall ? 12 : 16,
+    borderRadius: r.xl,
     alignItems: 'center' as const,
     overflow: 'hidden' as const,
   },
   statTileIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
+    width: 32,
+    height: 32,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   statTileValue: {
-    fontSize: 20,
+    fontSize: screen.isSmall ? fs.xl : fs.h3,
     fontWeight: '800',
     marginBottom: 2,
   },
   statTileLabel: {
-    fontSize: 11,
+    fontSize: fs.xs,
     fontWeight: '600',
     textAlign: 'center',
   },

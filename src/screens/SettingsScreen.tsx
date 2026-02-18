@@ -34,6 +34,7 @@ import { AppSettings, SecurityLockTimeout } from '../models/Types';
 import { commonStyles } from '../themes/AppTheme';
 import DoodleBackground from '../components/DoodleBackground';
 import { useNavigation } from '@react-navigation/native';
+import { tabBar as tabBarDims, fontSize as fs, spacing as sp, radius as r, screen } from '../themes/Responsive';
 
 const SettingsScreen: React.FC = () => {
   const theme = useTheme();
@@ -706,54 +707,54 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   sectionCard: {
-    margin: 16,
-    borderRadius: 24,
+    margin: sp.base,
+    borderRadius: r.xxl,
     ...commonStyles.shadow,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: screen.isSmall ? fs.xl : fs.xxl,
     fontWeight: '800',
-    marginBottom: 8,
+    marginBottom: 6,
     letterSpacing: -0.5,
   },
   divider: {
-    marginVertical: commonStyles.spacing.sm,
+    marginVertical: sp.sm,
   },
   securityNote: {
-    fontSize: 12,
+    fontSize: fs.xs,
     opacity: 0.7,
-    marginTop: commonStyles.spacing.xs,
-    marginLeft: 56, // Align with list item content
+    marginTop: sp.xs,
+    marginLeft: 56,
   },
   aboutText: {
-    fontSize: 14,
+    fontSize: fs.sm,
     opacity: 0.8,
-    marginTop: commonStyles.spacing.sm,
+    marginTop: sp.sm,
     lineHeight: 20,
   },
   warningText: {
     fontWeight: '500',
-    marginTop: commonStyles.spacing.sm,
+    marginTop: sp.sm,
   },
   exportScrollArea: {
     maxHeight: 300,
   },
   exportTextInput: {
     fontFamily: 'Courier',
-    fontSize: 12,
+    fontSize: fs.xs,
   },
   sectionDescription: {
-    fontSize: 14,
-    marginBottom: 16,
+    fontSize: fs.sm,
+    marginBottom: sp.base,
   },
   themeSelector: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 8,
+    gap: 6,
   },
   themeButton: {
     flex: 1,
-    borderRadius: 12,
+    borderRadius: r.md,
   },
 });
 

@@ -24,6 +24,7 @@ import { useNavigation, useIsFocused } from '@react-navigation/native';
 import { notesManager } from '../managers/NotesManager';
 import { Note } from '../models/Types';
 import DoodleBackground from '../components/DoodleBackground';
+import { tabBar as tabBarDims, fontSize as fs, spacing as sp, radius as r, screen } from '../themes/Responsive';
 
 const { width } = Dimensions.get('window');
 const cardWidth = (width - 48) / 2; // 2 columns with padding
@@ -246,17 +247,17 @@ const NotesScreen: React.FC = () => {
       flex: 1,
     },
     notesGrid: {
-      padding: 16,
+      padding: sp.base,
     },
     noteRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      marginBottom: 16,
+      marginBottom: sp.base,
     },
     noteCard: {
-      minHeight: 140,
+      minHeight: screen.isSmall ? 120 : 140,
       backgroundColor: theme.colors.surface,
-      borderRadius: 12,
+      borderRadius: r.lg,
       elevation: 2,
       shadowColor: theme.colors.shadow,
       shadowOffset: { width: 0, height: 1 },
@@ -265,13 +266,13 @@ const NotesScreen: React.FC = () => {
     },
     cardContent: {
       flex: 1,
-      padding: 16,
+      padding: sp.md,
     },
     noteHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: 12,
+      marginBottom: sp.sm,
     },
     numberBadge: {
       width: 20,
@@ -283,31 +284,31 @@ const NotesScreen: React.FC = () => {
     },
     numberText: {
       color: theme.colors.onPrimary,
-      fontSize: 10,
+      fontSize: fs.xs,
       fontWeight: 'bold',
     },
     dateText: {
-      fontSize: 10,
+      fontSize: fs.xs,
       color: theme.colors.onSurfaceVariant,
     },
     noteTitle: {
-      fontSize: 16,
+      fontSize: fs.base,
       fontWeight: '600',
-      marginBottom: 8,
+      marginBottom: 6,
       lineHeight: 20,
       color: theme.colors.onSurface,
     },
     noteContent: {
-      fontSize: 14,
+      fontSize: fs.sm,
       color: theme.colors.onSurfaceVariant,
       lineHeight: 18,
-      marginBottom: 8,
+      marginBottom: 6,
     },
     noContent: {
-      fontSize: 14,
+      fontSize: fs.sm,
       color: theme.colors.onSurfaceVariant,
       fontStyle: 'italic',
-      marginBottom: 8,
+      marginBottom: 6,
     },
     spacer: {
       flex: 1,
@@ -316,43 +317,43 @@ const NotesScreen: React.FC = () => {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginTop: 8,
+      marginTop: 6,
     },
     editButtonText: {
-      fontSize: 12,
+      fontSize: fs.xs,
       color: theme.colors.primary,
     },
     emptyState: {
       flex: 1,
       justifyContent: 'center',
       alignItems: 'center',
-      padding: 40,
+      padding: screen.isSmall ? 28 : 40,
       minHeight: 400,
     },
     emptyTitle: {
-      fontSize: 24,
+      fontSize: screen.isSmall ? fs.xxl : fs.h2,
       fontWeight: 'bold',
-      marginTop: 30,
-      marginBottom: 16,
+      marginTop: 24,
+      marginBottom: sp.base,
       textAlign: 'center',
       color: theme.colors.onBackground,
     },
     emptyText: {
-      fontSize: 16,
+      fontSize: fs.base,
       color: theme.colors.onSurfaceVariant,
       textAlign: 'center',
-      lineHeight: 24,
-      marginBottom: 30,
-      paddingHorizontal: 20,
+      lineHeight: 22,
+      marginBottom: 24,
+      paddingHorizontal: 16,
     },
     addFirstNoteButton: {
-      paddingHorizontal: 20,
+      paddingHorizontal: sp.xl,
     },
     fab: {
       position: 'absolute',
-      margin: 16,
+      margin: screen.isSmall ? 12 : 16,
       right: 0,
-      bottom: 120,
+      bottom: tabBarDims.height + tabBarDims.bottomOffset + 10,
       backgroundColor: theme.colors.primary,
     },
   });

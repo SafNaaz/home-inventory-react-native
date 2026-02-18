@@ -8,6 +8,7 @@ import {
   Platform,
   UIManager,
   ActivityIndicator,
+  KeyboardAvoidingView,
 } from 'react-native';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -38,6 +39,7 @@ import { ShoppingListItem, ShoppingState, InventoryItem, InventoryCategory } fro
 import { getCategoryConfig, getSubcategoryConfig } from '../constants/CategoryConfig';
 import { commonStyles, getCategoryColor } from '../themes/AppTheme';
 import DoodleBackground from '../components/DoodleBackground';
+import { tabBar as tabBarDims, fontSize as fs, spacing as sp, radius as r, screen } from '../themes/Responsive';
 
 const ShoppingScreen: React.FC = () => {
   const theme = useTheme();
@@ -64,6 +66,7 @@ const ShoppingScreen: React.FC = () => {
   const [filteredAllItems, setFilteredAllItems] = useState<InventoryItem[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [isSearchingItems, setIsSearchingItems] = useState(false);
+  const [helpVisible, setHelpVisible] = useState(false);
 
   useEffect(() => {
     // Load initial data
@@ -309,7 +312,6 @@ const ShoppingScreen: React.FC = () => {
         ]}
         titleStyle={[
           item.isChecked && { 
-            textDecorationLine: 'line-through',
             color: theme.colors.onSurfaceDisabled || theme.colors.onSurfaceVariant 
           },
         ]}
@@ -410,11 +412,23 @@ const ShoppingScreen: React.FC = () => {
       <DoodleBackground />
       <Card style={[styles.statusCard, { backgroundColor: theme.colors.surface }]} mode="elevated">
         <Card.Content>
-          <View style={styles.statusHeader}>
-            <Icon name="cart-plus" size={24} color={theme.colors.primary} />
-            <Text style={[styles.statusTitle, { color: theme.colors.onSurface }]}>Editing Shopping List</Text>
+          <View style={[styles.statusHeader, { justifyContent: 'space-between' }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Icon name="cart-plus" size={24} color={theme.colors.primary} />
+              <Text style={[styles.statusTitle, { color: theme.colors.onSurface }]}>Editing Shopping List</Text>
+            </View>
+            <IconButton 
+              icon={helpVisible ? "chevron-up" : "information-outline"} 
+              size={20} 
+              onPress={() => {
+                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                setHelpVisible(!helpVisible);
+              }}
+            />
           </View>
-          <Text style={{ color: theme.colors.onSurfaceVariant }}>{getStateDescription()}</Text>
+          {helpVisible && (
+            <Text style={{ color: theme.colors.onSurfaceVariant, marginTop: 8 }}>{getStateDescription()}</Text>
+          )}
         </Card.Content>
       </Card>
 
@@ -494,11 +508,23 @@ const ShoppingScreen: React.FC = () => {
       <DoodleBackground />
       <Card style={[styles.statusCard, { backgroundColor: theme.colors.surface }]} mode="elevated">
         <Card.Content>
-          <View style={styles.statusHeader}>
-            <Icon name="clipboard-list" size={24} color={theme.colors.primary} />
-            <Text style={[styles.statusTitle, { color: theme.colors.onSurface }]}>Shopping List Ready</Text>
+          <View style={[styles.statusHeader, { justifyContent: 'space-between' }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Icon name="clipboard-list" size={24} color={theme.colors.primary} />
+              <Text style={[styles.statusTitle, { color: theme.colors.onSurface }]}>Shopping List Ready</Text>
+            </View>
+            <IconButton 
+              icon={helpVisible ? "chevron-up" : "information-outline"} 
+              size={20} 
+              onPress={() => {
+                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                setHelpVisible(!helpVisible);
+              }}
+            />
           </View>
-          <Text style={{ color: theme.colors.onSurfaceVariant }}>{getStateDescription()}</Text>
+          {helpVisible && (
+            <Text style={{ color: theme.colors.onSurfaceVariant, marginTop: 8 }}>{getStateDescription()}</Text>
+          )}
         </Card.Content>
       </Card>
 
@@ -549,11 +575,23 @@ const ShoppingScreen: React.FC = () => {
         <DoodleBackground />
         <Card style={[styles.statusCard, { backgroundColor: theme.colors.surface }]} mode="elevated">
           <Card.Content>
-            <View style={styles.statusHeader}>
-              <Icon name="cart" size={24} color={theme.colors.primary} />
-              <Text style={[styles.statusTitle, { color: theme.colors.onSurface }]}>Shopping in Progress</Text>
+            <View style={[styles.statusHeader, { justifyContent: 'space-between' }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Icon name="cart" size={24} color={theme.colors.primary} />
+                <Text style={[styles.statusTitle, { color: theme.colors.onSurface }]}>Shopping in Progress</Text>
+              </View>
+              <IconButton 
+                icon={helpVisible ? "chevron-up" : "information-outline"} 
+                size={20} 
+                onPress={() => {
+                   LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                   setHelpVisible(!helpVisible);
+                }}
+              />
             </View>
-            <Text style={{ color: theme.colors.onSurfaceVariant }}>{getStateDescription()}</Text>
+            {helpVisible && (
+               <Text style={{ color: theme.colors.onSurfaceVariant, marginTop: 8 }}>{getStateDescription()}</Text>
+            )}
             <View style={styles.progressInfo}>
               <Text style={{ color: theme.colors.onSurface, fontWeight: '600' }}>
                 Progress: {checkedItems.length} of {shoppingList.length} items
@@ -736,45 +774,47 @@ const ShoppingScreen: React.FC = () => {
       <Portal>
         <Dialog visible={searchItemsDialogVisible} onDismiss={() => setSearchItemsDialogVisible(false)} style={{ maxHeight: '80%' }}>
           <Dialog.Content>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-              <Title>Search & Add Item</Title>
-              <IconButton icon="close" size={24} onPress={() => setSearchItemsDialogVisible(false)} />
-            </View>
-            <TextInput
-              label="Search items..."
-              value={itemSearchQuery}
-              onChangeText={(text) => {
-                setItemSearchQuery(text);
-                if (text.trim().length > 0) {
-                  setIsSearchingItems(true);
-                }
-              }}
-              mode="outlined"
-              style={{ marginBottom: 8 }}
-              right={<TextInput.Icon icon="magnify" />}
-              autoFocus
-            />
-            <ScrollView style={{ maxHeight: 300 }} keyboardShouldPersistTaps="handled">
-              {isSearchingItems ? (
-                <View style={{ padding: 20, alignItems: 'center' }}>
-                  <ActivityIndicator size="small" color={theme.colors.primary} />
-                </View>
-              ) : filteredAllItems.length > 0 ? (
-                filteredAllItems.map(item => (
-                  <List.Item
-                    key={item.id}
-                    title={item.name}
-                    description={`${item.subcategory} • ${Math.round(item.quantity * 100)}% stock`}
-                    onPress={() => handleAddAnyItem(item)}
-                    right={() => <IconButton icon="plus-circle-outline" />}
-                  />
-                ))
-              ) : (
-                <Text style={{ textAlign: 'center', marginTop: 16, color: theme.colors.onSurfaceVariant }}>
-                  No items found
-                </Text>
-              )}
-            </ScrollView>
+            <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{maxHeight:'100%'}}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                <Title>Search & Add Item</Title>
+                <IconButton icon="close" size={24} onPress={() => setSearchItemsDialogVisible(false)} />
+              </View>
+              <TextInput
+                label="Search items..."
+                value={itemSearchQuery}
+                onChangeText={(text) => {
+                  setItemSearchQuery(text);
+                  if (text.trim().length > 0) {
+                    setIsSearchingItems(true);
+                  }
+                }}
+                mode="outlined"
+                style={{ marginBottom: 8 }}
+                right={<TextInput.Icon icon="magnify" />}
+                autoFocus
+              />
+              <ScrollView style={{ maxHeight: 300, flexShrink: 1 }} keyboardShouldPersistTaps="handled">
+                {isSearchingItems ? (
+                  <View style={{ padding: 20, alignItems: 'center' }}>
+                    <ActivityIndicator size="small" color={theme.colors.primary} />
+                  </View>
+                ) : filteredAllItems.length > 0 ? (
+                  filteredAllItems.map(item => (
+                    <List.Item
+                      key={item.id}
+                      title={item.name}
+                      description={`${item.subcategory} • ${Math.round(item.quantity * 100)}% stock`}
+                      onPress={() => handleAddAnyItem(item)}
+                      right={() => <IconButton icon="plus-circle-outline" />}
+                    />
+                  ))
+                ) : (
+                  <Text style={{ textAlign: 'center', marginTop: 16, color: theme.colors.onSurfaceVariant }}>
+                    No items found
+                  </Text>
+                )}
+              </ScrollView>
+            </KeyboardAvoidingView>
           </Dialog.Content>
           {/* Actions removed as Close is now in header */}
         </Dialog>
@@ -906,119 +946,119 @@ const ShoppingScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingBottom: 85, // Space for floating tab bar
+    paddingBottom: tabBarDims.height + tabBarDims.bottomOffset,
   },
   statusCard: {
-    margin: 16,
-    borderRadius: 24,
+    margin: sp.base,
+    borderRadius: r.xxl,
     ...commonStyles.shadow,
     elevation: 3,
   },
   statusHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   statusTitle: {
-    marginLeft: 12,
-    fontSize: 20,
+    marginLeft: sp.sm,
+    fontSize: screen.isSmall ? fs.xl : fs.xxl,
     fontWeight: '800',
   },
   progressInfo: {
-    marginTop: 12,
-    padding: 12,
+    marginTop: sp.sm,
+    padding: sp.sm,
     backgroundColor: 'rgba(99, 102, 241, 0.1)',
-    borderRadius: 12,
+    borderRadius: r.md,
   },
   scrollView: {
     flex: 1,
   },
   listCard: {
-    margin: 16,
+    margin: sp.base,
     marginTop: 0,
-    borderRadius: 24,
+    borderRadius: r.xxl,
     ...commonStyles.shadow,
   },
   listItem: {
     paddingVertical: 0,
-    borderRadius: 8,
+    borderRadius: r.sm,
     marginVertical: 0,
   },
   // removed checkedItem and checkedText as we handle them inline for theme support
   actionButtons: {
-    padding: 16,
-    paddingTop: 8,
-    gap: 12,
+    padding: sp.base,
+    paddingTop: sp.sm,
+    gap: sp.sm,
     backgroundColor: 'transparent',
   },
   mainActionButton: {
-    borderRadius: 16,
+    borderRadius: r.lg,
     elevation: 2,
   },
   actionButtonContent: {
-    paddingVertical: 6,
+    paddingVertical: screen.isSmall ? 4 : 6,
   },
   secondaryActions: {
     flexDirection: 'row',
-    gap: 12,
+    gap: sp.sm,
   },
   secondaryActionButton: {
     flex: 1,
-    borderRadius: 16,
+    borderRadius: r.lg,
   },
   secondaryActionButtonFull: {
     width: '100%',
-    borderRadius: 16,
+    borderRadius: r.lg,
   },
   fab: {
     position: 'absolute',
-    margin: 20,
+    margin: screen.isSmall ? 12 : 16,
     right: 0,
-    bottom: 200, // Above tab bar and action buttons
+    bottom: tabBarDims.height + tabBarDims.bottomOffset + 60,
     borderRadius: 28,
   },
   emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
-    paddingBottom: 120,
+    padding: screen.isSmall ? 24 : 32,
+    paddingBottom: 100,
   },
   emptyTitle: {
-    marginTop: 16,
+    marginTop: sp.base,
     textAlign: 'center',
     fontWeight: '800',
-    fontSize: 24,
+    fontSize: screen.isSmall ? fs.xxl : fs.h2,
   },
   emptyText: {
     textAlign: 'center',
     opacity: 0.7,
-    marginTop: 8,
-    marginBottom: 24,
-    fontSize: 16,
-    lineHeight: 24,
+    marginTop: 6,
+    marginBottom: sp.xl,
+    fontSize: fs.base,
+    lineHeight: 22,
   },
   generateButton: {
-    marginTop: 16,
-    borderRadius: 16,
-    paddingHorizontal: 24,
+    marginTop: sp.base,
+    borderRadius: r.lg,
+    paddingHorizontal: sp.xl,
   },
   emptyListState: {
-    padding: 32,
+    padding: sp.xl,
     alignItems: 'center',
   },
   suggestions: {
-    marginTop: 16,
+    marginTop: sp.base,
   },
   suggestionsTitle: {
-    fontSize: 14,
-    marginBottom: 8,
+    fontSize: fs.sm,
+    marginBottom: 6,
     opacity: 0.7,
     fontWeight: '600',
   },
   suggestionChip: {
-    marginRight: 8,
-    borderRadius: 12,
+    marginRight: 6,
+    borderRadius: r.md,
     borderWidth: 1,
   },
   categoryGroup: {
@@ -1027,12 +1067,12 @@ const styles = StyleSheet.create({
   categoryHeader: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingHorizontal: 8,
-      paddingVertical: 8,
-      marginTop: 8,
+      paddingHorizontal: sp.sm,
+      paddingVertical: 6,
+      marginTop: 6,
   },
   categoryTitle: {
-      fontSize: 14,
+      fontSize: fs.sm,
       fontWeight: '700',
       letterSpacing: 0.5,
   },

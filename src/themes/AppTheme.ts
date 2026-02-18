@@ -113,12 +113,13 @@ declare global {
 // MARK: - Helper Functions
 export const getStockColor = (quantity: number, isDark: boolean = false) => {
   const theme = isDark ? darkTheme : lightTheme;
+  const percentage = Math.round(quantity * 100);
   
-  if (quantity <= 0) {
+  if (percentage <= 0) {
     return theme.colors.outOfStock;
-  } else if (quantity <= 0.25) {
+  } else if (percentage <= 25) {
     return theme.colors.lowStock;
-  } else if (quantity <= 0.5) {
+  } else if (percentage < 50) {
     return theme.colors.mediumStock;
   } else {
     return theme.colors.highStock;

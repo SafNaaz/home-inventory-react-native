@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
-import { View, StyleSheet, ScrollView, BackHandler, KeyboardAvoidingView, Platform, TouchableOpacity, Dimensions, Animated, TextInput as RNTextInput, Keyboard } from 'react-native';
+import { View, StyleSheet, ScrollView, BackHandler, KeyboardAvoidingView, Platform, TouchableOpacity, Dimensions, Animated, TextInput as RNTextInput, Keyboard, Alert } from 'react-native';
 import { useTheme, Button, IconButton, Text, Portal, Dialog } from 'react-native-paper';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -161,6 +161,8 @@ const NoteDetailScreen: React.FC = () => {
   const scrollTimeout = useRef<any>(null);
   const lineYPositions = useRef<Record<number, number>>({});
   const pendingFocusRef = useRef<number | null>(null);
+  const [unsavedDialogVisible, setUnsavedDialogVisible] = useState(false);
+  const pendingActionRef = useRef<any>(null); // For storing navigation action or callback
 
   // Refs to avoid stale closures in effects that shouldn't re-run on every keystroke
   const contentRef = useRef(content);
@@ -282,6 +284,20 @@ const NoteDetailScreen: React.FC = () => {
 
   // Back that reads from refs — isNewRef ensures we always have the latest value
   const handleBackViaRef = useCallback(async () => {
+    // Check for unsaved changes first (Custom Dialog)
+    const currentTitle = titleRef.current || '';
+    const currentContent = typeof contentRef.current === 'string' ? contentRef.current : '';
+    const originalTitle = noteRef.current?.title || '';
+    const originalContent = typeof noteRef.current?.content === 'string' ? noteRef.current?.content : '';
+    
+    const isDirty = (currentTitle !== originalTitle || currentContent !== originalContent) && !isViewModeRef.current;
+
+    if (isDirty) {
+      pendingActionRef.current = { type: 'hardware_back' };
+      setUnsavedDialogVisible(true);
+      return;
+    }
+
     if (isNewRef.current) {
       await notesManager.deleteNote(noteId);
       navigation.goBack();
@@ -296,6 +312,77 @@ const NoteDetailScreen: React.FC = () => {
       navigation.goBack();
     }
   }, [noteId]);
+
+  // Intercept Swipe Back / Header Back
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e: any) => {
+      if (isViewModeRef.current) return;
+      
+      const currentTitle = titleRef.current || '';
+      const currentContent = typeof contentRef.current === 'string' ? contentRef.current : '';
+      const originalTitle = noteRef.current?.title || '';
+      const originalContent = typeof noteRef.current?.content === 'string' ? noteRef.current?.content : '';
+      const isDirty = currentTitle !== originalTitle || currentContent !== originalContent;
+
+      if (!isDirty) {
+        if (isNewRef.current) {
+             // Cleanup if needed, usually handled by nav action if not prevented
+        }
+        return;
+      }
+
+      e.preventDefault();
+      
+      pendingActionRef.current = { type: 'navigation', action: e.data.action };
+      setUnsavedDialogVisible(true);
+    });
+
+    return unsubscribe;
+  }, [navigation, noteId]);
+
+  const handleUnsavedDiscard = async () => {
+    setUnsavedDialogVisible(false);
+    const action = pendingActionRef.current;
+    
+    if (isNewRef.current) {
+      await notesManager.deleteNote(noteId);
+    } else {
+      // Revert changes
+      const n = noteRef.current;
+      if (n) {
+        setTitle(n.title || '');
+        setContent(n.content || '');
+      }
+    }
+
+    if (action?.type === 'navigation') {
+      navigation.dispatch(action.action);
+    } else if (action?.type === 'hardware_back') {
+       if (isNewRef.current) {
+         navigation.goBack();
+       } else {
+         setIsViewMode(true);
+       }
+    }
+    pendingActionRef.current = null;
+  };
+
+  const handleUnsavedSave = async () => {
+    setUnsavedDialogVisible(false);
+    await handleSaveFromRef();
+    const action = pendingActionRef.current;
+
+    if (action?.type === 'navigation') {
+      navigation.dispatch(action.action);
+    } else if (action?.type === 'hardware_back') {
+       // Save already sets view mode to true.
+       if (isNewRef.current) {
+         navigation.goBack();
+       } 
+       // If existing note, handleSaveFromRef switches to ViewMode, which is what we want.
+    }
+    pendingActionRef.current = null;
+  };
 
   const handleDelete = useCallback(async () => {
     await notesManager.deleteNote(noteId);
@@ -535,6 +622,18 @@ const NoteDetailScreen: React.FC = () => {
           <Dialog.Actions>
             <Button onPress={() => setDeleteConfirmVisible(false)}>No</Button>
             <Button onPress={handleDelete} textColor={theme.colors.error}>Yes, Delete</Button>
+          </Dialog.Actions>
+        </Dialog>
+
+        <Dialog visible={unsavedDialogVisible} onDismiss={() => setUnsavedDialogVisible(false)}>
+          <Dialog.Title>Unsaved Changes</Dialog.Title>
+          <Dialog.Content>
+            <Text variant="bodyMedium">You have unsaved changes. Do you want to save them before leaving?</Text>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setUnsavedDialogVisible(false)}>Cancel</Button>
+            <Button onPress={handleUnsavedDiscard} textColor={theme.colors.error}>Discard</Button>
+            <Button onPress={handleUnsavedSave}>Save & Exit</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>

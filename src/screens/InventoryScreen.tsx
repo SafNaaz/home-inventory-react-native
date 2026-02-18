@@ -51,6 +51,7 @@ import { InventoryItem, InventoryCategory, InventorySubcategory, ShoppingState }
 import { CATEGORY_CONFIG, SUBCATEGORY_CONFIG, getAllCategories, getCategoryConfig, getSubcategoryConfig } from '../constants/CategoryConfig';
 import { getStockColor, getCategoryColor, commonStyles } from '../themes/AppTheme';
 import DoodleBackground from '../components/DoodleBackground';
+import { tabBar as tabBarDims, fontSize as fs, spacing as sp, radius as r, iconSize as is, card as cardDims, fab as fabDims, screen } from '../themes/Responsive';
 
 const { width, height } = Dimensions.get('window');
 const styles = StyleSheet.create({
@@ -62,28 +63,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: sp.base,
+    paddingVertical: sp.sm,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: fs.lg,
+    fontWeight: '700',
   },
   statsHeader: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    padding: 16,
-    marginBottom: 16,
+    paddingHorizontal: sp.base,
+    paddingVertical: sp.md,
+    marginBottom: sp.sm,
   },
   statItem: {
     alignItems: 'center',
   },
   statLabel: {
-    fontSize: 12,
-    marginBottom: 4,
+    fontSize: fs.sm,
+    marginBottom: 3,
   },
   statValue: {
-    fontSize: 22,
+    fontSize: fs.h3,
     fontWeight: '800',
     letterSpacing: -0.5,
   },
@@ -91,47 +93,47 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   categoriesGrid: {
-    padding: 16,
+    padding: sp.base,
   },
   categoryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: sp.base,
   },
   categoryCard: {
-    minHeight: 180,
-    borderRadius: 32,
+    minHeight: cardDims.categoryMinHeight,
+    borderRadius: cardDims.borderRadius,
     ...commonStyles.shadow,
   },
   categoryCardContent: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 16,
+    padding: cardDims.padding,
   },
   categoryIcon: {
-    marginBottom: 16,
+    marginBottom: sp.sm,
   },
   categoryTitle: {
-    fontSize: 16,
+    fontSize: fs.base,
     fontWeight: 'bold',
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   categoryStats: {
     alignItems: 'center',
   },
   categoryStatsText: {
-    fontSize: 12,
+    fontSize: fs.xs,
     marginBottom: 2,
   },
   subcategoriesList: {
-    padding: 16,
+    padding: sp.base,
   },
   subcategoryCard: {
-    marginVertical: 8,
+    marginVertical: 6,
     marginHorizontal: 4,
-    borderRadius: 24,
+    borderRadius: r.xl,
     ...commonStyles.shadow,
   },
   addSubCard: {
@@ -143,45 +145,45 @@ const styles = StyleSheet.create({
   subcategoryContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    padding: sp.md,
   },
   iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: sp.md,
   },
   subcategoryInfo: {
     flex: 1,
   },
   subcategoryTitle: {
-    fontSize: 16,
+    fontSize: fs.base,
     fontWeight: '600',
-    marginBottom: 4,
+    marginBottom: 3,
   },
   subcategoryStats: {
-    fontSize: 12,
+    fontSize: fs.sm,
     marginBottom: 2,
   },
   itemsList: {
-    padding: 16,
+    padding: sp.base,
   },
   itemCard: {
-    marginVertical: 8,
+    marginVertical: 6,
     marginHorizontal: 4,
-    borderRadius: 24,
+    borderRadius: r.xl,
     ...commonStyles.shadow,
   },
   itemHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: sp.sm,
   },
   itemTitle: {
-    fontSize: 16,
+    fontSize: fs.base,
     fontWeight: '600',
     flex: 1,
   },
@@ -190,108 +192,108 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   itemPercentage: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginLeft: 8,
+    fontSize: fs.md,
+    fontWeight: '700',
+    marginLeft: 6,
   },
   stockSliderContainer: {
-    marginBottom: 8,
+    marginBottom: 6,
   },
   stockLabel: {
-    fontSize: 12,
-    marginBottom: 8,
+    fontSize: fs.sm,
+    marginBottom: 6,
   },
   stockControls: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   stockValue: {
-    fontSize: 14,
+    fontSize: fs.md,
     fontWeight: '600',
-    marginRight: 12,
-    minWidth: 40,
+    marginRight: sp.sm,
+    minWidth: 36,
   },
   sliderContainer: {
     flex: 1,
-    height: 40,
+    height: 36,
     justifyContent: 'center',
   },
   sliderTrack: {
-    height: 12, // Slightly thicker
-    borderRadius: 6,
+    height: 10,
+    borderRadius: 5,
     position: 'relative',
-    borderWidth: 1, // Added border for visibility
+    borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.05)',
   },
   sliderProgress: {
-    height: 12,
-    borderRadius: 6,
+    height: 10,
+    borderRadius: 5,
     position: 'absolute',
     left: 0,
-    top: -1, // Adjust for border
+    top: -1,
   },
   sliderThumb: {
-    width: 28, // Slightly larger
-    height: 28,
-    borderRadius: 14,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     position: 'absolute',
     top: -9,
-    marginLeft: -14,
+    marginLeft: -13,
     ...commonStyles.shadow,
-    borderWidth: 3,
+    borderWidth: 2,
     borderColor: '#fff',
     elevation: 4,
   },
   progressContainer: {
     flex: 1,
-    marginHorizontal: 8,
+    marginHorizontal: 6,
   },
   progressBar: {
-    height: 6,
+    height: 5,
     borderRadius: 3,
   },
   lowStockWarning: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 6,
   },
   lowStockText: {
-    fontSize: 12,
+    fontSize: fs.sm,
     marginLeft: 4,
   },
-  // New compact styles
+  // Compact item styles
   compactItemContent: {
-    paddingVertical: 16,
-    paddingHorizontal: 20,
+    paddingVertical: sp.md,
+    paddingHorizontal: sp.base,
   },
   itemHeaderCompact: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   stockControlsCompact: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 4,
   },
   quantityButton: {
     margin: 0,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
   },
   sliderWrapper: {
     flex: 1,
-    marginHorizontal: 4,
+    marginHorizontal: 2,
   },
   lowStockWarningCompact: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 6,
+    marginTop: 4,
   },
   lowStockTextCompact: {
-    fontSize: 11,
+    fontSize: fs.xs,
     marginLeft: 4,
   },
   // Swipe action styles
@@ -299,26 +301,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     width: 80,
-    marginVertical: 8,
-    // Add margin to match card indentation so it blends
+    marginVertical: 6,
   },
   deleteAction: {
     backgroundColor: '#FF3B30',
-    borderTopRightRadius: 24,
-    borderBottomRightRadius: 24,
+    borderTopRightRadius: r.xl,
+    borderBottomRightRadius: r.xl,
     marginRight: 4,
-    marginLeft: -20, // Overlap with card to hide gap
-    paddingLeft: 20, // Center icon
-    width: 100, // 80 visible + 20 overlap
+    marginLeft: -20,
+    paddingLeft: 20,
+    width: 100,
   },
   editAction: {
     backgroundColor: '#007AFF',
-    borderTopLeftRadius: 24,
-    borderBottomLeftRadius: 24,
+    borderTopLeftRadius: r.xl,
+    borderBottomLeftRadius: r.xl,
     marginLeft: 4,
-    marginRight: -20, // Overlap with card
-    paddingRight: 20, // Center icon
-    width: 100, // 80 visible + 20 overlap
+    marginRight: -20,
+    paddingRight: 20,
+    width: 100,
   },
   swipeActionButton: {
     flex: 1,
@@ -328,30 +329,29 @@ const styles = StyleSheet.create({
   },
   swipeActionText: {
     color: '#fff',
-    fontSize: 12,
+    fontSize: fs.xs,
     fontWeight: '600',
-    marginTop: 4,
+    marginTop: 3,
   },
   fab: {
     position: 'absolute',
-    margin: 20,
+    margin: fabDims.margin,
     right: 0,
-    bottom: 120,
+    bottom: tabBarDims.height + tabBarDims.bottomOffset + 10,
     borderRadius: 28,
   },
   searchBar: {
-    borderRadius: 16,
-    backgroundColor: '#fff', 
-    // Removed fixed height to allow auto-sizing and better alignment
+    borderRadius: r.lg,
+    backgroundColor: '#fff',
   },
   searchPlaceholder: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    height: 56,
-    borderRadius: 16,
+    paddingHorizontal: sp.base,
+    height: 52,
+    borderRadius: r.lg,
     ...commonStyles.shadow,
-    elevation: 2, // Low elevation for the static placeholder
+    elevation: 2,
   },
 });
 const cardWidth = (width - 48) / 2; // 2 columns with padding
@@ -1070,7 +1070,7 @@ const InventoryScreen: React.FC = () => {
         <Card.Content style={styles.categoryCardContent}>
           <Icon
             name={config.icon as any}
-            size={48}
+            size={screen.isSmall ? 36 : screen.isMedium ? 40 : 44}
             color={config.color}
             style={styles.categoryIcon}
           />
@@ -1086,9 +1086,9 @@ const InventoryScreen: React.FC = () => {
             </Text>
           </View>
           {lowStockCount > 0 && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
-              <Icon name="alert-circle" size={16} color={theme.colors.error} />
-              <Text style={{ marginLeft: 4, fontSize: 12, color: theme.colors.error, fontWeight: '600' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 5 }}>
+              <Icon name="alert-circle" size={14} color={theme.colors.error} />
+              <Text style={{ marginLeft: 3, fontSize: fs.xs, color: theme.colors.error, fontWeight: '600' }}>
                 {lowStockCount} need restock
               </Text>
             </View>
@@ -1750,7 +1750,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
         {/* Search FAB - always visible, positioned above shopping FAB */}
         <FAB
           icon="magnify"
-          style={[styles.fab, { backgroundColor: theme.colors.surface, bottom: 190, zIndex: 90 }]}
+          style={[styles.fab, { backgroundColor: theme.colors.surface, bottom: tabBarDims.height + tabBarDims.bottomOffset + 68, zIndex: 90 }]}
           color={theme.colors.onSurface}
           onPress={openSearch}
           small

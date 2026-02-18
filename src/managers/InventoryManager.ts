@@ -560,6 +560,13 @@ export class InventoryManager {
           inventoryItem.quantity = 1.0;
           inventoryItem.purchaseHistory.push(new Date());
           inventoryItem.lastUpdated = new Date();
+          
+          // Un-hide if it was hidden, since it's now freshly stocked
+          if (inventoryItem.isIgnored) {
+            inventoryItem.isIgnored = false;
+            console.log(`👁️ Un-ignored ${inventoryItem.name} as it was restocked`);
+          }
+
           console.log(`🔄 Restored ${inventoryItem.name} to 100%`);
         }
       }
