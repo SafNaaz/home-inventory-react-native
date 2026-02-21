@@ -31,6 +31,12 @@ import { notesManager } from './src/managers/NotesManager';
 // Themes
 import { lightTheme, darkTheme, commonStyles } from './src/themes/AppTheme';
 import * as Notifications from 'expo-notifications';
+import * as ExpoSplashScreen from 'expo-splash-screen';
+
+// Keep the native splash screen visible while we fetch resources
+ExpoSplashScreen.preventAutoHideAsync().catch(() => {
+  /* reloading app might cause error here, ignore */
+});
 
 export const SwipeContext = React.createContext({
   swipeEnabled: true,

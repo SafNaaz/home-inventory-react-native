@@ -50,6 +50,34 @@ import { inventoryManager } from '../managers/InventoryManager';
 import { InventoryItem, InventoryCategory, InventorySubcategory, ShoppingState } from '../models/Types';
 import { CATEGORY_CONFIG, SUBCATEGORY_CONFIG, getAllCategories, getCategoryConfig, getSubcategoryConfig } from '../constants/CategoryConfig';
 import { getStockColor, getCategoryColor, commonStyles } from '../themes/AppTheme';
+
+// Theme-based icon shades: slight variation per category type
+const getCategoryIconColor = (category: string, isDark: boolean): string => {
+  const cat = category.toLowerCase();
+  if (isDark) {
+    switch (cat) {
+      case 'fridge': return '#FFFFFF';
+      case 'grocery': return '#D4D4D4';
+      case 'hygiene': return '#BABABA';
+      case 'personal care': case 'personalcare': return '#A0A0A0';
+      default: return '#CCCCCC';
+    }
+  } else {
+    switch (cat) {
+      case 'fridge': return '#1A1A1A';
+      case 'grocery': return '#333333';
+      case 'hygiene': return '#4D4D4D';
+      case 'personal care': case 'personalcare': return '#666666';
+      default: return '#444444';
+    }
+  }
+};
+
+// Get icon shade for a subcategory based on its parent category
+const getSubcategoryIconColor = (config: any, isDark: boolean): string => {
+  if (!config?.category) return isDark ? '#CCCCCC' : '#444444';
+  return getCategoryIconColor(config.category, isDark);
+};
 import DoodleBackground from '../components/DoodleBackground';
 import { SwipeContext } from '../../App';
 import { tabBar as tabBarDims, fontSize as fs, spacing as sp, radius as r, iconSize as is, card as cardDims, fab as fabDims, screen } from '../themes/Responsive';
@@ -242,7 +270,6 @@ const styles = StyleSheet.create({
     marginLeft: -13,
     ...commonStyles.shadow,
     borderWidth: 2,
-    borderColor: '#fff',
     elevation: 4,
   },
   progressContainer: {
@@ -391,7 +418,8 @@ const SliderControl: React.FC<{
   trackColor: string;
   progressColor: string;
   thumbColor: string;
-}> = ({ initialValue, onComplete, trackColor, progressColor, thumbColor }) => {
+  thumbBorderColor: string;
+}> = ({ initialValue, onComplete, trackColor, progressColor, thumbColor, thumbBorderColor }) => {
   const [value, setValue] = useState<number>(initialValue);
   const [dragging, setDragging] = useState(false);
   const trackWidth = useRef<number>(200);
@@ -451,7 +479,7 @@ const SliderControl: React.FC<{
           <View
             style={[
               styles.sliderThumb,
-              { left: `${value * 100}%`, backgroundColor: thumbColor },
+              { left: `${value * 100}%`, backgroundColor: thumbColor, borderColor: thumbBorderColor },
             ]}
           />
         </View>
@@ -475,9 +503,11 @@ interface ItemRowProps {
   quantity: number;
   isIgnored: boolean;
   categoryName?: string;
+  subcategoryIcon?: string;
+  iconColor?: string;
 }
 
-const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, onUpdate, onDelete, onEdit, onToggleIgnore, isSearch, name, quantity, isIgnored, categoryName }: ItemRowProps) => {
+const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, onUpdate, onDelete, onEdit, onToggleIgnore, isSearch, name, quantity, isIgnored, categoryName, subcategoryIcon, iconColor }: ItemRowProps) => {
   const stockColor = getStockColor(quantity, theme.dark);
 
   const swipeableRef = useRef<Swipeable>(null);
@@ -562,14 +592,15 @@ const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, on
         <View style={styles.itemHeaderCompact}>
           <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
             {!isSearch && (
-              <Checkbox.Android
-                status={item.isIgnored ? 'checked' : 'unchecked'}
+              <IconButton
+                icon={item.isIgnored ? "sleep" : "eye-outline"}
+                size={22}
+                iconColor={item.isIgnored ? theme.colors.primary : theme.colors.onSurfaceVariant}
                 onPress={() => onToggleIgnore(item)}
-                color={theme.colors.error}
-                uncheckedColor={theme.colors.onSurfaceVariant}
+                style={{ margin: 0, marginLeft: -10, padding: 0, width: 30, height: 30 }}
               />
             )}
-            <View style={{ flex: 1, marginLeft: isSearch ? 4 : 0 }}>
+            <View style={{ flex: 1, marginLeft: isSearch ? 4 : 8, justifyContent: 'center' }}>
               <Text 
                 style={[
                   styles.itemTitle, 
@@ -577,6 +608,8 @@ const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, on
                     color: theme.colors.onSurface,
                     textDecorationLine: 'none',
                     opacity: item.isIgnored ? 0.5 : 1,
+                    includeFontPadding: false,
+                    textAlignVertical: 'center',
                   }
                 ]}
                 numberOfLines={isSearch ? 1 : 2}
@@ -603,7 +636,7 @@ const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, on
               )}
             </View>
           </View>
-          <Text style={[styles.itemPercentage, { color: stockColor }]}>
+          <Text style={[styles.itemPercentage, { color: stockColor, includeFontPadding: false, textAlignVertical: 'center' }]}>
             {Math.round(item.quantity * 100)}%
           </Text>
         </View>
@@ -622,7 +655,8 @@ const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, on
               onComplete={(q) => onUpdate(item, q)}
               trackColor={theme.colors.outline}
               progressColor={stockColor}
-              thumbColor={theme.colors.primary}
+              thumbColor="#FFFFFF"
+              thumbBorderColor="#FFFFFF"
             />
           </View>
           <IconButton
@@ -1279,7 +1313,7 @@ const InventoryScreen: React.FC = () => {
           <Icon
             name={config.icon as any}
             size={screen.isSmall ? 36 : screen.isMedium ? 40 : 44}
-            color={config.color}
+            color={getCategoryIconColor(category, theme.dark)}
             style={styles.categoryIcon}
           />
           <Title style={[styles.categoryTitle, { color: theme.colors.onSurface }]}>
@@ -1370,8 +1404,8 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
         onPress={() => setNavigationFluid({ state: 'subcategory', category: navigation.category, subcategory: subName as InventorySubcategory })}
       >
         <Card.Content style={styles.subcategoryContent}>
-          <View style={[styles.iconContainer, { backgroundColor: (config?.color || theme.colors.primary) + '15' }]}>
-            <Icon name={(config?.icon || 'help-circle') as any} size={24} color={config?.color || theme.colors.primary} />
+          <View style={[styles.iconContainer, { backgroundColor: (theme.dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)') }]}>
+            <Icon name={(config?.icon || 'help-circle') as any} size={24} color={getSubcategoryIconColor(config, theme.dark)} />
           </View>
           <View style={styles.subcategoryInfo}>
             <Title style={[styles.subcategoryTitle, { color: theme.colors.onSurface }]}>
@@ -1423,9 +1457,9 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
 
   const renderItemRow = (item: InventoryItem, isSearch: boolean = false) => {
     let categoryName = '';
+    const subConfig = inventoryManager.getSubcategoryConfig(item.subcategory);
     if (isSearch) {
-      const config = inventoryManager.getSubcategoryConfig(item.subcategory);
-      categoryName = config?.category || '';
+      categoryName = subConfig?.category || '';
     }
     
     return (
@@ -1444,6 +1478,8 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
         quantity={item.quantity}
         isIgnored={item.isIgnored ?? false}
         categoryName={categoryName}
+        subcategoryIcon={subConfig?.icon}
+        iconColor={getSubcategoryIconColor(subConfig, theme.dark)}
       />
     );
   };
@@ -1590,8 +1626,8 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
             ]}
           >
             <Card.Content style={styles.subcategoryContent}>
-              <View style={[styles.iconContainer, { backgroundColor: (config?.color || theme.colors.primary) + '15' }]}>
-                <Icon name={(config?.icon || 'help-circle') as any} size={24} color={config?.color || theme.colors.primary} />
+              <View style={[styles.iconContainer, { backgroundColor: (theme.dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)') }]}>
+                <Icon name={(config?.icon || 'help-circle') as any} size={24} color={getSubcategoryIconColor(config, theme.dark)} />
               </View>
               <View style={styles.subcategoryInfo}>
                 <Title style={[styles.subcategoryTitle, { color: theme.colors.onSurface }]}>
@@ -1627,10 +1663,13 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
             size={24}
             onPress={() => setNavigationFluid({ state: 'home' })}
           />
-          <Title style={[styles.headerTitle, { color: theme.colors.onSurface }]}>
-            {navigation.category}
-          </Title>
-          <View style={{ flexDirection: 'row' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+            <Icon name={config.icon as any} size={22} color={getCategoryIconColor(navigation.category!, theme.dark)} style={{ marginRight: 6 }} />
+            <Title style={[styles.headerTitle, { color: theme.colors.onSurface }]} numberOfLines={1}>
+              {navigation.category}
+            </Title>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <IconButton
               icon={isReordering ? "check" : "sort-variant"}
               size={24}
@@ -1641,8 +1680,8 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
                 icon="plus"
                 size={22}
                 mode="contained"
-                containerColor={config.color + '20'}
-                iconColor={config.color}
+                containerColor={theme.dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)'}
+                iconColor={getCategoryIconColor(navigation.category!, theme.dark)}
                 onPress={openSubAddDialog}
                 style={{ margin: 4 }}
               />
@@ -1769,24 +1808,27 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
               setShowIgnoredOnly(false); // Reset ignored filter when going back
             }}
           />
-          <Title style={[styles.headerTitle, { color: theme.colors.onSurface }]}>
-            {navigation.subcategory}
-          </Title>
-          <View style={{ flexDirection: 'row' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+            <Icon name={(inventoryManager.getSubcategoryConfig(navigation.subcategory as any)?.icon || 'help-circle') as any} size={20} color={getSubcategoryIconColor(inventoryManager.getSubcategoryConfig(navigation.subcategory as any), theme.dark)} style={{ marginRight: 6 }} />
+            <Title style={[styles.headerTitle, { color: theme.colors.onSurface }]} numberOfLines={1}>
+              {navigation.subcategory}
+            </Title>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <IconButton
               icon={isReordering ? "check" : "sort-variant"}
               size={24}
               onPress={() => setIsReordering(!isReordering)}
             />
             {!isReordering && (
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 4 }}>
                   <IconButton
                     icon={showIgnoredOnly ? "eye-off" : "eye-off-outline"}
                     size={24}
                     iconColor={showIgnoredOnly ? theme.colors.error : theme.colors.onSurfaceVariant}
                     onPress={() => setShowIgnoredOnly(!showIgnoredOnly)}
-                    style={{ marginRight: -4 }}
+                    style={{ margin: 0 }}
                   />
                   {(() => {
                     const subItems = inventoryItems.filter(it => it.subcategory === navigation.subcategory);
@@ -1796,23 +1838,22 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
                         fontSize: 12, 
                         color: showIgnoredOnly ? theme.colors.error : theme.colors.onSurfaceVariant,
                         fontWeight: '600',
-                        marginRight: 4
                       }}>
                         {hiddenCount}
                       </Text>
                     ) : null;
                   })()}
                 </View>
-                  <IconButton
-                    icon="plus"
-                    size={22}
-                    mode="contained"
-                    containerColor={(inventoryManager.getSubcategoryConfig(navigation.subcategory as any)?.color || theme.colors.primary) + '20'}
-                    iconColor={inventoryManager.getSubcategoryConfig(navigation.subcategory as any)?.color || theme.colors.primary}
-                    onPress={() => setShowingAddDialog(true)}
-                    style={{ margin: 4 }}
-                  />
-              </View>
+                <IconButton
+                  icon="plus"
+                  size={22}
+                  mode="contained"
+                  containerColor={theme.dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)'}
+                  iconColor={getSubcategoryIconColor(inventoryManager.getSubcategoryConfig(navigation.subcategory as any), theme.dark)}
+                  onPress={() => setShowingAddDialog(true)}
+                  style={{ margin: 4 }}
+                />
+              </>
             )}
           </View>
         </View>

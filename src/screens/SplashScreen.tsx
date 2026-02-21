@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet, Animated, Dimensions, StatusBar, Image, Platform } from 'react-native';
 import { Title, useTheme, Text } from 'react-native-paper';
 import { rs } from '../themes/Responsive';
+import * as ExpoSplashScreen from 'expo-splash-screen';
 
 interface SplashScreenProps {
   onAnimationFinish: () => void;
@@ -35,6 +36,9 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onAnimationFinish, isDark }
         useNativeDriver: true,
       })
     ]).start();
+
+    // Hide native splash screen as soon as our custom one is ready to animate
+    ExpoSplashScreen.hideAsync().catch(() => {});
 
     // 2. Subtitle Reveal
     Animated.timing(taglineOpacity, {

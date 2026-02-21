@@ -24,6 +24,28 @@ import { commonStyles } from '../themes/AppTheme';
 import DoodleBackground from '../components/DoodleBackground';
 import { tabBar as tabBarDims, fontSize as fs, spacing as sp, radius as r, screen } from '../themes/Responsive';
 
+// Theme-based icon shades: slight variation per category type
+const getCategoryIconColor = (category: string, isDark: boolean): string => {
+  const cat = category.toLowerCase();
+  if (isDark) {
+    switch (cat) {
+      case 'fridge': return '#FFFFFF';
+      case 'grocery': return '#D4D4D4';
+      case 'hygiene': return '#BABABA';
+      case 'personal care': case 'personalcare': return '#A0A0A0';
+      default: return '#CCCCCC';
+    }
+  } else {
+    switch (cat) {
+      case 'fridge': return '#1A1A1A';
+      case 'grocery': return '#333333';
+      case 'hygiene': return '#4D4D4D';
+      case 'personal care': case 'personalcare': return '#666666';
+      default: return '#444444';
+    }
+  }
+};
+
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -63,7 +85,7 @@ const SectionHeader: React.FC<{
   rightElement?: React.ReactNode;
   theme: any;
 }> = ({ icon, title, subtitle, iconColor, badgeCount, badgeColor, rightElement, theme }) => (
-  <View style={styles.sectionHeader}>
+  <View style={[styles.sectionHeader, { borderBottomColor: theme.colors.outlineVariant }]}>
     <View style={{flexDirection: 'row', flex: 1}}>
         <View style={[styles.sectionIconWrap, { backgroundColor: iconColor + '18' }]}>
         <Icon name={icon as any} size={22} color={iconColor} />
@@ -544,18 +566,18 @@ const InsightsScreen: React.FC = () => {
 
     return (
       <View style={styles.sectionContainer}>
-        <SectionHeader
-          icon="alert-decagram"
-          title="Stale Items"
-          subtitle="Items not updated within their check-in threshold"
-          iconColor={theme.dark ? '#FCA5A5' : '#EF4444'}
-          badgeCount={totalStaleCount}
-          badgeColor={theme.dark ? '#FCA5A5' : '#EF4444'}
-          theme={theme}
-        />
+        <Surface style={[styles.card, { backgroundColor: theme.colors.surface }]} elevation={theme.dark ? 1 : 2}>
+          <SectionHeader
+            icon="alert-decagram"
+            title="Stale Items"
+            subtitle="Items not updated within their check-in threshold"
+            iconColor={theme.dark ? '#FCA5A5' : '#EF4444'}
+            badgeCount={totalStaleCount}
+            badgeColor={theme.dark ? '#FCA5A5' : '#EF4444'}
+            theme={theme}
+          />
 
-        {categoryEntries.length === 0 ? (
-          <Surface style={[styles.card, { backgroundColor: theme.dark ? theme.colors.surface : '#FFFFFF' }]} elevation={theme.dark ? 1 : 2}>
+          {categoryEntries.length === 0 ? (
             <EmptyState
               icon="check-decagram"
               title="Everything's Fresh!"
@@ -563,19 +585,14 @@ const InsightsScreen: React.FC = () => {
               color={theme.dark ? '#34D399' : '#10B981'}
               theme={theme}
             />
-          </Surface>
-        ) : (
-          categoryEntries.map(([category, group]) => {
-            const sectionKey = `stale_${category}`;
-            return (
-              <Surface
-                key={category}
-                style={[styles.card, { backgroundColor: theme.dark ? theme.colors.surface : '#FFFFFF' }]}
-                elevation={theme.dark ? 1 : 2}
-              >
-                <View style={styles.staleCategoryHeader}>
-                  <View style={[styles.staleCatIconWrap, { backgroundColor: group.config.color + '15' }]}>
-                    <Icon name={group.config.icon as any} size={20} color={group.config.color} />
+          ) : (
+            categoryEntries.map(([category, group], i) => {
+              const sectionKey = `stale_${category}`;
+              return (
+                <View key={category}>
+                <View style={[styles.staleCategoryHeader, { borderTopWidth: i === 0 ? 0 : 1, borderTopColor: theme.colors.outlineVariant }]}>
+                  <View style={[styles.staleCatIconWrap, { backgroundColor: theme.dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
+                    <Icon name={group.config.icon as any} size={20} color={getCategoryIconColor(category, theme.dark)} />
                   </View>
                   <View style={styles.staleCatInfo}>
                     <Text style={[styles.staleCatName, { color: theme.colors.onSurface }]}>{category}</Text>
@@ -602,10 +619,11 @@ const InsightsScreen: React.FC = () => {
                     theme.dark ? '#FCA5A5' : '#EF4444',
                   )}
                 </View>
-              </Surface>
+              </View>
             );
           })
         )}
+        </Surface>
       </View>
     );
   };
@@ -614,16 +632,16 @@ const InsightsScreen: React.FC = () => {
     const accentColor = theme.dark ? '#FBBF24' : '#F59E0B';
     return (
       <View style={styles.sectionContainer}>
-        <SectionHeader
-          icon="trophy"
-          title="Most Restocked"
-          subtitle="Items you restock the most frequently"
-          iconColor={accentColor}
-          badgeCount={topUsed.length}
-          badgeColor={accentColor}
-          theme={theme}
-        />
-        <Surface style={[styles.card, { backgroundColor: theme.dark ? theme.colors.surface : '#FFFFFF' }]} elevation={theme.dark ? 1 : 2}>
+        <Surface style={[styles.card, { backgroundColor: theme.colors.surface }]} elevation={theme.dark ? 1 : 2}>
+          <SectionHeader
+            icon="trophy"
+            title="Most Restocked"
+            subtitle="Items you restock the most frequently"
+            iconColor={accentColor}
+            badgeCount={topUsed.length}
+            badgeColor={accentColor}
+            theme={theme}
+          />
           {topUsed.length === 0 ? (
             <EmptyState icon="cart-off" title="No Restock Data Yet" subtitle="Complete a shopping trip to start tracking" color={accentColor} theme={theme} />
           ) : (
@@ -652,16 +670,16 @@ const InsightsScreen: React.FC = () => {
     const accentColor = theme.dark ? '#94A3B8' : '#64748B';
     return (
       <View style={styles.sectionContainer}>
-        <SectionHeader
-          icon="sleep"
-          title="Least Active"
-          subtitle="Items untouched for the longest time"
-          iconColor={accentColor}
-          badgeCount={leastUsed.length > 0 ? leastUsed.length : undefined}
-          badgeColor={accentColor}
-          theme={theme}
-        />
-        <Surface style={[styles.card, { backgroundColor: theme.dark ? theme.colors.surface : '#FFFFFF' }]} elevation={theme.dark ? 1 : 2}>
+        <Surface style={[styles.card, { backgroundColor: theme.colors.surface }]} elevation={theme.dark ? 1 : 2}>
+          <SectionHeader
+            icon="sleep"
+            title="Least Active"
+            subtitle="Items untouched for the longest time"
+            iconColor={accentColor}
+            badgeCount={leastUsed.length > 0 ? leastUsed.length : undefined}
+            badgeColor={accentColor}
+            theme={theme}
+          />
           {leastUsed.length === 0 ? (
             <EmptyState icon="package-variant" title="No Items Yet" subtitle="Add items to your inventory to see activity insights" color={accentColor} theme={theme} />
           ) : (
@@ -693,29 +711,29 @@ const InsightsScreen: React.FC = () => {
     const accentColor = theme.dark ? '#FBBF24' : '#EF4444';
     return (
       <View style={styles.sectionContainer}>
-        <SectionHeader
-          icon="arrow-down-bold-circle"
-          title="Running Low"
-          subtitle="Items below 25% stock"
-          iconColor={accentColor}
-          badgeCount={lowStockItems.length}
-          badgeColor={accentColor}
-          theme={theme}
-          rightElement={
-            <TouchableOpacity 
-              onPress={() => setShowHiddenRunLow(!showHiddenRunLow)} 
-              style={{ padding: 8 }}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-                <Icon 
-                  name={showHiddenRunLow ? 'eye' : 'eye-off-outline'} 
-                  size={24} 
-                  color={showHiddenRunLow ? accentColor : theme.colors.onSurfaceVariant} 
-                />
-            </TouchableOpacity>
-          }
-        />
-        <Surface style={[styles.card, { backgroundColor: theme.dark ? theme.colors.surface : '#FFFFFF' }]} elevation={theme.dark ? 1 : 2}>
+        <Surface style={[styles.card, { backgroundColor: theme.colors.surface }]} elevation={theme.dark ? 1 : 2}>
+          <SectionHeader
+            icon="arrow-down-bold-circle"
+            title="Running Low"
+            subtitle="Items below 25% stock"
+            iconColor={accentColor}
+            badgeCount={lowStockItems.length}
+            badgeColor={accentColor}
+            theme={theme}
+            rightElement={
+              <TouchableOpacity 
+                onPress={() => setShowHiddenRunLow(!showHiddenRunLow)} 
+                style={{ padding: 8 }}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                  <Icon 
+                    name={showHiddenRunLow ? 'eye' : 'eye-off-outline'} 
+                    size={24} 
+                    color={showHiddenRunLow ? accentColor : theme.colors.onSurfaceVariant} 
+                  />
+              </TouchableOpacity>
+            }
+          />
           {lowStockItems.length === 0 ? (
             <EmptyState icon="check-circle" title="Fully Stocked!" subtitle="No items are running low right now" color={theme.dark ? '#34D399' : '#10B981'} theme={theme} />
           ) : (
@@ -737,14 +755,14 @@ const InsightsScreen: React.FC = () => {
     const accentColor = theme.dark ? '#818CF8' : '#6366F1';
     return (
       <View style={styles.sectionContainer}>
-        <SectionHeader
-          icon="view-grid"
-          title="Category Health"
-          subtitle="Staleness & stock levels per category"
-          iconColor={accentColor}
-          theme={theme}
-        />
-        <Surface style={[styles.card, { backgroundColor: theme.dark ? theme.colors.surface : '#FFFFFF' }]} elevation={theme.dark ? 1 : 2}>
+        <Surface style={[styles.card, { backgroundColor: theme.colors.surface }]} elevation={theme.dark ? 1 : 2}>
+          <SectionHeader
+            icon="view-grid"
+            title="Category Health"
+            subtitle="Staleness & stock levels per category"
+            iconColor={accentColor}
+            theme={theme}
+          />
           {categoryHealth.length === 0 ? (
             <EmptyState icon="shape-outline" title="No Categories Yet" subtitle="Add items to see category-level insights" color={accentColor} theme={theme} />
           ) : (
@@ -753,8 +771,8 @@ const InsightsScreen: React.FC = () => {
                 <View key={cat.category}>
                   {index > 0 && <View style={[styles.divider, { backgroundColor: theme.dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }]} />}
                   <View style={styles.catHealthRow}>
-                    <View style={[styles.catHealthIcon, { backgroundColor: cat.config.color + '15' }]}>
-                      <Icon name={cat.config.icon as any} size={20} color={cat.config.color} />
+                    <View style={[styles.catHealthIcon, { backgroundColor: theme.dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
+                      <Icon name={cat.config.icon as any} size={20} color={getCategoryIconColor(cat.category, theme.dark)} />
                     </View>
                     <View style={styles.catHealthInfo}>
                       <View style={styles.catHealthNameRow}>
@@ -763,7 +781,7 @@ const InsightsScreen: React.FC = () => {
                       </View>
                       <ProgressBar
                         progress={cat.avgStock / 100}
-                        color={cat.config.color}
+                        color={getCategoryIconColor(cat.category, theme.dark)}
                         style={[styles.catHealthBar, { backgroundColor: theme.dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
                       />
                       <View style={styles.catHealthDetails}>
@@ -800,16 +818,16 @@ const InsightsScreen: React.FC = () => {
     const accentColor = theme.dark ? '#A78BFA' : '#7C3AED';
     return (
       <View style={styles.sectionContainer}>
-        <SectionHeader
-          icon="package-variant-closed"
-          title="Never Restocked"
-          subtitle="Items that have never been through a shopping trip"
-          iconColor={accentColor}
-          badgeCount={neverRestocked.length}
-          badgeColor={accentColor}
-          theme={theme}
-        />
-        <Surface style={[styles.card, { backgroundColor: theme.dark ? theme.colors.surface : '#FFFFFF' }]} elevation={theme.dark ? 1 : 2}>
+        <Surface style={[styles.card, { backgroundColor: theme.colors.surface }]} elevation={theme.dark ? 1 : 2}>
+          <SectionHeader
+            icon="package-variant-closed"
+            title="Never Restocked"
+            subtitle="Items that have never been through a shopping trip"
+            iconColor={accentColor}
+            badgeCount={neverRestocked.length}
+            badgeColor={accentColor}
+            theme={theme}
+          />
           {neverRestocked.length === 0 ? (
             <EmptyState icon="cart-check" title="All Restocked!" subtitle="Every item has been through at least one shopping trip" color={accentColor} theme={theme} />
           ) : (
@@ -849,16 +867,16 @@ const InsightsScreen: React.FC = () => {
 
     return (
       <View style={styles.sectionContainer}>
-        <SectionHeader
-          icon="calendar-month"
-          title="Monthly Summary"
-          subtitle="Restocking activity over the last 6 months"
-          iconColor={chartAccent}
-          theme={theme}
-        />
+        <Surface style={[styles.card, { backgroundColor: theme.colors.surface }]} elevation={theme.dark ? 1 : 2}>
+          <SectionHeader
+            icon="calendar-month"
+            title="Monthly Summary"
+            subtitle="Restocking activity over the last 6 months"
+            iconColor={chartAccent}
+            theme={theme}
+          />
 
         {/* Restocks Bar Chart */}
-        <Surface style={[styles.card, { backgroundColor: theme.dark ? theme.colors.surface : '#FFFFFF' }]} elevation={theme.dark ? 1 : 2}>
           <View style={styles.chartSection}>
             <View style={styles.chartLegendRow}>
               <View style={styles.chartLegendItem}>
@@ -1022,51 +1040,51 @@ const InsightsScreen: React.FC = () => {
         <Surface
           style={[
             styles.heroCard,
-            { backgroundColor: theme.dark ? theme.colors.surfaceVariant : theme.colors.primary }
+            { backgroundColor: theme.colors.surface }
           ]}
-          elevation={theme.dark ? 1 : 4}
+          elevation={theme.dark ? 1 : 2}
         >
           <View style={styles.heroContent}>
             <View style={styles.heroTextWrap}>
-              <Text style={[styles.heroLabel, { color: theme.dark ? theme.colors.onSurfaceVariant : theme.colors.surfaceVariant }]}>
+              <Text style={[styles.heroLabel, { color: theme.colors.onSurfaceVariant }]}>
                 Inventory Health
               </Text>
-              <Text style={[styles.heroValue, { color: theme.dark ? theme.colors.primary : '#FFFFFF' }]}>
+              <Text style={[styles.heroValue, { color: theme.colors.primary }]}>
                 {totalStaleCount === 0 ? 'All Good ✓' : `${totalStaleCount} Need${totalStaleCount === 1 ? 's' : ''} Attention`}
               </Text>
             </View>
-            <View style={[styles.heroIconWrap, { backgroundColor: theme.dark ? theme.colors.primary + '20' : theme.colors.surface + '25' }]}>
+            <View style={[styles.heroIconWrap, { backgroundColor: theme.colors.primary + '15' }]}>
               <Icon
                 name={totalStaleCount === 0 ? 'shield-check' : 'alert-circle-outline'}
                 size={32}
-                color={theme.dark ? theme.colors.primary : '#FFFFFF'}
+                color={theme.colors.primary}
               />
             </View>
           </View>
           <View style={styles.heroStats}>
             <View style={styles.heroStatItem}>
-              <Text style={[styles.heroStatValue, { color: theme.dark ? theme.colors.onSurface : '#FFFFFF' }]}>
+              <Text style={[styles.heroStatValue, { color: theme.colors.onSurface }]}>
                 {inventoryItems.length}
               </Text>
-              <Text style={[styles.heroStatLabel, { color: theme.dark ? theme.colors.onSurfaceVariant : theme.colors.surfaceVariant }]}>
+              <Text style={[styles.heroStatLabel, { color: theme.colors.onSurfaceVariant }]}>
                 Total Items
               </Text>
             </View>
-            <View style={[styles.heroStatDivider, { backgroundColor: theme.dark ? theme.colors.outlineVariant : theme.colors.surface + '30' }]} />
+            <View style={[styles.heroStatDivider, { backgroundColor: theme.colors.outlineVariant }]} />
             <View style={styles.heroStatItem}>
-              <Text style={[styles.heroStatValue, { color: theme.dark ? theme.colors.onSurface : '#FFFFFF' }]}>
+              <Text style={[styles.heroStatValue, { color: theme.colors.onSurface }]}>
                 {totalStaleCount}
               </Text>
-              <Text style={[styles.heroStatLabel, { color: theme.dark ? theme.colors.onSurfaceVariant : 'rgba(255,255,255,0.7)' }]}>
+              <Text style={[styles.heroStatLabel, { color: theme.colors.onSurfaceVariant }]}>
                 Stale
               </Text>
             </View>
-            <View style={[styles.heroStatDivider, { backgroundColor: theme.dark ? theme.colors.outlineVariant : 'rgba(255,255,255,0.2)' }]} />
+            <View style={[styles.heroStatDivider, { backgroundColor: theme.colors.outlineVariant }]} />
             <View style={styles.heroStatItem}>
-              <Text style={[styles.heroStatValue, { color: theme.dark ? theme.colors.onSurface : '#FFFFFF' }]}>
+              <Text style={[styles.heroStatValue, { color: theme.colors.onSurface }]}>
                 {inventoryItems.length > 0 ? Math.round((1 - totalStaleCount / inventoryItems.length) * 100) : 100}%
               </Text>
-              <Text style={[styles.heroStatLabel, { color: theme.dark ? theme.colors.onSurfaceVariant : theme.colors.surfaceVariant }]}>
+              <Text style={[styles.heroStatLabel, { color: theme.colors.onSurfaceVariant }]}>
                 Fresh
               </Text>
             </View>
@@ -1170,8 +1188,9 @@ const styles = StyleSheet.create({
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: sp.sm,
-    paddingHorizontal: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
   },
   sectionIconWrap: {
     width: 36,
