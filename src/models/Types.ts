@@ -149,3 +149,27 @@ export interface SubcategoryConfig {
   category: InventoryCategory;
   sampleItems: string[];
 }
+
+// MARK: - Activity Tracking
+export enum ActivityAction {
+  UPDATE_QUANTITY = 'update_quantity',
+  UPDATE_NAME = 'update_name',
+  RESTOCK = 'restock',
+  REMOVE_ITEM = 'remove_item',
+  ADD_ITEM = 'add_item',
+  TOGGLE_IGNORE = 'toggle_ignore',
+}
+
+export interface ActivityLog {
+  id: string;
+  action: ActivityAction;
+  timestamp: Date;
+  itemId: string;
+  itemName: string;
+  details: {
+    previousValue?: any;
+    newValue?: any;
+    itemSnapshot?: InventoryItem; // Full item snapshot for reliable undo
+  };
+  isUndone?: boolean;
+}

@@ -7,6 +7,8 @@ import { notesManager } from '../managers/NotesManager';
 import { Note } from '../models/Types';
 import DoodleBackground from '../components/DoodleBackground';
 import * as Clipboard from 'expo-clipboard';
+import { commonStyles } from '../themes/AppTheme';
+import { spacing as sp, radius as r } from '../themes/Responsive';
 
 // Define constants outside to avoid re-creation and dependency issues
 const BULLET_PREFIX = '\u2022 '; 
@@ -227,8 +229,8 @@ const NoteDetailScreen: React.FC = () => {
         handleBackViaRef();
         return true;
       };
-      BackHandler.addEventListener('hardwareBackPress', onBackPress);
-      return () => BackHandler.removeEventListener('hardwareBackPress', onBackPress);
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => subscription.remove();
     }, []) // stable — reads from refs
   );
 
@@ -620,7 +622,7 @@ const NoteDetailScreen: React.FC = () => {
   if (!note) return <View style={styles.container} />;
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <View style={styles.container}>
       <DoodleBackground />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -637,36 +639,38 @@ const NoteDetailScreen: React.FC = () => {
             onScroll={showMenu}
             scrollEventThrottle={100}
           >
-            <View style={styles.titleSection}>
-              <RNTextInput
-                ref={titleInputRef}
-                placeholder="Title"
-                value={title || ''}
-                onChangeText={setTitle}
-                editable={!isViewMode}
-                style={[styles.titleInput, { color: theme.colors.onBackground }]}
-                placeholderTextColor={theme.colors.onSurfaceVariant}
-              />
-            </View>
-
-            <View style={styles.editorContentWrapper}>
-              {lines.map((line, index) => (
-                <LineRow
-                  key={index}
-                  line={line}
-                  index={index}
-                  isViewMode={isViewMode}
-                  primaryColor={theme.colors.primary}
-                  onSurfaceColor={theme.colors.onSurface}
-                  onSurfaceVariantColor={theme.colors.onSurfaceVariant}
-                  onUpdateLine={onUpdateLine}
-                  onFocusLine={onFocusLine}
-                  onKeyPress={onKeyPressLine}
-                  onToggleCheckbox={onToggleCheckbox}
-                  onLayoutLine={onLayoutLine}
-                  inputRef={setInputRef}
+            <View style={[styles.noteCard, { backgroundColor: theme.colors.surface }]}>
+              <View style={styles.titleSection}>
+                <RNTextInput
+                  ref={titleInputRef}
+                  placeholder="Title"
+                  value={title || ''}
+                  onChangeText={setTitle}
+                  editable={!isViewMode}
+                  style={[styles.titleInput, { color: theme.colors.onBackground }]}
+                  placeholderTextColor={theme.colors.onSurfaceVariant}
                 />
-              ))}
+              </View>
+
+              <View style={styles.editorContentWrapper}>
+                {lines.map((line, index) => (
+                  <LineRow
+                    key={index}
+                    line={line}
+                    index={index}
+                    isViewMode={isViewMode}
+                    primaryColor={theme.colors.primary}
+                    onSurfaceColor={theme.colors.onSurface}
+                    onSurfaceVariantColor={theme.colors.onSurfaceVariant}
+                    onUpdateLine={onUpdateLine}
+                    onFocusLine={onFocusLine}
+                    onKeyPress={onKeyPressLine}
+                    onToggleCheckbox={onToggleCheckbox}
+                    onLayoutLine={onLayoutLine}
+                    inputRef={setInputRef}
+                  />
+                ))}
+              </View>
             </View>
           </ScrollView>
 
@@ -675,7 +679,9 @@ const NoteDetailScreen: React.FC = () => {
               styles.sideToolbarFixed,
               {
                 opacity: sideMenuOpacity,
-                backgroundColor: theme.dark ? 'rgba(30, 41, 59, 0.8)' : 'rgba(255, 255, 255, 0.8)'
+                backgroundColor: theme.colors.surface,
+                borderWidth: 1,
+                borderColor: theme.colors.outlineVariant,
               }
             ]}>
               <IconButton
@@ -757,9 +763,16 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   mainLayout: { flex: 1, flexDirection: 'row' },
   content: { flex: 1 },
-  titleSection: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10 },
-  titleInput: { fontSize: 24, fontWeight: 'bold', padding: 0 },
-  editorContentWrapper: { paddingRight: 40 },
+  titleSection: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 10 },
+  titleInput: { fontSize: 28, fontWeight: 'bold', padding: 0 },
+  noteCard: {
+    margin: sp.base,
+    borderRadius: r.xxl,
+    minHeight: Dimensions.get('window').height * 0.7,
+    ...commonStyles.shadow,
+    paddingBottom: sp.xl,
+  },
+  editorContentWrapper: { paddingRight: 40, paddingLeft: 8 },
   lineRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',

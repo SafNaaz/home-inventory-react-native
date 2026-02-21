@@ -50,7 +50,36 @@ import { inventoryManager } from '../managers/InventoryManager';
 import { InventoryItem, InventoryCategory, InventorySubcategory, ShoppingState } from '../models/Types';
 import { CATEGORY_CONFIG, SUBCATEGORY_CONFIG, getAllCategories, getCategoryConfig, getSubcategoryConfig } from '../constants/CategoryConfig';
 import { getStockColor, getCategoryColor, commonStyles } from '../themes/AppTheme';
+
+// Theme-based icon shades: slight variation per category type
+const getCategoryIconColor = (category: string, isDark: boolean): string => {
+  const cat = category.toLowerCase();
+  if (isDark) {
+    switch (cat) {
+      case 'fridge': return '#FFFFFF';
+      case 'grocery': return '#D4D4D4';
+      case 'hygiene': return '#BABABA';
+      case 'personal care': case 'personalcare': return '#A0A0A0';
+      default: return '#CCCCCC';
+    }
+  } else {
+    switch (cat) {
+      case 'fridge': return '#1A1A1A';
+      case 'grocery': return '#333333';
+      case 'hygiene': return '#4D4D4D';
+      case 'personal care': case 'personalcare': return '#666666';
+      default: return '#444444';
+    }
+  }
+};
+
+// Get icon shade for a subcategory based on its parent category
+const getSubcategoryIconColor = (config: any, isDark: boolean): string => {
+  if (!config?.category) return isDark ? '#CCCCCC' : '#444444';
+  return getCategoryIconColor(config.category, isDark);
+};
 import DoodleBackground from '../components/DoodleBackground';
+import { SwipeContext } from '../../App';
 import { tabBar as tabBarDims, fontSize as fs, spacing as sp, radius as r, iconSize as is, card as cardDims, fab as fabDims, screen } from '../themes/Responsive';
 
 const { width, height } = Dimensions.get('window');
@@ -241,7 +270,6 @@ const styles = StyleSheet.create({
     marginLeft: -13,
     ...commonStyles.shadow,
     borderWidth: 2,
-    borderColor: '#fff',
     elevation: 4,
   },
   progressContainer: {
@@ -390,7 +418,8 @@ const SliderControl: React.FC<{
   trackColor: string;
   progressColor: string;
   thumbColor: string;
-}> = ({ initialValue, onComplete, trackColor, progressColor, thumbColor }) => {
+  thumbBorderColor: string;
+}> = ({ initialValue, onComplete, trackColor, progressColor, thumbColor, thumbBorderColor }) => {
   const [value, setValue] = useState<number>(initialValue);
   const [dragging, setDragging] = useState(false);
   const trackWidth = useRef<number>(200);
@@ -450,7 +479,7 @@ const SliderControl: React.FC<{
           <View
             style={[
               styles.sliderThumb,
-              { left: `${value * 100}%`, backgroundColor: thumbColor },
+              { left: `${value * 100}%`, backgroundColor: thumbColor, borderColor: thumbBorderColor },
             ]}
           />
         </View>
@@ -474,9 +503,11 @@ interface ItemRowProps {
   quantity: number;
   isIgnored: boolean;
   categoryName?: string;
+  subcategoryIcon?: string;
+  iconColor?: string;
 }
 
-const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, onUpdate, onDelete, onEdit, onToggleIgnore, isSearch, name, quantity, isIgnored, categoryName }: ItemRowProps) => {
+const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, onUpdate, onDelete, onEdit, onToggleIgnore, isSearch, name, quantity, isIgnored, categoryName, subcategoryIcon, iconColor }: ItemRowProps) => {
   const stockColor = getStockColor(quantity, theme.dark);
 
   const swipeableRef = useRef<Swipeable>(null);
@@ -550,9 +581,10 @@ const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, on
       style={[
         styles.itemCard, 
         { 
-          elevation: item.isIgnored ? 0 : 2,
-          backgroundColor: theme.colors.surface,
+          backgroundColor: isSearch ? theme.colors.surfaceVariant : theme.colors.surface,
           borderRadius: 24,
+          ...commonStyles.shadow,
+          elevation: (item.isIgnored || isSearch) ? 0 : 6,
         }
       ]}
     >
@@ -560,14 +592,15 @@ const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, on
         <View style={styles.itemHeaderCompact}>
           <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
             {!isSearch && (
-              <Checkbox.Android
-                status={item.isIgnored ? 'checked' : 'unchecked'}
+              <IconButton
+                icon={item.isIgnored ? "sleep" : "eye-outline"}
+                size={22}
+                iconColor={item.isIgnored ? theme.colors.primary : theme.colors.onSurfaceVariant}
                 onPress={() => onToggleIgnore(item)}
-                color={theme.colors.error}
-                uncheckedColor={theme.colors.onSurfaceVariant}
+                style={{ margin: 0, marginLeft: -10, padding: 0, width: 30, height: 30 }}
               />
             )}
-            <View style={{ flex: 1, marginLeft: isSearch ? 4 : 0 }}>
+            <View style={{ flex: 1, marginLeft: isSearch ? 4 : 8, justifyContent: 'center' }}>
               <Text 
                 style={[
                   styles.itemTitle, 
@@ -575,6 +608,8 @@ const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, on
                     color: theme.colors.onSurface,
                     textDecorationLine: 'none',
                     opacity: item.isIgnored ? 0.5 : 1,
+                    includeFontPadding: false,
+                    textAlignVertical: 'center',
                   }
                 ]}
                 numberOfLines={isSearch ? 1 : 2}
@@ -601,7 +636,7 @@ const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, on
               )}
             </View>
           </View>
-          <Text style={[styles.itemPercentage, { color: stockColor }]}>
+          <Text style={[styles.itemPercentage, { color: stockColor, includeFontPadding: false, textAlignVertical: 'center' }]}>
             {Math.round(item.quantity * 100)}%
           </Text>
         </View>
@@ -620,7 +655,8 @@ const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, on
               onComplete={(q) => onUpdate(item, q)}
               trackColor={theme.colors.outline}
               progressColor={stockColor}
-              thumbColor={theme.colors.primary}
+              thumbColor="#FFFFFF"
+              thumbBorderColor="#FFFFFF"
             />
           </View>
           <IconButton
@@ -632,7 +668,7 @@ const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, on
           />
         </View>
 
-        {item.quantity <= 0.25 && (
+        {Math.round(item.quantity * 100) < 25 && (
           <View style={styles.lowStockWarningCompact}>
             <Icon name="alert-circle" size={14} color={theme.colors.error} />
             <Text style={[styles.lowStockTextCompact, { color: theme.colors.error }]}>
@@ -697,9 +733,42 @@ const EditItemInput = ({ initialValue, onSave, onCancel }: { initialValue: strin
       
       <Dialog.Actions style={{ paddingHorizontal: 0, marginTop: 10 }}>
         <Button onPress={onCancel}>Cancel</Button>
-        <Button onPress={handleSave} disabled={!isValid}>
-          Save
-        </Button>
+        <Button mode="contained" onPress={handleSave} disabled={!isValid} style={{ borderRadius: 12 }}>Save</Button>
+      </Dialog.Actions>
+    </>
+  );
+};
+
+const AddItemInput = ({ onAdd, onCancel, subcategory }: { onAdd: (name: string) => void, onCancel: () => void, subcategory: string }) => {
+  const [isValid, setIsValid] = useState(false);
+  const textRef = useRef('');
+
+  const handleChangeText = (text: string) => {
+    textRef.current = text;
+    setIsValid(!!text.trim());
+  };
+
+  const handleAdd = () => {
+    if (textRef.current.trim()) {
+      onAdd(textRef.current.trim());
+    }
+  };
+
+  return (
+    <>
+      <Text style={{ marginBottom: 16 }}>Adding to {subcategory}</Text>
+      <TextInput
+        label="Item Name"
+        onChangeText={handleChangeText}
+        mode="outlined"
+        onSubmitEditing={handleAdd}
+        returnKeyType="done"
+        autoFocus={true}
+      />
+      
+      <Dialog.Actions style={{ paddingHorizontal: 0, marginTop: 10 }}>
+        <Button onPress={onCancel}>Cancel</Button>
+        <Button mode="contained" onPress={handleAdd} disabled={!isValid} style={{ borderRadius: 12 }}>Add</Button>
       </Dialog.Actions>
     </>
   );
@@ -779,10 +848,19 @@ const SubcategoryInput = ({
 const InventoryScreen: React.FC = () => {
   const theme = useTheme();
   const navigationObj = useNavigation();
+  const { setSwipeEnabled } = React.useContext(SwipeContext);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const pendingUpdatesRef = useRef<Record<string, number>>({});
   const [refreshing, setRefreshing] = useState(false);
   const [navigation, setNavigation] = useState<NavigationContext>({ state: 'home' });
+
+  // Control tab swipe based on internal navigation state
+  useFocusEffect(
+    useCallback(() => {
+      setSwipeEnabled(navigation.state === 'home');
+      return () => setSwipeEnabled(true);
+    }, [navigation.state, setSwipeEnabled])
+  );
   const [showIgnoredOnly, setShowIgnoredOnly] = useState(false);
   const [showingAddDialog, setShowingAddDialog] = useState(false);
   const [newItemName, setNewItemName] = useState('');
@@ -812,6 +890,8 @@ const InventoryScreen: React.FC = () => {
   const sheetTranslateY = useRef(new Animated.Value(0)).current;
   const searchInputRef = useRef<RNTextInput>(null);
   const isSearchVisibleRef = useRef(isSearchVisible);
+  const editNameRef = useRef('');
+  const homeScrollViewRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     isSearchVisibleRef.current = isSearchVisible;
@@ -851,7 +931,7 @@ const InventoryScreen: React.FC = () => {
     }
 
     const diff = currentScrollY - lastScrollY.current;
-    if (Math.abs(diff) < 5) return; // Ignore small noise
+    if (Math.abs(diff) < 5) return; 
 
     if (diff > 20 && isFabVisible) {
       setIsFabVisible(false);
@@ -860,7 +940,6 @@ const InventoryScreen: React.FC = () => {
         duration: 200,
         useNativeDriver: true
       }).start();
-      navigationObj.getParent()?.setOptions({ tabBarStyle: { display: 'none' } });
     } else if (diff < -20 && !isFabVisible) {
       setIsFabVisible(true);
       Animated.spring(fabAnimation, {
@@ -869,21 +948,6 @@ const InventoryScreen: React.FC = () => {
         tension: 40,
         friction: 7
       }).start();
-      navigationObj.getParent()?.setOptions({
-        tabBarStyle: {
-          backgroundColor: theme.colors.surface,
-          borderTopWidth: 0,
-          height: 65,
-          paddingBottom: 10,
-          paddingTop: 10,
-          position: 'absolute',
-          bottom: 20,
-          left: 20,
-          right: 20,
-          borderRadius: 32,
-          elevation: 8,
-        }
-      });
     }
     
     lastScrollY.current = currentScrollY;
@@ -900,36 +964,40 @@ const InventoryScreen: React.FC = () => {
       loadInventoryData();
     });
 
-    // Handle Android back button
-    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-      // Use ref to check visibility without stale closures
-      if (isSearchVisibleRef.current) {
-        closeSearch();
-        return true;
-      }
-      if (isReordering) {
-        setIsReordering(false);
-        return true;
-      }
-      if (navigation.state === 'subcategory') {
-        // Go back to category view
-        setNavigationFluid({ state: 'category', category: navigation.category });
-        return true; 
-      } else if (navigation.state === 'category') {
-        // Go back to home view
-        setNavigationFluid({ state: 'home' });
-        return true; 
-      }
-      // If we're on home, let the default behavior happen (close app or go to previous screen)
-      return false;
-    });
+    // Move BackHandler to useFocusEffect
 
     return () => {
       unsubscribeInventory();
       unsubscribeSettings();
-      backHandler.remove();
+      
     };
-  }, [navigation]); // Only depend on navigation, back handler uses refs for other dynamic state
+  }, [navigation]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        if (isSearchVisibleRef.current) {
+          closeSearch();
+          return true;
+        }
+        if (isReordering) {
+          setIsReordering(false);
+          return true;
+        }
+        if (navigation.state === 'subcategory') {
+          setNavigationFluid({ state: 'category', category: navigation.category });
+          return true;
+        } else if (navigation.state === 'category') {
+          setNavigationFluid({ state: 'home' });
+          return true;
+        }
+        return false;
+      };
+
+      const handler = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => handler.remove();
+    }, [navigation, isReordering, isSearchVisible])
+  );
 
   const setNavigationFluid = (newNav: NavigationContext | ((prev: NavigationContext) => NavigationContext)) => {
     Keyboard.dismiss();
@@ -951,6 +1019,32 @@ const InventoryScreen: React.FC = () => {
     setIsReordering(false);
   }, [navigation.state, navigation.category]);
 
+  // Control tab bar visibility based on isFabVisible state
+  useEffect(() => {
+    const parent = navigationObj.getParent();
+    if (parent) {
+      if (!isFabVisible) {
+        parent.setOptions({ tabBarStyle: { display: 'none' } });
+      } else {
+        parent.setOptions({
+          tabBarStyle: {
+            backgroundColor: theme.colors.surface,
+            borderTopWidth: 0,
+            height: 65,
+            paddingBottom: 10,
+            paddingTop: 10,
+            position: 'absolute',
+            bottom: 20,
+            left: 20,
+            right: 20,
+            borderRadius: 32,
+            elevation: 8,
+          }
+        });
+      }
+    }
+  }, [isFabVisible, theme, navigationObj]);
+
   // Reset to home view when Inventory tab is pressed
   useEffect(() => {
     const unsubscribe = (navigationObj as any).addListener('tabPress', (e: any) => {
@@ -958,24 +1052,10 @@ const InventoryScreen: React.FC = () => {
       InteractionManager.runAfterInteractions(() => {
         setNavigationFluid(prevNav => {
           if (prevNav.state !== 'home') {
-             // Force restore tab bar when jumping home
-             navigationObj.getParent()?.setOptions({
-               tabBarStyle: {
-                 backgroundColor: theme.colors.surface,
-                 borderTopWidth: 0,
-                 height: 65,
-                 paddingBottom: 10,
-                 paddingTop: 10,
-                 position: 'absolute',
-                 bottom: 20,
-                 left: 20,
-                 right: 20,
-                 borderRadius: 32,
-                 elevation: 8,
-               }
-             });
+             // Force restore tab bar when jumping home - handled by useEffect now
              return { state: 'home' };
           }
+          homeScrollViewRef.current?.scrollTo({ y: 0, animated: true });
           setIsReordering(false);
           return prevNav;
         });
@@ -1005,7 +1085,7 @@ const InventoryScreen: React.FC = () => {
 
   const getTotalItems = () => inventoryItems.filter(item => !item.isIgnored).length;
   
-  const getLowStockCount = () => inventoryItems.filter(item => !item.isIgnored && item.quantity <= 0.25).length;
+  const getLowStockCount = () => inventoryItems.filter(item => !item.isIgnored && Math.round(item.quantity * 100) < 25).length;
 
   const getItemsForCategory = (category: InventoryCategory): InventoryItem[] => {
     return inventoryItems.filter(item => {
@@ -1134,11 +1214,11 @@ const InventoryScreen: React.FC = () => {
 
 
 
-  const handleAddItem = async () => {
+  const handleAddItem = async (name: string) => {
     try {
-      if (!newItemName.trim() || !navigation.subcategory) return;
+      if (!name.trim() || !navigation.subcategory) return;
       
-      await inventoryManager.addCustomItem(newItemName.trim(), navigation.subcategory);
+      await inventoryManager.addCustomItem(name.trim(), navigation.subcategory);
       setNewItemName('');
       setShowingAddDialog(false);
     } catch (err: any) {
@@ -1203,7 +1283,15 @@ const InventoryScreen: React.FC = () => {
   
 
   const renderStatsHeader = () => (
-    <View style={[styles.statsHeader, { backgroundColor: theme.colors.surfaceVariant }]}>
+    <View style={[
+      styles.statsHeader, 
+      { 
+        backgroundColor: theme.colors.surface,
+        borderWidth: 1,
+        borderColor: theme.colors.outlineVariant,
+        borderRadius: 16
+      }
+    ]}>
       <View style={styles.statItem}>
         <Text style={[styles.statLabel, { color: theme.colors.onSurfaceVariant }]}>Total Items</Text>
         <Text style={[styles.statValue, { color: theme.colors.onSurface }]}>{getTotalItems()}</Text>
@@ -1225,19 +1313,19 @@ const InventoryScreen: React.FC = () => {
     const subcategories = inventoryManager.getSubcategoriesForCategory(category);
     const allCategoryItems = inventoryManager.getItemsForCategory(category).filter(item => !item.isIgnored);
     const itemsCount = allCategoryItems.length;
-    const lowStockCount = allCategoryItems.filter(it => it.quantity <= 0.25).length;
+    const lowStockCount = allCategoryItems.filter(it => Math.round(it.quantity * 100) < 25).length;
 
     return (
       <Card
         key={category}
-        style={[styles.categoryCard, { width: cardWidth }]}
+        style={[styles.categoryCard, { width: cardWidth, backgroundColor: theme.colors.surface, ...commonStyles.shadow }]}
         onPress={() => setNavigationFluid({ state: 'category', category })}
       >
         <Card.Content style={styles.categoryCardContent}>
           <Icon
             name={config.icon as any}
             size={screen.isSmall ? 36 : screen.isMedium ? 40 : 44}
-            color={config.color}
+            color={getCategoryIconColor(category, theme.dark)}
             style={styles.categoryIcon}
           />
           <Title style={[styles.categoryTitle, { color: theme.colors.onSurface }]}>
@@ -1324,12 +1412,12 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
       childrenContainerStyle={{ overflow: 'visible' }}
     >
       <Card
-        style={styles.subcategoryCard}
+        style={[styles.subcategoryCard, { backgroundColor: theme.colors.surface, ...commonStyles.shadow }]}
         onPress={() => setNavigationFluid({ state: 'subcategory', category: navigation.category, subcategory: subName as InventorySubcategory })}
       >
         <Card.Content style={styles.subcategoryContent}>
-          <View style={[styles.iconContainer, { backgroundColor: (config?.color || theme.colors.primary) + '15' }]}>
-            <Icon name={(config?.icon || 'help-circle') as any} size={24} color={config?.color || theme.colors.primary} />
+          <View style={[styles.iconContainer, { backgroundColor: (theme.dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)') }]}>
+            <Icon name={(config?.icon || 'help-circle') as any} size={24} color={getSubcategoryIconColor(config, theme.dark)} />
           </View>
           <View style={styles.subcategoryInfo}>
             <Title style={[styles.subcategoryTitle, { color: theme.colors.onSurface }]}>
@@ -1381,9 +1469,9 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
 
   const renderItemRow = (item: InventoryItem, isSearch: boolean = false) => {
     let categoryName = '';
+    const subConfig = inventoryManager.getSubcategoryConfig(item.subcategory);
     if (isSearch) {
-      const config = inventoryManager.getSubcategoryConfig(item.subcategory);
-      categoryName = config?.category || '';
+      categoryName = subConfig?.category || '';
     }
     
     return (
@@ -1400,8 +1488,10 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
         isSearch={isSearch}
         name={item.name}
         quantity={item.quantity}
-        isIgnored={item.isIgnored}
+        isIgnored={item.isIgnored ?? false}
         categoryName={categoryName}
+        subcategoryIcon={subConfig?.icon}
+        iconColor={getSubcategoryIconColor(subConfig, theme.dark)}
       />
     );
   };
@@ -1480,7 +1570,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
     return (
       <View 
         key="home-screen" 
-        style={{ flex: 1, backgroundColor: theme.colors.background }} 
+        style={{ flex: 1 }} 
         collapsable={false}
         needsOffscreenAlphaCompositing={true}
       >
@@ -1503,6 +1593,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
         </View>
         
         <ScrollView
+          ref={homeScrollViewRef}
           style={styles.scrollView}
           contentContainerStyle={{ paddingBottom: 110 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
@@ -1534,7 +1625,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
     const renderDraggableSubcategory = ({ item, drag, isActive }: RenderItemParams<InventorySubcategory>) => {
       const subName = item;
       const subItems = getItemsForSubcategory(subName as InventorySubcategory);
-      const lowStockCount = subItems.filter(it => it.quantity <= 0.25).length;
+      const lowStockCount = subItems.filter(it => Math.round(it.quantity * 100) < 25).length;
       const config = inventoryManager.getSubcategoryConfig(subName as InventorySubcategory);
 
       return (
@@ -1548,8 +1639,8 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
             ]}
           >
             <Card.Content style={styles.subcategoryContent}>
-              <View style={[styles.iconContainer, { backgroundColor: (config?.color || theme.colors.primary) + '15' }]}>
-                <Icon name={(config?.icon || 'help-circle') as any} size={24} color={config?.color || theme.colors.primary} />
+              <View style={[styles.iconContainer, { backgroundColor: (theme.dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)') }]}>
+                <Icon name={(config?.icon || 'help-circle') as any} size={24} color={getSubcategoryIconColor(config, theme.dark)} />
               </View>
               <View style={styles.subcategoryInfo}>
                 <Title style={[styles.subcategoryTitle, { color: theme.colors.onSurface }]}>
@@ -1574,7 +1665,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
     return (
       <View 
         key={`category-${navigation.category}`} 
-        style={[styles.container, { backgroundColor: theme.colors.background }]} 
+        style={[styles.container]} 
         collapsable={false}
         needsOffscreenAlphaCompositing={true}
       >
@@ -1585,10 +1676,13 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
             size={24}
             onPress={() => setNavigationFluid({ state: 'home' })}
           />
-          <Title style={[styles.headerTitle, { color: theme.colors.onSurface }]}>
-            {navigation.category}
-          </Title>
-          <View style={{ flexDirection: 'row' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+            <Icon name={config.icon as any} size={22} color={getCategoryIconColor(navigation.category!, theme.dark)} style={{ marginRight: 6 }} />
+            <Title style={[styles.headerTitle, { color: theme.colors.onSurface }]} numberOfLines={1}>
+              {navigation.category}
+            </Title>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <IconButton
               icon={isReordering ? "check" : "sort-variant"}
               size={24}
@@ -1597,8 +1691,12 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
             {!isReordering && (
               <IconButton
                 icon="plus"
-                size={24}
+                size={22}
+                mode="contained"
+                containerColor={theme.dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)'}
+                iconColor={getCategoryIconColor(navigation.category!, theme.dark)}
                 onPress={openSubAddDialog}
+                style={{ margin: 4 }}
               />
             )}
           </View>
@@ -1631,7 +1729,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
                 const activeCount = allSubItems.filter(it => !it.isIgnored).length;
                 const hiddenCount = allSubItems.filter(it => it.isIgnored).length;
                 const items = getItemsForSubcategory(subName as InventorySubcategory);
-                const lowStockCount = allSubItems.filter(it => !it.isIgnored && it.quantity <= 0.25).length;
+                const lowStockCount = allSubItems.filter(it => !it.isIgnored && Math.round(it.quantity * 100) < 25).length;
                 const config = inventoryManager.getSubcategoryConfig(subName as InventorySubcategory);
                 return (
                   <SubcategoryRow
@@ -1709,7 +1807,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
     return (
       <View 
         key={`subcat-${navigation.subcategory}`} 
-        style={[styles.container, { backgroundColor: theme.colors.background }]} 
+        style={[styles.container]} 
         collapsable={false}
         needsOffscreenAlphaCompositing={true}
       >
@@ -1723,24 +1821,27 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
               setShowIgnoredOnly(false); // Reset ignored filter when going back
             }}
           />
-          <Title style={[styles.headerTitle, { color: theme.colors.onSurface }]}>
-            {navigation.subcategory}
-          </Title>
-          <View style={{ flexDirection: 'row' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+            <Icon name={(inventoryManager.getSubcategoryConfig(navigation.subcategory as any)?.icon || 'help-circle') as any} size={20} color={getSubcategoryIconColor(inventoryManager.getSubcategoryConfig(navigation.subcategory as any), theme.dark)} style={{ marginRight: 6 }} />
+            <Title style={[styles.headerTitle, { color: theme.colors.onSurface }]} numberOfLines={1}>
+              {navigation.subcategory}
+            </Title>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <IconButton
               icon={isReordering ? "check" : "sort-variant"}
               size={24}
               onPress={() => setIsReordering(!isReordering)}
             />
             {!isReordering && (
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 4 }}>
                   <IconButton
                     icon={showIgnoredOnly ? "eye-off" : "eye-off-outline"}
                     size={24}
                     iconColor={showIgnoredOnly ? theme.colors.error : theme.colors.onSurfaceVariant}
                     onPress={() => setShowIgnoredOnly(!showIgnoredOnly)}
-                    style={{ marginRight: -4 }}
+                    style={{ margin: 0 }}
                   />
                   {(() => {
                     const subItems = inventoryItems.filter(it => it.subcategory === navigation.subcategory);
@@ -1750,7 +1851,6 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
                         fontSize: 12, 
                         color: showIgnoredOnly ? theme.colors.error : theme.colors.onSurfaceVariant,
                         fontWeight: '600',
-                        marginRight: 4
                       }}>
                         {hiddenCount}
                       </Text>
@@ -1759,10 +1859,14 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
                 </View>
                 <IconButton
                   icon="plus"
-                  size={24}
+                  size={22}
+                  mode="contained"
+                  containerColor={theme.dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)'}
+                  iconColor={getSubcategoryIconColor(inventoryManager.getSubcategoryConfig(navigation.subcategory as any), theme.dark)}
                   onPress={() => setShowingAddDialog(true)}
+                  style={{ margin: 4 }}
                 />
-              </View>
+              </>
             )}
           </View>
         </View>
@@ -1797,25 +1901,19 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
 
   const renderAddItemDialog = () => (
     <Portal>
-      <Dialog visible={showingAddDialog} onDismiss={() => setShowingAddDialog(false)}>
+      <Dialog 
+        visible={showingAddDialog} 
+        onDismiss={() => setShowingAddDialog(false)}
+        style={{ backgroundColor: theme.colors.elevation?.level3 || theme.colors.surface, borderRadius: 28 }}
+      >
         <Dialog.Title>Add New Item</Dialog.Title>
         <Dialog.Content>
-          <Text style={{ marginBottom: 16 }}>Adding to {navigation.subcategory}</Text>
-          <TextInput
-            label="Item Name"
-            value={newItemName}
-            onChangeText={setNewItemName}
-            mode="outlined"
-            onSubmitEditing={handleAddItem}
-            returnKeyType="done"
-          />
+           <AddItemInput 
+              subcategory={navigation.subcategory || ''}
+              onAdd={handleAddItem}
+              onCancel={() => setShowingAddDialog(false)}
+           />
         </Dialog.Content>
-        <Dialog.Actions>
-          <Button onPress={() => setShowingAddDialog(false)}>Cancel</Button>
-          <Button onPress={handleAddItem} disabled={!newItemName.trim()}>
-            Add
-          </Button>
-        </Dialog.Actions>
       </Dialog>
     </Portal>
   );
@@ -1825,7 +1923,6 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
   const renderEditItemDialog = () => {
     // We use a ref and uncontrolled input to prevent cursor jumping issues during typing
     // caused by re-renders of the parent component.
-    const editNameRef = useRef('');
     
     // We need a wrapper component to hold the ref and logic, 
     // ensuring it persists across parent re-renders but resets on new item.
@@ -1870,7 +1967,11 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
 
   const renderDeleteConfirmDialog = () => (
     <Portal>
-      <Dialog visible={!!deleteConfirmItem} onDismiss={() => setDeleteConfirmItem(null)}>
+      <Dialog 
+        visible={!!deleteConfirmItem} 
+        onDismiss={() => setDeleteConfirmItem(null)}
+        style={{ backgroundColor: theme.dark ? theme.colors.elevation.level3 : '#F8FAFC', borderRadius: 28 }}
+      >
         <Dialog.Title>Delete Item</Dialog.Title>
         <Dialog.Content>
           <Text>Are you sure you want to delete "{deleteConfirmItem?.name}"?</Text>
@@ -1922,7 +2023,11 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
 
   const renderSuccessDialog = () => (
     <Portal>
-      <Dialog visible={showingSuccessDialog} onDismiss={() => setShowingSuccessDialog(false)}>
+      <Dialog 
+        visible={showingSuccessDialog} 
+        onDismiss={() => setShowingSuccessDialog(false)}
+        style={{ backgroundColor: theme.dark ? theme.colors.elevation.level3 : '#F1F5F9', borderRadius: 28 }}
+      >
         <Dialog.Title>Success</Dialog.Title>
         <Dialog.Content>
           <Text style={{ color: theme.colors.onSurface }}>{successMessage}</Text>
@@ -1960,7 +2065,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
           duration: 200,
           useNativeDriver: true
         }).start();
-        navigationObj.getParent()?.setOptions({ tabBarStyle: { display: 'none' } });
+        // navigationObj.getParent()?.setOptions({ tabBarStyle: { display: 'none' } }); // Handled by useEffect
       } else if (translationY < -20 && !isFabVisible) {
         // Swipe Up -> Show
         setIsFabVisible(true);
@@ -1970,21 +2075,6 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
           tension: 40,
           friction: 7
         }).start();
-        navigationObj.getParent()?.setOptions({
-          tabBarStyle: {
-            backgroundColor: theme.colors.surface,
-            borderTopWidth: 0,
-            height: 65,
-            paddingBottom: 10,
-            paddingTop: 10,
-            position: 'absolute',
-            bottom: 20,
-            left: 20,
-            right: 20,
-            borderRadius: 32,
-            elevation: 8,
-          }
-        });
       }
     };
 
@@ -2028,11 +2118,11 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
             <FAB
               icon="auto-fix"
               style={{ 
-                backgroundColor: theme.colors.primary, 
+                backgroundColor: theme.colors.secondaryContainer, 
                 borderRadius: 28,
                 elevation: 4
               }}
-              color={theme.dark ? '#000' : '#fff'}
+              color={theme.colors.onSecondaryContainer}
               onPress={handleStartShopping}
             />
           </Animated.View>
@@ -2040,9 +2130,15 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
       </PanGestureHandler>
     );
   };
-  const renderSubAddDialog = () => (
-    <Portal>
-      <Dialog visible={showingSubAddDialog} onDismiss={() => setShowingSubAddDialog(false)}>
+  const renderSubAddDialog = () => {
+    const config = navigation.category ? getCategoryConfig(navigation.category) : null;
+    return (
+      <Portal>
+        <Dialog 
+          visible={showingSubAddDialog} 
+          onDismiss={() => setShowingSubAddDialog(false)}
+          style={{ backgroundColor: theme.colors.elevation?.level3 || theme.colors.surface, borderRadius: 28 }}
+        >
         <Dialog.Title>{editingSubId ? 'Edit Type' : 'Add New Type'}</Dialog.Title>
         <Dialog.Content>
           <SubcategoryInput
@@ -2056,8 +2152,9 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
           />
         </Dialog.Content>
       </Dialog>
-    </Portal>
-  );
+      </Portal>
+    );
+  };
 
   const renderSubDeleteConfirmDialog = () => (
     <Portal>
@@ -2204,7 +2301,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
   }, [navigation.state, navigation.category, navigation.subcategory, inventoryItems, refreshing, isReordering, theme, searchQuery, isSearchVisible, showIgnoredOnly, isFabVisible]);
 
   return (
-    <GestureHandlerRootView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <GestureHandlerRootView style={styles.container}>
       {mainContent}
 
       {renderSearchOverlay()}

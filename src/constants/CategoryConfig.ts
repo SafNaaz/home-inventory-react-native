@@ -38,7 +38,7 @@ export const CATEGORY_CONFIG: Record<InventoryCategory, CategoryConfig> = {
   },
   [InventoryCategory.PERSONAL_CARE]: {
     icon: 'account-heart',
-    color: '#FF2D92',
+    color: '#64748B', // Neutral Slate instead of Pink/Violet
     subcategories: [
       BuiltinSubcategory.FACE,
       BuiltinSubcategory.BODY,
@@ -82,7 +82,7 @@ export const SUBCATEGORY_CONFIG: Record<string, SubcategoryConfig> = {
   },
   [BuiltinSubcategory.MINI_COOLER]: {
     icon: 'cube-outline',
-    color: '#BF5AF2',
+    color: '#475569',
     category: InventoryCategory.FRIDGE,
     sampleItems: ['Cold Drinks', 'Snacks', 'Chocolates'],
   },
@@ -140,13 +140,13 @@ export const SUBCATEGORY_CONFIG: Record<string, SubcategoryConfig> = {
   },
   [BuiltinSubcategory.KIDS]: {
     icon: 'baby-face',
-    color: '#FF2D92',
+    color: '#64748B',
     category: InventoryCategory.HYGIENE,
     sampleItems: ['Diapers', 'Baby Wipes', 'Baby Shampoo'],
   },
   [BuiltinSubcategory.GENERAL_CLEANING]: {
     icon: 'spray',
-    color: '#BF5AF2',
+    color: '#475569',
     category: InventoryCategory.HYGIENE,
     sampleItems: ['All-Purpose Cleaner', 'Floor Cleaner', 'Glass Cleaner'],
   },
@@ -154,7 +154,7 @@ export const SUBCATEGORY_CONFIG: Record<string, SubcategoryConfig> = {
   // Personal Care subcategories
   [BuiltinSubcategory.FACE]: {
     icon: 'face-woman',
-    color: '#FF2D92',
+    color: '#64748B',
     category: InventoryCategory.PERSONAL_CARE,
     sampleItems: ['CC Cream', 'Powder', 'Face Wash', 'Moisturizer'],
   },
@@ -166,7 +166,7 @@ export const SUBCATEGORY_CONFIG: Record<string, SubcategoryConfig> = {
   },
   [BuiltinSubcategory.HEAD]: {
     icon: 'head-outline',
-    color: '#5856D6',
+    color: '#1E293B', // Slate 800 (Dark neutral instead of violet)
     category: InventoryCategory.PERSONAL_CARE,
     sampleItems: ['Shampoo', 'Conditioner', 'Hair Oil', 'Hair Gel'],
   },

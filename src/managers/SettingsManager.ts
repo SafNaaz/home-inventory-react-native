@@ -279,7 +279,15 @@ export class SettingsManager {
         shouldShowAlert: true,
         shouldPlaySound: true,
         shouldSetBadge: false,
+        shouldShowBanner: true,
+        shouldShowList: true,
       }),
+    });
+
+    // Listen for notification responses (user tapping on a notification)
+    Notifications.addNotificationResponseReceivedListener(async (response) => {
+      console.log('🔔 Notification response received, clearing all notifications');
+      await Notifications.dismissAllNotificationsAsync();
     });
   }
 
@@ -432,10 +440,11 @@ export class SettingsManager {
         sound: true,
       },
       trigger: {
+        type: 'calendar',
         hour: time.getHours(),
         minute: time.getMinutes(),
         repeats: true,
-      },
+      } as any,
     });
   }
 
@@ -535,10 +544,11 @@ export class SettingsManager {
         ...(Platform.OS === 'android' ? { channelId: 'health' } : {}),
       },
       trigger: {
+        type: 'calendar',
         hour: time.getHours(),
         minute: time.getMinutes(),
         repeats: true,
-      },
+      } as any,
     });
 
     console.log(`💚 Health notification scheduled at ${this.formatTime(time)}`);

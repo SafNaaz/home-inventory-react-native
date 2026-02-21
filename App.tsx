@@ -1,13 +1,14 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo, useContext } from 'react';
 import { NavigationContainer, DefaultTheme as NavDefaultTheme, DarkTheme as NavDarkTheme } from '@react-navigation/native';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { createStackNavigator } from '@react-navigation/stack';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { Provider as PaperProvider, IconButton, Title, Paragraph, Button } from 'react-native-paper';
+import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
+import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
+import { createStackNavigator, CardStyleInterpolators } from '@react-navigation/stack';
+import { GestureHandlerRootView, FlatList, ScrollView } from 'react-native-gesture-handler';
+import { Provider as PaperProvider, IconButton, Title, Paragraph, Button, Text } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
-import { StatusBar, Alert, View, StyleSheet, AppState } from 'react-native';
-import { tabBar as tabBarDims, fontSize, spacing, iconSize } from './src/themes/Responsive';
+import { StatusBar, Alert, View, StyleSheet, AppState, TouchableOpacity, RefreshControl } from 'react-native';
+import { rs, tabBar as tabBarDims, fontSize, spacing, iconSize } from './src/themes/Responsive';
 
 // Screens
 import InventoryScreen from './src/screens/InventoryScreen';
@@ -17,6 +18,7 @@ import NotesScreen from './src/screens/NotesScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import NoteDetailScreen from './src/screens/NoteDetailScreen';
 import SplashScreen from './src/screens/SplashScreen';
+import ActivityHistoryScreen from './src/screens/ActivityHistoryScreen';
 
 import NotificationSettingsScreen from './src/screens/NotificationSettingsScreen';
 import { useColorScheme } from 'react-native';
@@ -28,9 +30,109 @@ import { notesManager } from './src/managers/NotesManager';
 
 // Themes
 import { lightTheme, darkTheme, commonStyles } from './src/themes/AppTheme';
+import * as Notifications from 'expo-notifications';
+import * as ExpoSplashScreen from 'expo-splash-screen';
 
-const Tab = createBottomTabNavigator();
+// Keep the native splash screen visible while we fetch resources
+ExpoSplashScreen.preventAutoHideAsync().catch(() => {
+  /* reloading app might cause error here, ignore */
+});
+
+export const SwipeContext = React.createContext({
+  swipeEnabled: true,
+  setSwipeEnabled: (enabled: boolean) => {},
+});
+
+const Tab = createMaterialTopTabNavigator();
 const Stack = createStackNavigator();
+
+// Tab Navigator Component
+const TabNavigator = () => {
+  const { swipeEnabled } = useContext(SwipeContext);
+  const systemColorScheme = useColorScheme();
+  const settings = settingsManager.getSettings();
+  const themeMode = settings.themeMode;
+  const isDark = themeMode === 'system' ? systemColorScheme === 'dark' : themeMode === 'dark';
+  const theme = isDark ? darkTheme : lightTheme;
+
+  return (
+    <Tab.Navigator
+      tabBarPosition="bottom"
+      screenOptions={{
+        swipeEnabled: swipeEnabled,
+      }}
+      tabBar={({ state, descriptors, navigation }) => {
+        return (
+          <View style={{
+            position: 'absolute',
+            bottom: tabBarDims.bottomOffset,
+            left: tabBarDims.sideOffset,
+            right: tabBarDims.sideOffset,
+            height: tabBarDims.height,
+            backgroundColor: theme.colors.surface,
+            borderRadius: tabBarDims.borderRadius,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-around',
+            ...commonStyles.shadow,
+            elevation: 8,
+            paddingBottom: rs(4),
+          }}>
+            {state.routes.map((route, index) => {
+              const isFocused = state.index === index;
+              const color = isFocused ? theme.colors.primary : theme.colors.onSurfaceVariant;
+
+              const onPress = () => {
+                const event = navigation.emit({
+                  type: 'tabPress',
+                  target: route.key,
+                  canPreventDefault: true,
+                });
+
+                if (!isFocused && !event.defaultPrevented) {
+                  navigation.navigate(route.name);
+                }
+              };
+
+              let iconName: any;
+              switch (route.name) {
+                case 'Inventory': iconName = isFocused ? 'fridge' : 'fridge-outline'; break;
+                case 'Shopping': iconName = isFocused ? 'cart' : 'cart-outline'; break;
+                case 'Insights': iconName = isFocused ? 'chart-bar' : 'chart-bar'; break;
+                case 'Notes': iconName = isFocused ? 'note-text' : 'note-text-outline'; break;
+                default: iconName = 'circle';
+              }
+
+              return (
+                <TouchableOpacity
+                  key={route.key}
+                  onPress={onPress}
+                  style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+                  activeOpacity={0.7}
+                >
+                  <Icon name={iconName} size={rs(24)} color={color} />
+                  <Text style={{ 
+                    fontSize: rs(10), 
+                    color, 
+                    fontWeight: '700',
+                    marginTop: rs(2),
+                  }}>
+                    {route.name}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        );
+      }}
+    >
+      <Tab.Screen name="Inventory" component={InventoryScreen} />
+      <Tab.Screen name="Shopping" component={ShoppingScreen} />
+      <Tab.Screen name="Insights" component={InsightsScreen} />
+      <Tab.Screen name="Notes" component={NotesScreen} />
+    </Tab.Navigator>
+  );
+};
 
 const App: React.FC = () => {
   const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>('system');
@@ -39,8 +141,7 @@ const App: React.FC = () => {
   const [isSecurityEnabled, setIsSecurityEnabled] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [showSplashScreen, setShowSplashScreen] = useState(true);
-
-
+  const [swipeEnabled, setSwipeEnabled] = useState(true);
 
   useEffect(() => {
     // Initialize app
@@ -100,6 +201,9 @@ const App: React.FC = () => {
         setIsAuthenticated(authSuccess);
       }
 
+      // Clear all notifications on startup
+      await Notifications.dismissAllNotificationsAsync();
+
       setIsLoading(false);
     } catch (error) {
       console.error('❌ Error initializing app:', error);
@@ -123,7 +227,11 @@ const App: React.FC = () => {
 
   // Show splash screen while initializing or during animation
   if (showSplashScreen) {
-    return <SplashScreen onAnimationFinish={handleSplashFinish} />;
+    return (
+      <PaperProvider theme={theme}>
+        <SplashScreen onAnimationFinish={handleSplashFinish} isDark={isDark} />
+      </PaperProvider>
+    );
   }
 
   // Show authentication screen if security is enabled but not authenticated
@@ -159,154 +267,14 @@ const App: React.FC = () => {
     );
   }
 
-  // Tab Navigator Component
-  const TabNavigator = () => {
-    return (
-      <Tab.Navigator
-        screenOptions={({ route }) => ({
-          tabBarIcon: ({ focused, color, size }) => {
-            let iconName: string;
-
-            switch (route.name) {
-              case 'Inventory':
-                iconName = focused ? 'fridge' : 'fridge-outline';
-                break;
-              case 'Shopping':
-                iconName = focused ? 'cart' : 'cart-outline';
-                break;
-              case 'Insights':
-                iconName = focused ? 'chart-bar' : 'chart-bar';
-                break;
-              case 'Notes':
-                iconName = focused ? 'note-text' : 'note-text-outline';
-                break;
-              default:
-                iconName = 'circle';
-            }
-
-            return <Icon name={iconName as any} size={size} color={color} />;
-          },
-          tabBarActiveTintColor: theme.colors.primary,
-          tabBarInactiveTintColor: theme.colors.onSurfaceVariant,
-          tabBarShowLabel: true,
-          tabBarLabelStyle: {
-            fontSize: fontSize.xs,
-            fontWeight: '600',
-            marginBottom: 2,
-          },
-          tabBarStyle: {
-            backgroundColor: theme.colors.surface,
-            borderTopWidth: 0,
-            height: tabBarDims.height,
-            paddingBottom: 8,
-            paddingTop: 8,
-            position: 'absolute',
-            bottom: tabBarDims.bottomOffset,
-            left: tabBarDims.sideOffset,
-            right: tabBarDims.sideOffset,
-            borderRadius: tabBarDims.borderRadius,
-            ...commonStyles.shadow,
-            elevation: 8,
-          },
-          headerStyle: {
-            backgroundColor: theme.colors.background,
-            elevation: 0,
-            shadowOpacity: 0,
-            borderBottomWidth: 0,
-          },
-          headerTitleAlign: 'center',
-          headerTitleStyle: {
-            fontWeight: '800',
-            fontSize: fontSize.xl,
-            color: theme.colors.onBackground,
-            letterSpacing: -0.5,
-          },
-          headerLeft: () => null,
-        })}
-      >
-        <Tab.Screen 
-          name="Inventory" 
-          component={InventoryScreen}
-          options={({ navigation }) => ({
-            title: 'Inventory',
-            headerRight: () => (
-              <View style={{ marginRight: 16 }}>
-                <IconButton
-                  icon="cog"
-                  size={22}
-                  iconColor={theme.colors.onSurfaceVariant}
-                  onPress={() => navigation.navigate('Settings')}
-                  style={{ margin: 0, backgroundColor: theme.colors.surfaceVariant }}
-                />
-              </View>
-            ),
-          })}
-        />
-        <Tab.Screen 
-          name="Shopping" 
-          component={ShoppingScreen}
-          options={({ navigation }) => ({
-            title: 'Shopping List',
-            headerRight: () => (
-              <View style={{ marginRight: 16 }}>
-                <IconButton
-                  icon="cog"
-                  size={22}
-                  iconColor={theme.colors.onSurfaceVariant}
-                  onPress={() => navigation.navigate('Settings')}
-                  style={{ margin: 0, backgroundColor: theme.colors.surfaceVariant }}
-                />
-              </View>
-            ),
-          })}
-        />
-        <Tab.Screen 
-          name="Insights" 
-          component={InsightsScreen}
-          options={({ navigation }) => ({
-            title: 'Insights',
-            headerRight: () => (
-              <View style={{ marginRight: 16 }}>
-                <IconButton
-                  icon="cog"
-                  size={22}
-                  iconColor={theme.colors.onSurfaceVariant}
-                  onPress={() => navigation.navigate('Settings')}
-                  style={{ margin: 0, backgroundColor: theme.colors.surfaceVariant }}
-                />
-              </View>
-            ),
-          })}
-        />
-        <Tab.Screen 
-          name="Notes" 
-          component={NotesScreen}
-          options={({ navigation }) => ({
-            title: 'Notes',
-            headerRight: () => (
-              <View style={{ marginRight: 16 }}>
-                <IconButton
-                  icon="cog"
-                  size={22}
-                  iconColor={theme.colors.onSurfaceVariant}
-                  onPress={() => navigation.navigate('Settings')}
-                  style={{ margin: 0, backgroundColor: theme.colors.surfaceVariant }}
-                />
-              </View>
-            ),
-          })}
-        />
-      </Tab.Navigator>
-    );
-  };
-
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
+    <SwipeContext.Provider value={{ swipeEnabled, setSwipeEnabled }}>
     <PaperProvider theme={theme}>
       <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
         <StatusBar
           barStyle={isDark ? 'light-content' : 'dark-content'}
-          backgroundColor={theme.colors.surface}
+          backgroundColor={isDark ? theme.colors.surface : theme.colors.background}
         />
         <NavigationContainer
           theme={{
@@ -325,7 +293,10 @@ const App: React.FC = () => {
           <Stack.Navigator
             screenOptions={{
               headerStyle: {
-                backgroundColor: theme.colors.surface,
+                backgroundColor: theme.colors.background,
+                elevation: 0,
+                shadowOpacity: 0,
+                borderBottomWidth: 0,
               },
               headerTintColor: theme.colors.onSurface,
               headerTitleStyle: {
@@ -334,12 +305,55 @@ const App: React.FC = () => {
               },
               headerTitleAlign: 'left',
               cardStyle: { backgroundColor: theme.colors.background },
+              gestureEnabled: true,
+              gestureDirection: 'horizontal',
+              gestureResponseDistance: 50,
+              cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
             }}
           >
             <Stack.Screen 
               name="MainTabs" 
               component={TabNavigator}
-              options={{ headerShown: false }}
+              options={({ route, navigation }: any) => {
+                const routeName = getFocusedRouteNameFromRoute(route) ?? 'Inventory';
+                let headerTitle = 'Inventory';
+                switch (routeName) {
+                  case 'Inventory': headerTitle = 'Inventory'; break;
+                  case 'Shopping': headerTitle = 'Shopping List'; break;
+                  case 'Insights': headerTitle = 'Insights'; break;
+                  case 'Notes': headerTitle = 'Notes'; break;
+                }
+                
+                return {
+                  headerShown: true,
+                  title: headerTitle,
+                  headerTitleAlign: 'center',
+                  headerTitleStyle: {
+                    fontWeight: '800',
+                    fontSize: fontSize.xl,
+                    color: theme.colors.onBackground,
+                    letterSpacing: -0.5,
+                  },
+                  headerStyle: {
+                    backgroundColor: theme.colors.background,
+                    elevation: 0,
+                    shadowOpacity: 0,
+                    borderBottomWidth: 0,
+                  },
+                  headerLeft: () => null,
+                  headerRight: () => (
+                    <View style={{ marginRight: 16 }}>
+                      <IconButton
+                        icon="cog"
+                        size={22}
+                        iconColor={theme.colors.onSurfaceVariant}
+                        onPress={() => navigation.navigate('Settings')}
+                        style={{ margin: 0, backgroundColor: theme.colors.surfaceVariant }}
+                      />
+                    </View>
+                  ),
+                };
+              }}
             />
             <Stack.Screen 
               name="Settings" 
@@ -365,10 +379,20 @@ const App: React.FC = () => {
                 headerBackTitleVisible: false,
               }}
             />
+            <Stack.Screen 
+              name="ActivityHistory" 
+              component={ActivityHistoryScreen}
+              options={{ 
+                title: 'Activity History',
+                headerBackTitleVisible: false,
+                gestureResponseDistance: 40,
+              }}
+            />
           </Stack.Navigator>
         </NavigationContainer>
       </View>
     </PaperProvider>
+    </SwipeContext.Provider>
     </GestureHandlerRootView>
   );
 };

@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { InventoryItem, ShoppingListItem, Note, AppSettings, ShoppingState } from '../models/Types';
+import { InventoryItem, ShoppingListItem, Note, AppSettings, ShoppingState, ActivityLog } from '../models/Types';
 
 // MARK: - Storage Keys
 const STORAGE_KEYS = {
@@ -11,6 +11,7 @@ const STORAGE_KEYS = {
   CUSTOM_SUBCATEGORIES: 'custom_subcategories',
   HIDDEN_BUILTIN_SUBS: 'hidden_builtin_subs',
   SUBCATEGORY_ORDER: 'subcategory_order',
+  ACTIVITY_LOGS: 'activity_logs',
 } as const;
 
 // MARK: - Storage Service Class
@@ -288,6 +289,44 @@ export class StorageService {
     }
   }
 
+  // MARK: - Activity Logs
+  static async saveActivityLogs(logs: ActivityLog[]): Promise<void> {
+    try {
+      const serializedLogs = JSON.stringify(logs, (key, value) => {
+        if (key === 'timestamp' || key === 'lastUpdated' || key === 'purchaseHistory') {
+          return value instanceof Date ? value.toISOString() : value;
+        }
+        return value;
+      });
+      await AsyncStorage.setItem(STORAGE_KEYS.ACTIVITY_LOGS, serializedLogs);
+    } catch (error) {
+      console.error('❌ Error saving activity logs:', error);
+      throw error;
+    }
+  }
+
+  static async loadActivityLogs(): Promise<ActivityLog[]> {
+    try {
+      const serializedLogs = await AsyncStorage.getItem(STORAGE_KEYS.ACTIVITY_LOGS);
+      if (!serializedLogs) return [];
+
+      const logs = JSON.parse(serializedLogs, (key, value) => {
+        if (key === 'timestamp' || key === 'lastUpdated') {
+          return new Date(value);
+        }
+        if (key === 'purchaseHistory') {
+          return Array.isArray(value) ? value.map(date => new Date(date)) : [];
+        }
+        return value;
+      });
+
+      return logs;
+    } catch (error) {
+      console.error('❌ Error loading activity logs:', error);
+      return [];
+    }
+  }
+
   // MARK: - Clear All Data
   static async clearAllData(): Promise<void> {
     try {
@@ -300,6 +339,7 @@ export class StorageService {
         STORAGE_KEYS.CUSTOM_SUBCATEGORIES,
         STORAGE_KEYS.HIDDEN_BUILTIN_SUBS,
         STORAGE_KEYS.SUBCATEGORY_ORDER,
+        STORAGE_KEYS.ACTIVITY_LOGS,
       ]);
       console.log('🗑️ All data cleared from storage');
     } catch (error) {
