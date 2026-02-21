@@ -60,6 +60,7 @@ const TabNavigator = () => {
       tabBarPosition="bottom"
       screenOptions={{
         swipeEnabled: swipeEnabled,
+        animationEnabled: false,
       }}
       tabBar={({ state, descriptors, navigation }) => {
         return (
