@@ -152,8 +152,8 @@ const ShoppingScreen: React.FC = () => {
     await inventoryManager.removeItemFromShoppingList(item.id);
   };
 
-  const handleAddMiscItem = async () => {
-    const trimmedName = newItemName.trim();
+  const handleAddMiscItem = async (name: string) => {
+    const trimmedName = name.trim();
     if (!trimmedName) {
       setInvalidInputAlertVisible(true);
       return;
@@ -706,54 +706,81 @@ const ShoppingScreen: React.FC = () => {
       <Dialog visible={addItemDialogVisible} onDismiss={() => setAddItemDialogVisible(false)}>
         <Dialog.Title>Add Misc Item</Dialog.Title>
         <Dialog.Content>
-          <TextInput
-            label="Item Name"
-            value={newItemName}
-            onChangeText={setNewItemName}
-            mode="outlined"
-            autoFocus
-            onSubmitEditing={handleAddMiscItem}
-            returnKeyType="done"
-          />
-          
-          {miscSuggestions.length > 0 && (
-            <View style={styles.suggestions}>
-              <Text style={[styles.suggestionsTitle, { color: theme.colors.onSurface }]}>Recent items:</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {miscSuggestions.map((suggestion, index) => (
-                  <Button
-                    key={index}
-                    mode="outlined"
-                    compact
-                    onPress={() => handleSuggestionPress(suggestion)}
-                    style={[
-                      styles.suggestionChip, 
-                      { 
-                        backgroundColor: theme.colors.primary + '15',
-                        borderColor: theme.colors.primary + '30'
-                      }
-                    ]}
-                  >
-                    {suggestion}
-                  </Button>
-                ))}
-              </ScrollView>
-            </View>
-          )}
+           <AddShoppingItemInput 
+              initialValue={newItemName}
+              suggestions={miscSuggestions}
+              onAdd={handleAddMiscItem}
+              onCancel={() => setAddItemDialogVisible(false)}
+           />
         </Dialog.Content>
-        <Dialog.Actions>
-          <Button onPress={() => setAddItemDialogVisible(false)}>Cancel</Button>
-          <Button 
-            mode="contained" 
-            onPress={handleAddMiscItem}
-            style={{ borderRadius: 12 }}
-          >
-            Add Item
-          </Button>
-        </Dialog.Actions>
       </Dialog>
     </Portal>
   );
+
+const AddShoppingItemInput = ({ initialValue, onAdd, onCancel, suggestions }: { 
+  initialValue: string, 
+  onAdd: (name: string) => void, 
+  onCancel: () => void,
+  suggestions: string[]
+}) => {
+  const theme = useTheme();
+  const [isValid, setIsValid] = useState(!!initialValue.trim());
+  const [text, setText] = useState(initialValue);
+
+  const handleChangeText = (val: string) => {
+    setText(val);
+    setIsValid(!!val.trim());
+  };
+
+  const handleAdd = () => {
+    if (text.trim()) {
+      onAdd(text.trim());
+    }
+  };
+
+  return (
+    <>
+      <TextInput
+        label="Item Name"
+        value={text}
+        onChangeText={handleChangeText}
+        mode="outlined"
+        autoFocus
+        onSubmitEditing={handleAdd}
+        returnKeyType="done"
+      />
+      
+      {suggestions.length > 0 && (
+        <View style={{ marginTop: 16 }}>
+          <Text style={{ fontSize: 12, marginBottom: 8, opacity: 0.7, fontWeight: '600', color: theme.colors.onSurface }}>Recent items:</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            {suggestions.map((suggestion, index) => (
+              <Button
+                key={index}
+                mode="outlined"
+                compact
+                onPress={() => handleChangeText(suggestion)}
+                style={{
+                   marginRight: 6,
+                   borderRadius: 8,
+                   backgroundColor: theme.colors.primary + '10',
+                   borderColor: theme.colors.primary + '30'
+                }}
+              >
+                {suggestion}
+              </Button>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+      
+      <Dialog.Actions style={{ paddingHorizontal: 0, marginTop: 16 }}>
+        <Button onPress={onCancel}>Cancel</Button>
+        <Button mode="contained" onPress={handleAdd} disabled={!isValid} style={{ borderRadius: 12 }}>Add Item</Button>
+      </Dialog.Actions>
+    </>
+  );
+};
 
   const renderIgnoredItemsDialog = () => (
     <Portal>

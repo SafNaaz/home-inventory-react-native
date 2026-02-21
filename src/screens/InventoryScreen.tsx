@@ -698,9 +698,42 @@ const EditItemInput = ({ initialValue, onSave, onCancel }: { initialValue: strin
       
       <Dialog.Actions style={{ paddingHorizontal: 0, marginTop: 10 }}>
         <Button onPress={onCancel}>Cancel</Button>
-        <Button onPress={handleSave} disabled={!isValid}>
-          Save
-        </Button>
+        <Button onPress={handleSave} disabled={!isValid}>Save</Button>
+      </Dialog.Actions>
+    </>
+  );
+};
+
+const AddItemInput = ({ onAdd, onCancel, subcategory }: { onAdd: (name: string) => void, onCancel: () => void, subcategory: string }) => {
+  const [isValid, setIsValid] = useState(false);
+  const textRef = useRef('');
+
+  const handleChangeText = (text: string) => {
+    textRef.current = text;
+    setIsValid(!!text.trim());
+  };
+
+  const handleAdd = () => {
+    if (textRef.current.trim()) {
+      onAdd(textRef.current.trim());
+    }
+  };
+
+  return (
+    <>
+      <Text style={{ marginBottom: 16 }}>Adding to {subcategory}</Text>
+      <TextInput
+        label="Item Name"
+        onChangeText={handleChangeText}
+        mode="outlined"
+        onSubmitEditing={handleAdd}
+        returnKeyType="done"
+        autoFocus={true}
+      />
+      
+      <Dialog.Actions style={{ paddingHorizontal: 0, marginTop: 10 }}>
+        <Button onPress={onCancel}>Cancel</Button>
+        <Button onPress={handleAdd} disabled={!isValid}>Add</Button>
       </Dialog.Actions>
     </>
   );
@@ -1146,11 +1179,11 @@ const InventoryScreen: React.FC = () => {
 
 
 
-  const handleAddItem = async () => {
+  const handleAddItem = async (name: string) => {
     try {
-      if (!newItemName.trim() || !navigation.subcategory) return;
+      if (!name.trim() || !navigation.subcategory) return;
       
-      await inventoryManager.addCustomItem(newItemName.trim(), navigation.subcategory);
+      await inventoryManager.addCustomItem(name.trim(), navigation.subcategory);
       setNewItemName('');
       setShowingAddDialog(false);
     } catch (err: any) {
@@ -1812,22 +1845,12 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
       <Dialog visible={showingAddDialog} onDismiss={() => setShowingAddDialog(false)}>
         <Dialog.Title>Add New Item</Dialog.Title>
         <Dialog.Content>
-          <Text style={{ marginBottom: 16 }}>Adding to {navigation.subcategory}</Text>
-          <TextInput
-            label="Item Name"
-            value={newItemName}
-            onChangeText={setNewItemName}
-            mode="outlined"
-            onSubmitEditing={handleAddItem}
-            returnKeyType="done"
-          />
+           <AddItemInput 
+              subcategory={navigation.subcategory || ''}
+              onAdd={handleAddItem}
+              onCancel={() => setShowingAddDialog(false)}
+           />
         </Dialog.Content>
-        <Dialog.Actions>
-          <Button onPress={() => setShowingAddDialog(false)}>Cancel</Button>
-          <Button onPress={handleAddItem} disabled={!newItemName.trim()}>
-            Add
-          </Button>
-        </Dialog.Actions>
       </Dialog>
     </Portal>
   );
