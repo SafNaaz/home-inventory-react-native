@@ -29,6 +29,7 @@ import {
   Dialog,
   TextInput,
   Snackbar,
+  Divider,
 } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -368,7 +369,7 @@ const ShoppingScreen: React.FC = () => {
                   const config = !isMisc ? getCategoryConfig(catKey as InventoryCategory) : null;
                   
                   return (
-                      <View key={catKey} style={styles.categoryGroup}>
+                      <View key={catKey} style={[styles.categoryCard, { backgroundColor: theme.colors.surface }]}>
                           <View style={styles.categoryHeader}>
                               <Icon 
                                 name={(config ? config.icon : 'tag-multiple') as any} 
@@ -380,7 +381,12 @@ const ShoppingScreen: React.FC = () => {
                                   {isMisc ? 'Miscellaneous' : catKey.charAt(0).toUpperCase() + catKey.slice(1).toLowerCase().replace('_', ' ')}
                               </Text>
                           </View>
-                          {categoryItems.map(renderShoppingListItem)}
+                          {categoryItems.map((item, idx) => (
+                            <React.Fragment key={item.id}>
+                              {renderShoppingListItem(item)}
+                              {idx < categoryItems.length - 1 && <Divider style={{ marginHorizontal: sp.md, opacity: 0.5 }} />}
+                            </React.Fragment>
+                          ))}
                       </View>
                   );
               })}
@@ -389,7 +395,7 @@ const ShoppingScreen: React.FC = () => {
   };
 
   const renderEmptyState = () => (
-    <View style={[styles.emptyState, { backgroundColor: theme.colors.background }]}>
+    <View style={styles.emptyState}>
       <DoodleBackground />
       <Icon name="cart-outline" size={64} color={theme.colors.onSurfaceVariant} />
       <Text variant="headlineSmall" style={[styles.emptyTitle, { color: theme.colors.onBackground }]}>No Shopping List</Text>
@@ -405,18 +411,18 @@ const ShoppingScreen: React.FC = () => {
         Generate Shopping List
       </Button>
       <Button
-        mode="text"
+        mode="contained"
         onPress={handleOpenIgnoredItemsDialog}
-        style={{ marginTop: 8 }}
-        textColor={theme.colors.secondary}
+        style={{ marginTop: 8, backgroundColor: theme.colors.secondaryContainer }}
+        textColor={theme.colors.onSecondaryContainer}
       >
         Add from hidden items
       </Button>
       <Button
-        mode="text"
+        mode="contained"
         onPress={handleOpenSearchItemsDialog}
-        style={{ marginTop: 0 }}
-        textColor={theme.colors.primary}
+        style={{ marginTop: 8, backgroundColor: theme.colors.secondaryContainer }}
+        textColor={theme.colors.onSecondaryContainer}
         icon={searchLoading ? undefined : "magnify"}
         loading={searchLoading}
         disabled={searchLoading}
@@ -425,15 +431,15 @@ const ShoppingScreen: React.FC = () => {
       </Button>
       <FAB
         icon="tag-plus"
-        style={[styles.fab, { backgroundColor: theme.colors.primary }]}
-        color={theme.dark ? '#000' : '#fff'}
+        style={[styles.fab, { backgroundColor: theme.colors.secondaryContainer }]}
+        color={theme.colors.onSecondaryContainer}
         onPress={() => setAddItemDialogVisible(true)}
       />
     </View>
   );
 
   const renderGeneratingState = () => (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <View style={styles.container}>
       <DoodleBackground />
       <Card style={[styles.statusCard, { backgroundColor: theme.colors.surface }]} mode="elevated">
         <Card.Content>
@@ -462,14 +468,11 @@ const ShoppingScreen: React.FC = () => {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         {shoppingList.length > 0 ? (
-          <Card style={styles.listCard}>
-            <Card.Content>
-              <Title>Shopping List ({shoppingList.length} items)</Title>
-              {renderGroupedItems(shoppingList)}
-            </Card.Content>
-          </Card>
+          <View style={styles.listContainer}>
+            {renderGroupedItems(shoppingList)}
+          </View>
         ) : (
-          <View style={[styles.emptyListState, { backgroundColor: theme.colors.background }]}>
+          <View style={[styles.emptyListState]}>
             <Text style={{ color: theme.colors.onBackground }}>No items in shopping list. Add some items to get started.</Text>
           </View>
         )}
@@ -486,21 +489,21 @@ const ShoppingScreen: React.FC = () => {
           Finalize List
         </Button>
         
-        <View style={styles.secondaryActions}>
+        <View style={[styles.secondaryActions, { backgroundColor: theme.colors.surface, padding: 6, borderRadius: 16, borderWidth: 1, borderColor: theme.colors.outlineVariant }]}>
           <Button
-            mode="outlined"
+            mode="contained"
             onPress={handleOpenIgnoredItemsDialog}
-            style={styles.secondaryActionButton}
-            textColor={theme.colors.secondary}
+            style={[styles.secondaryActionButton, { backgroundColor: theme.colors.secondaryContainer }]}
+            textColor={theme.colors.onSecondaryContainer}
             labelStyle={{ fontSize: 11 }}
           >
             Hidden
           </Button>
           <Button
-            mode="outlined"
+            mode="contained"
             onPress={handleOpenSearchItemsDialog}
-            style={styles.secondaryActionButton}
-            textColor={theme.colors.primary}
+            style={[styles.secondaryActionButton, { backgroundColor: theme.colors.secondaryContainer }]}
+            textColor={theme.colors.onSecondaryContainer}
             labelStyle={{ fontSize: 11 }}
             icon={searchLoading ? undefined : "magnify"}
             loading={searchLoading}
@@ -521,15 +524,15 @@ const ShoppingScreen: React.FC = () => {
 
       <FAB
         icon="tag-plus"
-        style={[styles.fab, { backgroundColor: theme.colors.primary }]}
-        color={theme.dark ? '#000' : '#fff'}
+        style={[styles.fab, { backgroundColor: theme.colors.secondaryContainer }]}
+        color={theme.colors.onSecondaryContainer}
         onPress={() => setAddItemDialogVisible(true)}
       />
     </View>
   );
 
   const renderListReadyState = () => (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <View style={styles.container}>
       <DoodleBackground />
       <Card style={[styles.statusCard, { backgroundColor: theme.colors.surface }]} mode="elevated">
         <Card.Content>
@@ -557,12 +560,9 @@ const ShoppingScreen: React.FC = () => {
         style={styles.scrollView}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        <Card style={styles.listCard}>
-          <Card.Content>
-            <Title>Shopping List ({shoppingList.length} items)</Title>
-            {renderGroupedItems(shoppingList)}
-          </Card.Content>
-        </Card>
+        <View style={styles.listContainer}>
+          {renderGroupedItems(shoppingList)}
+        </View>
       </ScrollView>
 
       <View style={styles.actionButtons}>
@@ -596,7 +596,7 @@ const ShoppingScreen: React.FC = () => {
     const uncheckedItems = getUncheckedItems();
 
     return (
-      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <View style={styles.container}>
         <DoodleBackground />
         <Card style={[styles.statusCard, { backgroundColor: theme.colors.surface }]} mode="elevated">
           <Card.Content>
@@ -630,21 +630,17 @@ const ShoppingScreen: React.FC = () => {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
           {uncheckedItems.length > 0 && (
-            <Card style={styles.listCard}>
-              <Card.Content>
-                <Title>To Buy ({uncheckedItems.length} items)</Title>
-                {renderGroupedItems(uncheckedItems)}
-              </Card.Content>
-            </Card>
+            <View style={styles.listContainer}>
+              <Title style={styles.sectionTitle}>To Buy ({uncheckedItems.length} items)</Title>
+              {renderGroupedItems(uncheckedItems)}
+            </View>
           )}
 
           {checkedItems.length > 0 && (
-            <Card style={styles.listCard}>
-              <Card.Content>
-                <Title>In Cart ({checkedItems.length} items)</Title>
-                {renderGroupedItems(checkedItems)}
-              </Card.Content>
-            </Card>
+            <View style={styles.listContainer}>
+              <Title style={styles.sectionTitle}>In Cart ({checkedItems.length} items)</Title>
+              {renderGroupedItems(checkedItems)}
+            </View>
           )}
         </ScrollView>
 
@@ -659,21 +655,21 @@ const ShoppingScreen: React.FC = () => {
             Complete Shopping
           </Button>
           
-          <View style={styles.secondaryActions}>
+          <View style={[styles.secondaryActions, { backgroundColor: theme.colors.surface, padding: 6, borderRadius: 16, borderWidth: 1, borderColor: theme.colors.outlineVariant }]}>
             <Button
-              mode="text"
+              mode="contained"
               onPress={handleOpenIgnoredItemsDialog}
-              style={styles.secondaryActionButton}
-              textColor={theme.colors.secondary}
+              style={[styles.secondaryActionButton, { backgroundColor: theme.colors.secondaryContainer }]}
+              textColor={theme.colors.onSecondaryContainer}
               labelStyle={{ fontSize: 11 }}
             >
               Hidden
             </Button>
             <Button
-              mode="text"
+              mode="contained"
               onPress={handleOpenSearchItemsDialog}
-              style={styles.secondaryActionButton}
-              textColor={theme.colors.primary}
+              style={[styles.secondaryActionButton, { backgroundColor: theme.colors.secondaryContainer }]}
+              textColor={theme.colors.onSecondaryContainer}
               labelStyle={{ fontSize: 11 }}
               icon={searchLoading ? undefined : "magnify"}
               loading={searchLoading}
@@ -693,8 +689,8 @@ const ShoppingScreen: React.FC = () => {
         </View>
       <FAB
         icon="tag-plus"
-        style={[styles.fab, { backgroundColor: theme.colors.primary }]}
-        color={theme.dark ? '#000' : '#fff'}
+        style={[styles.fab, { backgroundColor: theme.colors.secondaryContainer }]}
+        color={theme.colors.onSecondaryContainer}
         onPress={() => setAddItemDialogVisible(true)}
       />
     </View>
@@ -703,15 +699,19 @@ const ShoppingScreen: React.FC = () => {
 
   const renderAddItemDialog = () => (
     <Portal>
-      <Dialog visible={addItemDialogVisible} onDismiss={() => setAddItemDialogVisible(false)}>
+      <Dialog 
+        visible={addItemDialogVisible} 
+        onDismiss={() => setAddItemDialogVisible(false)}
+        style={{ backgroundColor: theme.colors.elevation?.level3 || theme.colors.surface, borderRadius: 28 }}
+      >
         <Dialog.Title>Add Misc Item</Dialog.Title>
         <Dialog.Content>
-           <AddShoppingItemInput 
+            <AddShoppingItemInput 
               initialValue={newItemName}
               suggestions={miscSuggestions}
               onAdd={handleAddMiscItem}
               onCancel={() => setAddItemDialogVisible(false)}
-           />
+            />
         </Dialog.Content>
       </Dialog>
     </Portal>
@@ -784,7 +784,11 @@ const AddShoppingItemInput = ({ initialValue, onAdd, onCancel, suggestions }: {
 
   const renderIgnoredItemsDialog = () => (
     <Portal>
-      <Dialog visible={ignoredItemsDialogVisible} onDismiss={() => setIgnoredItemsDialogVisible(false)} style={{ maxHeight: '80%' }}>
+      <Dialog 
+        visible={ignoredItemsDialogVisible} 
+        onDismiss={() => setIgnoredItemsDialogVisible(false)} 
+        style={{ maxHeight: '80%', backgroundColor: theme.colors.elevation?.level3 || theme.colors.surface, borderRadius: 28 }}
+      >
         <Dialog.Title>Add from Hidden Items</Dialog.Title>
         <Dialog.Content>
           {ignoredItems.length > 0 ? (
@@ -824,7 +828,7 @@ const AddShoppingItemInput = ({ initialValue, onAdd, onCancel, suggestions }: {
       
       {/* Search and Add Dialog */}
       <Portal>
-        <Dialog visible={searchItemsDialogVisible} onDismiss={() => setSearchItemsDialogVisible(false)} style={{ maxHeight: '80%' }}>
+        <Dialog visible={searchItemsDialogVisible} onDismiss={() => setSearchItemsDialogVisible(false)} style={{ maxHeight: '85%', backgroundColor: theme.colors.elevation?.level3 || theme.colors.surface, borderRadius: 28 }}>
           <Dialog.Content>
             <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{maxHeight:'100%'}}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
@@ -1036,7 +1040,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     margin: screen.isSmall ? 12 : 16,
     right: 0,
-    bottom: tabBarDims.height + tabBarDims.bottomOffset + 60,
+    bottom: tabBarDims.height + tabBarDims.bottomOffset + 85,
     borderRadius: 28,
   },
   emptyState: {
@@ -1077,6 +1081,26 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     opacity: 0.7,
     fontWeight: '600',
+  },
+  categoryCard: {
+    margin: sp.md,
+    marginBottom: sp.sm,
+    padding: sp.sm,
+    borderRadius: r.lg,
+    ...commonStyles.shadow,
+  },
+  sectionContainer: {
+    marginBottom: sp.lg,
+  },
+  listContainer: {
+    paddingBottom: 20,
+  },
+  sectionTitle: {
+    marginLeft: sp.md,
+    marginTop: sp.md,
+    marginBottom: sp.xs,
+    fontSize: fs.lg,
+    fontWeight: 'bold',
   },
   suggestionChip: {
     marginRight: 6,

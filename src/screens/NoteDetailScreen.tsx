@@ -679,7 +679,9 @@ const NoteDetailScreen: React.FC = () => {
               styles.sideToolbarFixed,
               {
                 opacity: sideMenuOpacity,
-                backgroundColor: theme.dark ? 'rgba(30, 41, 59, 0.8)' : 'rgba(255, 255, 255, 0.8)'
+                backgroundColor: theme.colors.surface,
+                borderWidth: 1,
+                borderColor: theme.colors.outlineVariant,
               }
             ]}>
               <IconButton

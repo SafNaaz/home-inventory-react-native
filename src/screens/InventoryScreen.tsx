@@ -551,9 +551,10 @@ const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, on
       style={[
         styles.itemCard, 
         { 
-          elevation: item.isIgnored ? 0 : 2,
-          backgroundColor: theme.colors.surface,
+          backgroundColor: isSearch ? theme.colors.surfaceVariant : theme.colors.surface,
           borderRadius: 24,
+          ...commonStyles.shadow,
+          elevation: (item.isIgnored || isSearch) ? 0 : 6,
         }
       ]}
     >
@@ -698,7 +699,7 @@ const EditItemInput = ({ initialValue, onSave, onCancel }: { initialValue: strin
       
       <Dialog.Actions style={{ paddingHorizontal: 0, marginTop: 10 }}>
         <Button onPress={onCancel}>Cancel</Button>
-        <Button onPress={handleSave} disabled={!isValid}>Save</Button>
+        <Button mode="contained" onPress={handleSave} disabled={!isValid} style={{ borderRadius: 12 }}>Save</Button>
       </Dialog.Actions>
     </>
   );
@@ -733,7 +734,7 @@ const AddItemInput = ({ onAdd, onCancel, subcategory }: { onAdd: (name: string) 
       
       <Dialog.Actions style={{ paddingHorizontal: 0, marginTop: 10 }}>
         <Button onPress={onCancel}>Cancel</Button>
-        <Button onPress={handleAdd} disabled={!isValid}>Add</Button>
+        <Button mode="contained" onPress={handleAdd} disabled={!isValid} style={{ borderRadius: 12 }}>Add</Button>
       </Dialog.Actions>
     </>
   );
@@ -853,6 +854,7 @@ const InventoryScreen: React.FC = () => {
   const sheetTranslateY = useRef(new Animated.Value(0)).current;
   const searchInputRef = useRef<RNTextInput>(null);
   const isSearchVisibleRef = useRef(isSearchVisible);
+  const editNameRef = useRef('');
 
   useEffect(() => {
     isSearchVisibleRef.current = isSearchVisible;
@@ -892,7 +894,7 @@ const InventoryScreen: React.FC = () => {
     }
 
     const diff = currentScrollY - lastScrollY.current;
-    if (Math.abs(diff) < 5) return; // Ignore small noise
+    if (Math.abs(diff) < 5) return; 
 
     if (diff > 20 && isFabVisible) {
       setIsFabVisible(false);
@@ -901,7 +903,6 @@ const InventoryScreen: React.FC = () => {
         duration: 200,
         useNativeDriver: true
       }).start();
-      navigationObj.getParent()?.setOptions({ tabBarStyle: { display: 'none' } });
     } else if (diff < -20 && !isFabVisible) {
       setIsFabVisible(true);
       Animated.spring(fabAnimation, {
@@ -910,21 +911,6 @@ const InventoryScreen: React.FC = () => {
         tension: 40,
         friction: 7
       }).start();
-      navigationObj.getParent()?.setOptions({
-        tabBarStyle: {
-          backgroundColor: theme.colors.surface,
-          borderTopWidth: 0,
-          height: 65,
-          paddingBottom: 10,
-          paddingTop: 10,
-          position: 'absolute',
-          bottom: 20,
-          left: 20,
-          right: 20,
-          borderRadius: 32,
-          elevation: 8,
-        }
-      });
     }
     
     lastScrollY.current = currentScrollY;
@@ -996,6 +982,32 @@ const InventoryScreen: React.FC = () => {
     setIsReordering(false);
   }, [navigation.state, navigation.category]);
 
+  // Control tab bar visibility based on isFabVisible state
+  useEffect(() => {
+    const parent = navigationObj.getParent();
+    if (parent) {
+      if (!isFabVisible) {
+        parent.setOptions({ tabBarStyle: { display: 'none' } });
+      } else {
+        parent.setOptions({
+          tabBarStyle: {
+            backgroundColor: theme.colors.surface,
+            borderTopWidth: 0,
+            height: 65,
+            paddingBottom: 10,
+            paddingTop: 10,
+            position: 'absolute',
+            bottom: 20,
+            left: 20,
+            right: 20,
+            borderRadius: 32,
+            elevation: 8,
+          }
+        });
+      }
+    }
+  }, [isFabVisible, theme, navigationObj]);
+
   // Reset to home view when Inventory tab is pressed
   useEffect(() => {
     const unsubscribe = (navigationObj as any).addListener('tabPress', (e: any) => {
@@ -1003,22 +1015,7 @@ const InventoryScreen: React.FC = () => {
       InteractionManager.runAfterInteractions(() => {
         setNavigationFluid(prevNav => {
           if (prevNav.state !== 'home') {
-             // Force restore tab bar when jumping home
-             navigationObj.getParent()?.setOptions({
-               tabBarStyle: {
-                 backgroundColor: theme.colors.surface,
-                 borderTopWidth: 0,
-                 height: 65,
-                 paddingBottom: 10,
-                 paddingTop: 10,
-                 position: 'absolute',
-                 bottom: 20,
-                 left: 20,
-                 right: 20,
-                 borderRadius: 32,
-                 elevation: 8,
-               }
-             });
+             // Force restore tab bar when jumping home - handled by useEffect now
              return { state: 'home' };
           }
           setIsReordering(false);
@@ -1275,7 +1272,7 @@ const InventoryScreen: React.FC = () => {
     return (
       <Card
         key={category}
-        style={[styles.categoryCard, { width: cardWidth }]}
+        style={[styles.categoryCard, { width: cardWidth, backgroundColor: theme.colors.surface, ...commonStyles.shadow }]}
         onPress={() => setNavigationFluid({ state: 'category', category })}
       >
         <Card.Content style={styles.categoryCardContent}>
@@ -1369,7 +1366,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
       childrenContainerStyle={{ overflow: 'visible' }}
     >
       <Card
-        style={styles.subcategoryCard}
+        style={[styles.subcategoryCard, { backgroundColor: theme.colors.surface, ...commonStyles.shadow }]}
         onPress={() => setNavigationFluid({ state: 'subcategory', category: navigation.category, subcategory: subName as InventorySubcategory })}
       >
         <Card.Content style={styles.subcategoryContent}>
@@ -1525,7 +1522,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
     return (
       <View 
         key="home-screen" 
-        style={{ flex: 1, backgroundColor: theme.colors.background }} 
+        style={{ flex: 1 }} 
         collapsable={false}
         needsOffscreenAlphaCompositing={true}
       >
@@ -1619,7 +1616,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
     return (
       <View 
         key={`category-${navigation.category}`} 
-        style={[styles.container, { backgroundColor: theme.colors.background }]} 
+        style={[styles.container]} 
         collapsable={false}
         needsOffscreenAlphaCompositing={true}
       >
@@ -1642,8 +1639,12 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
             {!isReordering && (
               <IconButton
                 icon="plus"
-                size={24}
+                size={22}
+                mode="contained"
+                containerColor={config.color + '20'}
+                iconColor={config.color}
                 onPress={openSubAddDialog}
+                style={{ margin: 4 }}
               />
             )}
           </View>
@@ -1754,7 +1755,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
     return (
       <View 
         key={`subcat-${navigation.subcategory}`} 
-        style={[styles.container, { backgroundColor: theme.colors.background }]} 
+        style={[styles.container]} 
         collapsable={false}
         needsOffscreenAlphaCompositing={true}
       >
@@ -1802,11 +1803,15 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
                     ) : null;
                   })()}
                 </View>
-                <IconButton
-                  icon="plus"
-                  size={24}
-                  onPress={() => setShowingAddDialog(true)}
-                />
+                  <IconButton
+                    icon="plus"
+                    size={22}
+                    mode="contained"
+                    containerColor={(inventoryManager.getSubcategoryConfig(navigation.subcategory as any)?.color || theme.colors.primary) + '20'}
+                    iconColor={inventoryManager.getSubcategoryConfig(navigation.subcategory as any)?.color || theme.colors.primary}
+                    onPress={() => setShowingAddDialog(true)}
+                    style={{ margin: 4 }}
+                  />
               </View>
             )}
           </View>
@@ -1842,7 +1847,11 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
 
   const renderAddItemDialog = () => (
     <Portal>
-      <Dialog visible={showingAddDialog} onDismiss={() => setShowingAddDialog(false)}>
+      <Dialog 
+        visible={showingAddDialog} 
+        onDismiss={() => setShowingAddDialog(false)}
+        style={{ backgroundColor: theme.colors.elevation?.level3 || theme.colors.surface, borderRadius: 28 }}
+      >
         <Dialog.Title>Add New Item</Dialog.Title>
         <Dialog.Content>
            <AddItemInput 
@@ -1860,7 +1869,6 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
   const renderEditItemDialog = () => {
     // We use a ref and uncontrolled input to prevent cursor jumping issues during typing
     // caused by re-renders of the parent component.
-    const editNameRef = useRef('');
     
     // We need a wrapper component to hold the ref and logic, 
     // ensuring it persists across parent re-renders but resets on new item.
@@ -1905,7 +1913,11 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
 
   const renderDeleteConfirmDialog = () => (
     <Portal>
-      <Dialog visible={!!deleteConfirmItem} onDismiss={() => setDeleteConfirmItem(null)}>
+      <Dialog 
+        visible={!!deleteConfirmItem} 
+        onDismiss={() => setDeleteConfirmItem(null)}
+        style={{ backgroundColor: theme.dark ? theme.colors.elevation.level3 : '#F8FAFC', borderRadius: 28 }}
+      >
         <Dialog.Title>Delete Item</Dialog.Title>
         <Dialog.Content>
           <Text>Are you sure you want to delete "{deleteConfirmItem?.name}"?</Text>
@@ -1957,7 +1969,11 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
 
   const renderSuccessDialog = () => (
     <Portal>
-      <Dialog visible={showingSuccessDialog} onDismiss={() => setShowingSuccessDialog(false)}>
+      <Dialog 
+        visible={showingSuccessDialog} 
+        onDismiss={() => setShowingSuccessDialog(false)}
+        style={{ backgroundColor: theme.dark ? theme.colors.elevation.level3 : '#F1F5F9', borderRadius: 28 }}
+      >
         <Dialog.Title>Success</Dialog.Title>
         <Dialog.Content>
           <Text style={{ color: theme.colors.onSurface }}>{successMessage}</Text>
@@ -1995,7 +2011,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
           duration: 200,
           useNativeDriver: true
         }).start();
-        navigationObj.getParent()?.setOptions({ tabBarStyle: { display: 'none' } });
+        // navigationObj.getParent()?.setOptions({ tabBarStyle: { display: 'none' } }); // Handled by useEffect
       } else if (translationY < -20 && !isFabVisible) {
         // Swipe Up -> Show
         setIsFabVisible(true);
@@ -2005,21 +2021,6 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
           tension: 40,
           friction: 7
         }).start();
-        navigationObj.getParent()?.setOptions({
-          tabBarStyle: {
-            backgroundColor: theme.colors.surface,
-            borderTopWidth: 0,
-            height: 65,
-            paddingBottom: 10,
-            paddingTop: 10,
-            position: 'absolute',
-            bottom: 20,
-            left: 20,
-            right: 20,
-            borderRadius: 32,
-            elevation: 8,
-          }
-        });
       }
     };
 
@@ -2063,11 +2064,11 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
             <FAB
               icon="auto-fix"
               style={{ 
-                backgroundColor: theme.colors.primary, 
+                backgroundColor: theme.colors.secondaryContainer, 
                 borderRadius: 28,
                 elevation: 4
               }}
-              color={theme.dark ? '#000' : '#fff'}
+              color={theme.colors.onSecondaryContainer}
               onPress={handleStartShopping}
             />
           </Animated.View>
@@ -2075,9 +2076,15 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
       </PanGestureHandler>
     );
   };
-  const renderSubAddDialog = () => (
-    <Portal>
-      <Dialog visible={showingSubAddDialog} onDismiss={() => setShowingSubAddDialog(false)}>
+  const renderSubAddDialog = () => {
+    const config = navigation.category ? getCategoryConfig(navigation.category) : null;
+    return (
+      <Portal>
+        <Dialog 
+          visible={showingSubAddDialog} 
+          onDismiss={() => setShowingSubAddDialog(false)}
+          style={{ backgroundColor: theme.colors.elevation?.level3 || theme.colors.surface, borderRadius: 28 }}
+        >
         <Dialog.Title>{editingSubId ? 'Edit Type' : 'Add New Type'}</Dialog.Title>
         <Dialog.Content>
           <SubcategoryInput
@@ -2091,8 +2098,9 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
           />
         </Dialog.Content>
       </Dialog>
-    </Portal>
-  );
+      </Portal>
+    );
+  };
 
   const renderSubDeleteConfirmDialog = () => (
     <Portal>
@@ -2239,7 +2247,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
   }, [navigation.state, navigation.category, navigation.subcategory, inventoryItems, refreshing, isReordering, theme, searchQuery, isSearchVisible, showIgnoredOnly, isFabVisible]);
 
   return (
-    <GestureHandlerRootView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <GestureHandlerRootView style={styles.container}>
       {mainContent}
 
       {renderSearchOverlay()}

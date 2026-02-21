@@ -275,7 +275,7 @@ const SettingsScreen: React.FC = () => {
   };
 
   const renderAppearanceSection = () => (
-    <Card style={styles.sectionCard}>
+    <Card style={[styles.sectionCard, { backgroundColor: theme.colors.surface }]}>
       <Card.Content>
         <Title style={styles.sectionTitle}>Appearance</Title>
         <Paragraph style={[styles.sectionDescription, { color: theme.colors.onSurfaceVariant }]}>
@@ -310,7 +310,7 @@ const SettingsScreen: React.FC = () => {
   );
 
   const renderSecuritySection = () => (
-    <Card style={styles.sectionCard}>
+    <Card style={[styles.sectionCard, { backgroundColor: theme.colors.surface }]}>
       <Card.Content>
         <Title style={styles.sectionTitle}>Security</Title>
         
@@ -370,7 +370,7 @@ const SettingsScreen: React.FC = () => {
   );
 
   const renderNotificationsSection = () => (
-    <Card style={styles.sectionCard}>
+    <Card style={[styles.sectionCard, { backgroundColor: theme.colors.surface }]}>
       <Card.Content>
         <Title style={styles.sectionTitle}>Notifications</Title>
         
@@ -427,7 +427,7 @@ const SettingsScreen: React.FC = () => {
   );
 
   const renderDataSection = () => (
-    <Card style={styles.sectionCard}>
+    <Card style={[styles.sectionCard, { backgroundColor: theme.colors.surface }]}>
       <Card.Content>
         <Title style={styles.sectionTitle}>Data Management</Title>
         
@@ -484,7 +484,7 @@ const SettingsScreen: React.FC = () => {
   );
 
   const renderAboutSection = () => (
-    <Card style={styles.sectionCard}>
+    <Card style={[styles.sectionCard, { backgroundColor: theme.colors.surface }]}>
       <Card.Content>
         <Title style={styles.sectionTitle}>About</Title>
         
@@ -637,7 +637,7 @@ const SettingsScreen: React.FC = () => {
 
   if (!settings) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
+      <View style={styles.loadingContainer}>
         <DoodleBackground />
         <Text style={{ color: theme.colors.onBackground }}>Loading settings...</Text>
       </View>
@@ -645,7 +645,7 @@ const SettingsScreen: React.FC = () => {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <View style={styles.container}>
       <DoodleBackground />
       <ScrollView
         style={styles.scrollView}

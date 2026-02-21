@@ -5,21 +5,21 @@ export const lightTheme = {
   ...MD3LightTheme,
   colors: {
     ...MD3LightTheme.colors,
-    primary: '#6366F1', // Modern Indigo
-    primaryContainer: '#EEF2FF',
-    secondary: '#10B981', // Emerald
-    secondaryContainer: '#ECFDF5',
-    tertiary: '#F43F5E', // Rose
-    tertiaryContainer: '#FFF1F2',
+    primary: '#0F172A', // Slate 900 (Clean, professional)
+    primaryContainer: '#F1F5F9',
+    secondary: '#334155', // Slate 700
+    secondaryContainer: '#E0E7FF', // Indigo tint (Distinct from Slate)
+    tertiary: '#475569', // Slate 600
+    tertiaryContainer: '#F1F5F9',
     surface: '#FFFFFF',
-    surfaceVariant: '#F8FAFC',
-    background: '#F1F5F9',
+    surfaceVariant: '#E2E8F0', // Slightly darker slate for variants
+    background: '#FFFFFF', // Pure white background
     error: '#EF4444',
     errorContainer: '#FEF2F2',
     onPrimary: '#FFFFFF',
     onPrimaryContainer: '#1E1B4B',
     onSecondary: '#FFFFFF',
-    onSecondaryContainer: '#064E3B',
+    onSecondaryContainer: '#3730A3', // Indigo 800
     onTertiary: '#FFFFFF',
     onTertiaryContainer: '#4C0519',
     onSurface: '#0F172A',
@@ -35,10 +35,10 @@ export const lightTheme = {
     inverseOnSurface: '#F8FAFC',
     inversePrimary: '#C7D2FE',
     // Custom colors for categories
-    fridge: '#3B82F6', // Blue
-    grocery: '#10B981', // Green
-    hygiene: '#06B6D4', // Cyan
-    personalCare: '#EC4899', // Pink
+    fridge: '#2563EB', // Blue
+    grocery: '#16A34A', // Green
+    hygiene: '#64748B', // Neutral Slate
+    personalCare: '#94A3B8', // Neutral Slate variant
     // Status colors
     lowStock: '#F59E0B', // Amber
     mediumStock: '#FBBF24', // Yellow
@@ -52,23 +52,23 @@ export const darkTheme = {
   ...MD3DarkTheme,
   colors: {
     ...MD3DarkTheme.colors,
-    primary: '#818CF8', // Soft Indigo
-    primaryContainer: '#312E81',
-    secondary: '#34D399', // Soft Emerald
-    secondaryContainer: '#064E3B',
-    tertiary: '#FB7185', // Soft Rose
-    tertiaryContainer: '#4C0519',
+    primary: '#F8FAFC', // Near white for dark mode (Clean)
+    primaryContainer: '#334155',
+    secondary: '#CBD5E1', 
+    secondaryContainer: '#1E293B',
+    tertiary: '#94A3B8',
+    tertiaryContainer: '#0F172A',
     surface: '#1E293B', // Slate 800
     surfaceVariant: '#0F172A', // Slate 900
     background: '#020617', // Slate 950
     error: '#F87171',
     errorContainer: '#450A0A',
-    onPrimary: '#FFFFFF',
-    onPrimaryContainer: '#E0E7FF',
-    onSecondary: '#FFFFFF',
-    onSecondaryContainer: '#D1FAE5',
-    onTertiary: '#FFFFFF',
-    onTertiaryContainer: '#FFE4E6',
+    onPrimary: '#020617', // Slate 950 (Contrast for white primary)
+    onPrimaryContainer: '#FFFFFF',
+    onSecondary: '#020617', // Contrast for light secondary
+    onSecondaryContainer: '#F1F5F9', // Contrast for dark container
+    onTertiary: '#020617',
+    onTertiaryContainer: '#F1F5F9',
     onSurface: '#F1F5F9',
     onSurfaceVariant: '#94A3B8',
     onBackground: '#F1F5F9',
@@ -84,8 +84,8 @@ export const darkTheme = {
     // Custom colors for categories
     fridge: '#60A5FA',
     grocery: '#34D399',
-    hygiene: '#22D3EE',
-    personalCare: '#F472B6',
+    hygiene: '#94A3B8',
+    personalCare: '#CBD5E1',
     // Status colors
     lowStock: '#FBBF24',
     mediumStock: '#FDE047',
@@ -167,16 +167,16 @@ export const commonStyles = {
     elevation: 6,
   },
   glass: {
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    backgroundColor: '#FFFFFF', // Solid white
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderColor: '#E2E8F0',
   },
   glassDark: {
-    backgroundColor: 'rgba(30, 41, 59, 0.7)',
+    backgroundColor: '#1E293B', // Solid slate
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: '#334155',
   },
   cardPadding: 20,
   borderRadius: 24, // Smoother, larger radius

@@ -940,7 +940,7 @@ const InsightsScreen: React.FC = () => {
             {/* Row 2: Busiest month */}
             {busiest && busiest.restocks > 0 && (
               <>
-                <View style={[styles.monthlyDivider, { backgroundColor: theme.dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }]} />
+                <View style={[styles.monthlyDivider, { backgroundColor: theme.colors.outlineVariant }]} />
                 <View style={styles.monthlyInsightRow}>
                   <View style={[styles.monthlyInsightIcon, { backgroundColor: '#F59E0B15' }]}>
                     <Icon name="fire" size={16} color={theme.dark ? '#FBBF24' : '#F59E0B'} />
@@ -956,7 +956,7 @@ const InsightsScreen: React.FC = () => {
             )}
 
             {/* Row 3: Averages */}
-            <View style={[styles.monthlyDivider, { backgroundColor: theme.dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }]} />
+            <View style={[styles.monthlyDivider, { backgroundColor: theme.colors.outlineVariant }]} />
             <View style={styles.monthlyInsightRow}>
               <View style={[styles.monthlyInsightIcon, { backgroundColor: tripsAccent + '15' }]}>
                 <Icon name="chart-line" size={16} color={tripsAccent} />
@@ -972,7 +972,7 @@ const InsightsScreen: React.FC = () => {
             {/* Row 4: Top item this month */}
             {currentMonth.topItem && (
               <>
-                <View style={[styles.monthlyDivider, { backgroundColor: theme.dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }]} />
+                <View style={[styles.monthlyDivider, { backgroundColor: theme.colors.outlineVariant }]} />
                 <View style={styles.monthlyInsightRow}>
                   <View style={[styles.monthlyInsightIcon, { backgroundColor: '#EC489915' }]}>
                     <Icon name="star" size={16} color={theme.dark ? '#F472B6' : '#EC4899'} />
@@ -988,7 +988,7 @@ const InsightsScreen: React.FC = () => {
             )}
 
             {/* Row 5: Total lifetime */}
-            <View style={[styles.monthlyDivider, { backgroundColor: theme.dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }]} />
+            <View style={[styles.monthlyDivider, { backgroundColor: theme.colors.outlineVariant }]} />
             <View style={styles.monthlyInsightRow}>
               <View style={[styles.monthlyInsightIcon, { backgroundColor: '#6366F115' }]}>
                 <Icon name="sigma" size={16} color={chartAccent} />
@@ -1028,14 +1028,14 @@ const InsightsScreen: React.FC = () => {
         >
           <View style={styles.heroContent}>
             <View style={styles.heroTextWrap}>
-              <Text style={[styles.heroLabel, { color: theme.dark ? theme.colors.onSurfaceVariant : 'rgba(255,255,255,0.8)' }]}>
+              <Text style={[styles.heroLabel, { color: theme.dark ? theme.colors.onSurfaceVariant : theme.colors.surfaceVariant }]}>
                 Inventory Health
               </Text>
               <Text style={[styles.heroValue, { color: theme.dark ? theme.colors.primary : '#FFFFFF' }]}>
                 {totalStaleCount === 0 ? 'All Good ✓' : `${totalStaleCount} Need${totalStaleCount === 1 ? 's' : ''} Attention`}
               </Text>
             </View>
-            <View style={[styles.heroIconWrap, { backgroundColor: theme.dark ? theme.colors.primary + '20' : 'rgba(255,255,255,0.2)' }]}>
+            <View style={[styles.heroIconWrap, { backgroundColor: theme.dark ? theme.colors.primary + '20' : theme.colors.surface + '25' }]}>
               <Icon
                 name={totalStaleCount === 0 ? 'shield-check' : 'alert-circle-outline'}
                 size={32}
@@ -1048,11 +1048,11 @@ const InsightsScreen: React.FC = () => {
               <Text style={[styles.heroStatValue, { color: theme.dark ? theme.colors.onSurface : '#FFFFFF' }]}>
                 {inventoryItems.length}
               </Text>
-              <Text style={[styles.heroStatLabel, { color: theme.dark ? theme.colors.onSurfaceVariant : 'rgba(255,255,255,0.7)' }]}>
+              <Text style={[styles.heroStatLabel, { color: theme.dark ? theme.colors.onSurfaceVariant : theme.colors.surfaceVariant }]}>
                 Total Items
               </Text>
             </View>
-            <View style={[styles.heroStatDivider, { backgroundColor: theme.dark ? theme.colors.outlineVariant : 'rgba(255,255,255,0.2)' }]} />
+            <View style={[styles.heroStatDivider, { backgroundColor: theme.dark ? theme.colors.outlineVariant : theme.colors.surface + '30' }]} />
             <View style={styles.heroStatItem}>
               <Text style={[styles.heroStatValue, { color: theme.dark ? theme.colors.onSurface : '#FFFFFF' }]}>
                 {totalStaleCount}
@@ -1066,7 +1066,7 @@ const InsightsScreen: React.FC = () => {
               <Text style={[styles.heroStatValue, { color: theme.dark ? theme.colors.onSurface : '#FFFFFF' }]}>
                 {inventoryItems.length > 0 ? Math.round((1 - totalStaleCount / inventoryItems.length) * 100) : 100}%
               </Text>
-              <Text style={[styles.heroStatLabel, { color: theme.dark ? theme.colors.onSurfaceVariant : 'rgba(255,255,255,0.7)' }]}>
+              <Text style={[styles.heroStatLabel, { color: theme.dark ? theme.colors.onSurfaceVariant : theme.colors.surfaceVariant }]}>
                 Fresh
               </Text>
             </View>
