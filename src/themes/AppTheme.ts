@@ -117,7 +117,7 @@ export const getStockColor = (quantity: number, isDark: boolean = false) => {
   
   if (percentage <= 0) {
     return theme.colors.outOfStock;
-  } else if (percentage <= 25) {
+  } else if (percentage < 25) {
     return theme.colors.lowStock;
   } else if (percentage < 50) {
     return theme.colors.mediumStock;

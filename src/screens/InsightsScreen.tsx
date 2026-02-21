@@ -333,12 +333,14 @@ const InsightsScreen: React.FC = () => {
       .slice(0, 10);
   }, [inventoryItems, staleItemIds]);
 
-  // Running low (quantity ≤ 25%) — excludes stale items, respects showHiddenRunLow
+  // Running low (quantity < 25%) — excludes stale items, respects showHiddenRunLow
   const lowStockItems = useMemo(() => {
-    return [...inventoryItems]
+    const thresholdPercent = 25;
+    return inventoryItems
       .filter(item => {
-        // Must be low stock and not stale
-        if (item.quantity > 0.25 || staleItemIds.has(item.id)) return false;
+        if (!showHiddenRunLow && item.isIgnored) return false;
+        const pct = Math.round(item.quantity * 100);
+        if (pct >= thresholdPercent || staleItemIds.has(item.id)) return false;
         // Respect hidden toggle
         return showHiddenRunLow ? true : !item.isIgnored;
       })
@@ -359,7 +361,7 @@ const InsightsScreen: React.FC = () => {
         const subcatConfig = inventoryManager.getSubcategoryConfig(item.subcategory);
         return subcatConfig?.category === category;
       }).length;
-      const lowCount = categoryItems.filter(i => i.quantity <= 0.25).length;
+      const lowCount = categoryItems.filter(i => Math.round(i.quantity * 100) < 25).length;
       const avgStock = categoryItems.length > 0
         ? Math.round((categoryItems.reduce((s, i) => s + i.quantity, 0) / categoryItems.length) * 100)
         : 0;
@@ -694,7 +696,7 @@ const InsightsScreen: React.FC = () => {
         <SectionHeader
           icon="arrow-down-bold-circle"
           title="Running Low"
-          subtitle="Items at 25% stock or below"
+          subtitle="Items below 25% stock"
           iconColor={accentColor}
           badgeCount={lowStockItems.length}
           badgeColor={accentColor}

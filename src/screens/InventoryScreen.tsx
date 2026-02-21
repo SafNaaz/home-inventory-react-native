@@ -633,7 +633,7 @@ const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, on
           />
         </View>
 
-        {item.quantity <= 0.25 && (
+        {Math.round(item.quantity * 100) < 25 && (
           <View style={styles.lowStockWarningCompact}>
             <Icon name="alert-circle" size={14} color={theme.colors.error} />
             <Text style={[styles.lowStockTextCompact, { color: theme.colors.error }]}>
@@ -1017,7 +1017,7 @@ const InventoryScreen: React.FC = () => {
 
   const getTotalItems = () => inventoryItems.filter(item => !item.isIgnored).length;
   
-  const getLowStockCount = () => inventoryItems.filter(item => !item.isIgnored && item.quantity <= 0.25).length;
+  const getLowStockCount = () => inventoryItems.filter(item => !item.isIgnored && Math.round(item.quantity * 100) < 25).length;
 
   const getItemsForCategory = (category: InventoryCategory): InventoryItem[] => {
     return inventoryItems.filter(item => {
@@ -1237,7 +1237,7 @@ const InventoryScreen: React.FC = () => {
     const subcategories = inventoryManager.getSubcategoriesForCategory(category);
     const allCategoryItems = inventoryManager.getItemsForCategory(category).filter(item => !item.isIgnored);
     const itemsCount = allCategoryItems.length;
-    const lowStockCount = allCategoryItems.filter(it => it.quantity <= 0.25).length;
+    const lowStockCount = allCategoryItems.filter(it => Math.round(it.quantity * 100) < 25).length;
 
     return (
       <Card
@@ -1546,7 +1546,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
     const renderDraggableSubcategory = ({ item, drag, isActive }: RenderItemParams<InventorySubcategory>) => {
       const subName = item;
       const subItems = getItemsForSubcategory(subName as InventorySubcategory);
-      const lowStockCount = subItems.filter(it => it.quantity <= 0.25).length;
+      const lowStockCount = subItems.filter(it => Math.round(it.quantity * 100) < 25).length;
       const config = inventoryManager.getSubcategoryConfig(subName as InventorySubcategory);
 
       return (
@@ -1643,7 +1643,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
                 const activeCount = allSubItems.filter(it => !it.isIgnored).length;
                 const hiddenCount = allSubItems.filter(it => it.isIgnored).length;
                 const items = getItemsForSubcategory(subName as InventorySubcategory);
-                const lowStockCount = allSubItems.filter(it => !it.isIgnored && it.quantity <= 0.25).length;
+                const lowStockCount = allSubItems.filter(it => !it.isIgnored && Math.round(it.quantity * 100) < 25).length;
                 const config = inventoryManager.getSubcategoryConfig(subName as InventorySubcategory);
                 return (
                   <SubcategoryRow

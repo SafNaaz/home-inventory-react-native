@@ -580,9 +580,9 @@ export class InventoryManager {
     // Clear existing shopping list
     this.shoppingList = [];
     
-    // Add items that need attention (≤25%) - sorted by urgency
+    // Add items that need attention (<25%) - sorted by urgency
     const attentionItems = this.inventoryItems
-      .filter(item => item.quantity <= 0.25 && !item.isIgnored)
+      .filter(item => Math.round(item.quantity * 100) < 25 && !item.isIgnored)
       .sort((a, b) => a.quantity - b.quantity);
     
     console.log(`⚠️ Found ${attentionItems.length} items needing attention`);
@@ -784,7 +784,7 @@ export class InventoryManager {
   }
 
   getLowStockItemsCount(): number {
-    return this.getVisibleInventoryItems().filter(item => item.quantity <= 0.25).length;
+    return this.getVisibleInventoryItems().filter(item => Math.round(item.quantity * 100) < 25).length;
   }
 
   getAverageStockLevel(): number {
@@ -796,7 +796,7 @@ export class InventoryManager {
 
   getItemsNeedingAttention(): InventoryItem[] {
     return this.getVisibleInventoryItems()
-      .filter(item => item.quantity <= 0.25)
+      .filter(item => Math.round(item.quantity * 100) < 25)
       .sort((a, b) => a.quantity - b.quantity);
   }
 
