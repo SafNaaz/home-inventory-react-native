@@ -9,7 +9,8 @@ import { settingsManager } from '../managers/SettingsManager';
 import { ActivityLog, ActivityAction } from '../models/Types';
 import { rs, fontSize, spacing } from '../themes/Responsive';
 import { useColorScheme } from 'react-native';
-import { lightTheme, darkTheme } from '../themes/AppTheme';
+import { lightTheme, darkTheme, commonStyles } from '../themes/AppTheme';
+import DoodleBackground from '../components/DoodleBackground';
 
 const ActivityHistoryScreen: React.FC = () => {
   const [logs, setLogs] = useState<ActivityLog[]>([]);
@@ -176,14 +177,16 @@ const ActivityHistoryScreen: React.FC = () => {
 
   if (isLoading) {
     return (
-      <View style={[styles.container, styles.centered, { backgroundColor: theme.colors.background }]}>
+      <View style={[styles.container, styles.centered]}>
+        <DoodleBackground />
         <ActivityIndicator size="large" />
       </View>
     );
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <View style={styles.container}>
+      <DoodleBackground />
       <FlatList
         data={logs}
         renderItem={renderLogItem}
@@ -246,9 +249,10 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   logCard: {
-    borderRadius: rs(12),
+    borderRadius: rs(16),
     padding: spacing.md,
     marginBottom: spacing.md,
+    ...commonStyles.shadow,
   },
   undoneCard: {
     opacity: 0.6,
