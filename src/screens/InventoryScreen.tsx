@@ -855,10 +855,12 @@ const InventoryScreen: React.FC = () => {
   const [navigation, setNavigation] = useState<NavigationContext>({ state: 'home' });
 
   // Control tab swipe based on internal navigation state
-  useEffect(() => {
-    setSwipeEnabled(navigation.state === 'home');
-    return () => setSwipeEnabled(true);
-  }, [navigation.state]);
+  useFocusEffect(
+    useCallback(() => {
+      setSwipeEnabled(navigation.state === 'home');
+      return () => setSwipeEnabled(true);
+    }, [navigation.state, setSwipeEnabled])
+  );
   const [showIgnoredOnly, setShowIgnoredOnly] = useState(false);
   const [showingAddDialog, setShowingAddDialog] = useState(false);
   const [newItemName, setNewItemName] = useState('');
