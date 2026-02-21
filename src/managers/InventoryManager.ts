@@ -1,4 +1,4 @@
-import { InventoryItem, ShoppingListItem, ShoppingState, InventoryCategory, InventorySubcategory, CustomSubcategory, SubcategoryConfig } from '../models/Types';
+import { InventoryItem, ShoppingListItem, ShoppingState, InventoryCategory, InventorySubcategory, CustomSubcategory, SubcategoryConfig, ActivityLog, ActivityAction } from '../models/Types';
 import { StorageService } from '../services/StorageService';
 import { SUBCATEGORY_CONFIG } from '../constants/CategoryConfig';
 import { v4 as uuidv4 } from 'uuid';
@@ -11,6 +11,7 @@ export class InventoryManager {
   private shoppingList: ShoppingListItem[] = [];
   private shoppingState: ShoppingState = ShoppingState.EMPTY;
   private subcategoryOrder: Record<string, string[]> = {};
+  private activityLogs: ActivityLog[] = [];
   private listeners: Set<() => void> = new Set();
 
   constructor() {
@@ -32,13 +33,14 @@ export class InventoryManager {
     try {
       console.log('📂 Loading data from storage...');
       
-      const [items, shoppingItems, state, customSubs, hiddenSubs, subOrder] = await Promise.all([
+      const [items, shoppingItems, state, customSubs, hiddenSubs, subOrder, loadedLogs] = await Promise.all([
         StorageService.loadInventoryItems(),
         StorageService.loadShoppingList(),
         StorageService.loadShoppingState(),
         StorageService.loadCustomSubcategories(),
         StorageService.loadHiddenBuiltinSubs(),
         StorageService.loadSubcategoryOrder(),
+        StorageService.loadActivityLogs(),
       ]);
 
       this.inventoryItems = items;
@@ -47,6 +49,7 @@ export class InventoryManager {
       this.shoppingList = shoppingItems;
       this.shoppingState = state;
       this.subcategoryOrder = subOrder || {};
+      this.activityLogs = loadedLogs || [];
 
       // Initialize order for legacy items
       // We group by subcategory and assign order to ensure stable sorting
@@ -236,6 +239,17 @@ export class InventoryManager {
     await StorageService.saveInventoryItems(this.inventoryItems);
     
     console.log(`✅ Added custom item: ${name}`);
+    
+    await this.addActivityLog({
+      action: ActivityAction.ADD_ITEM,
+      itemId: newItem.id,
+      itemName: newItem.name,
+      details: {
+        newValue: subcategory,
+        itemSnapshot: { ...newItem }
+      }
+    });
+
     this.notifyListeners();
   }
 
@@ -269,6 +283,16 @@ export class InventoryManager {
     ]);
 
     console.log(`✅ Removed item: ${item.name}`);
+    
+    await this.addActivityLog({
+      action: ActivityAction.REMOVE_ITEM,
+      itemId: itemId,
+      itemName: item.name,
+      details: {
+        itemSnapshot: { ...item }
+      }
+    });
+
     this.notifyListeners();
   }
 
@@ -280,11 +304,25 @@ export class InventoryManager {
     }
 
     const clampedQuantity = Math.max(0.0, Math.min(1.0, quantity));
+    const oldQuantity = item.quantity;
+    const oldItemSnapshot = { ...item };
     item.quantity = clampedQuantity;
     item.lastUpdated = new Date();
 
     await StorageService.saveInventoryItems(this.inventoryItems);
     console.log(`🔄 Updated ${item.name} quantity to ${Math.round(clampedQuantity * 100)}%`);
+    
+    await this.addActivityLog({
+      action: ActivityAction.UPDATE_QUANTITY,
+      itemId: itemId,
+      itemName: item.name,
+      details: {
+        previousValue: oldQuantity,
+        newValue: clampedQuantity,
+        itemSnapshot: oldItemSnapshot
+      }
+    });
+
     this.notifyListeners();
   }
 
@@ -295,11 +333,24 @@ export class InventoryManager {
       return;
     }
 
+    const oldItemSnapshot = { ...item };
     item.isIgnored = !item.isIgnored;
     item.lastUpdated = new Date();
 
     await StorageService.saveInventoryItems(this.inventoryItems);
     console.log(`🔄 Toggled ignore status for ${item.name}: ${item.isIgnored}`);
+    
+    await this.addActivityLog({
+      action: ActivityAction.TOGGLE_IGNORE,
+      itemId: itemId,
+      itemName: item.name,
+      details: {
+        previousValue: !item.isIgnored,
+        newValue: item.isIgnored,
+        itemSnapshot: oldItemSnapshot
+      }
+    });
+
     this.notifyListeners();
   }
 
@@ -320,6 +371,7 @@ export class InventoryManager {
     }
 
     const oldName = item.name;
+    const oldItemSnapshot = { ...item };
     item.name = trimmedName;
     item.lastUpdated = new Date();
 
@@ -336,6 +388,18 @@ export class InventoryManager {
     ]);
 
     console.log(`✏️ Updated item name: ${oldName} -> ${trimmedName}`);
+    
+    await this.addActivityLog({
+      action: ActivityAction.UPDATE_NAME,
+      itemId: itemId,
+      itemName: oldName,
+      details: {
+        previousValue: oldName,
+        newValue: trimmedName,
+        itemSnapshot: oldItemSnapshot
+      }
+    });
+
     this.notifyListeners();
   }
 
@@ -346,6 +410,8 @@ export class InventoryManager {
       return;
     }
 
+    const oldQuantity = item.quantity;
+    const oldItemSnapshot = { ...item };
     item.quantity = 1.0;
     item.purchaseHistory.push(new Date());
     item.lastUpdated = new Date();
@@ -353,6 +419,17 @@ export class InventoryManager {
     await StorageService.saveInventoryItems(this.inventoryItems);
     console.log(`🔄 Restocked ${item.name} to 100%`);
     
+    await this.addActivityLog({
+      action: ActivityAction.RESTOCK,
+      itemId: itemId,
+      itemName: item.name,
+      details: {
+        previousValue: oldQuantity,
+        newValue: 1.0,
+        itemSnapshot: oldItemSnapshot
+      }
+    });
+
     this.notifyListeners();
   }
 
@@ -947,6 +1024,94 @@ export class InventoryManager {
       
       return diffDays >= thresholdDays;
     });
+  }
+
+  // MARK: - Activity Tracking Internal
+  private async addActivityLog(log: Omit<ActivityLog, 'id' | 'timestamp'>): Promise<void> {
+    const newLog: ActivityLog = {
+      ...log,
+      id: uuidv4(),
+      timestamp: new Date(),
+    };
+
+    // Keep logs for the last 4 weeks (28 days)
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - 28);
+
+    // Filter out ANY previous logs for the same item (always keep only the LATEST action per item)
+    // AND filter by date
+    this.activityLogs = [
+      newLog,
+      ...this.activityLogs.filter(l => 
+        l.itemId !== log.itemId && 
+        new Date(l.timestamp) > cutoffDate
+      )
+    ].slice(0, 100);
+
+    await StorageService.saveActivityLogs(this.activityLogs);
+    this.notifyListeners();
+  }
+
+  async clearActivityLogs(): Promise<void> {
+    this.activityLogs = [];
+    await StorageService.saveActivityLogs([]);
+    this.notifyListeners();
+  }
+
+  getActivityLogs(): ActivityLog[] {
+    return [...this.activityLogs];
+  }
+
+  async undoActivity(logId: string): Promise<void> {
+    const logIndex = this.activityLogs.findIndex(l => l.id === logId);
+    if (logIndex === -1) return;
+
+    const log = this.activityLogs[logIndex];
+    if (log.isUndone) return;
+
+    console.log(`⏪ Undoing activity: ${log.action} for ${log.itemName}`);
+
+    try {
+      switch (log.action) {
+        case ActivityAction.UPDATE_QUANTITY:
+        case ActivityAction.UPDATE_NAME:
+        case ActivityAction.RESTOCK:
+        case ActivityAction.TOGGLE_IGNORE:
+          if (log.details.itemSnapshot) {
+            const itemIndex = this.inventoryItems.findIndex(i => i.id === log.itemId);
+            if (itemIndex !== -1) {
+              this.inventoryItems[itemIndex] = { ...log.details.itemSnapshot };
+            } else {
+              console.warn('Item not found for undo, re-adding it');
+              this.inventoryItems.push({ ...log.details.itemSnapshot });
+            }
+          }
+          break;
+
+        case ActivityAction.REMOVE_ITEM:
+          if (log.details.itemSnapshot) {
+            // Re-add the item
+            this.inventoryItems.push({ ...log.details.itemSnapshot });
+          }
+          break;
+
+        case ActivityAction.ADD_ITEM:
+          // Remove the added item
+          this.inventoryItems = this.inventoryItems.filter(i => i.id !== log.itemId);
+          break;
+      }
+
+      log.isUndone = true;
+      await Promise.all([
+        StorageService.saveInventoryItems(this.inventoryItems),
+        StorageService.saveActivityLogs(this.activityLogs),
+      ]);
+
+      this.notifyListeners();
+      console.log('✅ Undo successful');
+    } catch (error) {
+      console.error('❌ Error undoing activity:', error);
+    }
   }
 }
 

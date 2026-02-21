@@ -908,36 +908,40 @@ const InventoryScreen: React.FC = () => {
       loadInventoryData();
     });
 
-    // Handle Android back button
-    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-      // Use ref to check visibility without stale closures
-      if (isSearchVisibleRef.current) {
-        closeSearch();
-        return true;
-      }
-      if (isReordering) {
-        setIsReordering(false);
-        return true;
-      }
-      if (navigation.state === 'subcategory') {
-        // Go back to category view
-        setNavigationFluid({ state: 'category', category: navigation.category });
-        return true; 
-      } else if (navigation.state === 'category') {
-        // Go back to home view
-        setNavigationFluid({ state: 'home' });
-        return true; 
-      }
-      // If we're on home, let the default behavior happen (close app or go to previous screen)
-      return false;
-    });
+    // Move BackHandler to useFocusEffect
 
     return () => {
       unsubscribeInventory();
       unsubscribeSettings();
-      backHandler.remove();
+      
     };
-  }, [navigation]); // Only depend on navigation, back handler uses refs for other dynamic state
+  }, [navigation]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        if (isSearchVisibleRef.current) {
+          closeSearch();
+          return true;
+        }
+        if (isReordering) {
+          setIsReordering(false);
+          return true;
+        }
+        if (navigation.state === 'subcategory') {
+          setNavigationFluid({ state: 'category', category: navigation.category });
+          return true;
+        } else if (navigation.state === 'category') {
+          setNavigationFluid({ state: 'home' });
+          return true;
+        }
+        return false;
+      };
+
+      const handler = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => handler.remove();
+    }, [navigation, isReordering, isSearchVisible])
+  );
 
   const setNavigationFluid = (newNav: NavigationContext | ((prev: NavigationContext) => NavigationContext)) => {
     Keyboard.dismiss();

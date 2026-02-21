@@ -3,11 +3,11 @@ import React, { useEffect, useState, useMemo, useContext } from 'react';
 import { NavigationContainer, DefaultTheme as NavDefaultTheme, DarkTheme as NavDarkTheme } from '@react-navigation/native';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
-import { createStackNavigator } from '@react-navigation/stack';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { createStackNavigator, CardStyleInterpolators } from '@react-navigation/stack';
+import { GestureHandlerRootView, FlatList, ScrollView } from 'react-native-gesture-handler';
 import { Provider as PaperProvider, IconButton, Title, Paragraph, Button, Text } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
-import { StatusBar, Alert, View, StyleSheet, AppState, TouchableOpacity } from 'react-native';
+import { StatusBar, Alert, View, StyleSheet, AppState, TouchableOpacity, RefreshControl } from 'react-native';
 import { rs, tabBar as tabBarDims, fontSize, spacing, iconSize } from './src/themes/Responsive';
 
 // Screens
@@ -18,6 +18,7 @@ import NotesScreen from './src/screens/NotesScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import NoteDetailScreen from './src/screens/NoteDetailScreen';
 import SplashScreen from './src/screens/SplashScreen';
+import ActivityHistoryScreen from './src/screens/ActivityHistoryScreen';
 
 import NotificationSettingsScreen from './src/screens/NotificationSettingsScreen';
 import { useColorScheme } from 'react-native';
@@ -298,6 +299,10 @@ const App: React.FC = () => {
               },
               headerTitleAlign: 'left',
               cardStyle: { backgroundColor: theme.colors.background },
+              gestureEnabled: true,
+              gestureDirection: 'horizontal',
+              gestureResponseDistance: 50,
+              cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
             }}
           >
             <Stack.Screen 
@@ -366,6 +371,15 @@ const App: React.FC = () => {
               options={{ 
                 title: 'Note',
                 headerBackTitleVisible: false,
+              }}
+            />
+            <Stack.Screen 
+              name="ActivityHistory" 
+              component={ActivityHistoryScreen}
+              options={{ 
+                title: 'Activity History',
+                headerBackTitleVisible: false,
+                gestureResponseDistance: 40,
               }}
             />
           </Stack.Navigator>

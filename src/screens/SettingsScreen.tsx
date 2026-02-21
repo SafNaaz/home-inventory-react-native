@@ -439,6 +439,16 @@ const SettingsScreen: React.FC = () => {
         />
         
         <Divider style={styles.divider} />
+
+        <List.Item
+          title="Activity History"
+          description="View and undo recent inventory updates"
+          left={() => <Icon name="history" size={24} color={theme.colors.primary} />}
+          right={() => <List.Icon icon="chevron-right" />}
+          onPress={() => navigation.navigate('ActivityHistory')}
+        />
+
+        <Divider style={styles.divider} />
         
         <List.Item
           title="Export Data"
