@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo, useContext } from 'react';
 import { NavigationContainer, DefaultTheme as NavDefaultTheme, DarkTheme as NavDarkTheme } from '@react-navigation/native';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
@@ -29,9 +29,103 @@ import { notesManager } from './src/managers/NotesManager';
 
 // Themes
 import { lightTheme, darkTheme, commonStyles } from './src/themes/AppTheme';
+import * as Notifications from 'expo-notifications';
+
+export const SwipeContext = React.createContext({
+  swipeEnabled: true,
+  setSwipeEnabled: (enabled: boolean) => {},
+});
 
 const Tab = createMaterialTopTabNavigator();
 const Stack = createStackNavigator();
+
+// Tab Navigator Component
+const TabNavigator = () => {
+  const { swipeEnabled } = useContext(SwipeContext);
+  const systemColorScheme = useColorScheme();
+  const settings = settingsManager.getSettings();
+  const themeMode = settings.themeMode;
+  const isDark = themeMode === 'system' ? systemColorScheme === 'dark' : themeMode === 'dark';
+  const theme = isDark ? darkTheme : lightTheme;
+
+  return (
+    <Tab.Navigator
+      tabBarPosition="bottom"
+      screenOptions={{
+        swipeEnabled: swipeEnabled,
+      }}
+      tabBar={({ state, descriptors, navigation }) => {
+        return (
+          <View style={{
+            position: 'absolute',
+            bottom: tabBarDims.bottomOffset,
+            left: tabBarDims.sideOffset,
+            right: tabBarDims.sideOffset,
+            height: tabBarDims.height,
+            backgroundColor: theme.colors.surface,
+            borderRadius: tabBarDims.borderRadius,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-around',
+            ...commonStyles.shadow,
+            elevation: 8,
+            paddingBottom: rs(4),
+          }}>
+            {state.routes.map((route, index) => {
+              const isFocused = state.index === index;
+              const color = isFocused ? theme.colors.primary : theme.colors.onSurfaceVariant;
+
+              const onPress = () => {
+                const event = navigation.emit({
+                  type: 'tabPress',
+                  target: route.key,
+                  canPreventDefault: true,
+                });
+
+                if (!isFocused && !event.defaultPrevented) {
+                  navigation.navigate(route.name);
+                }
+              };
+
+              let iconName: any;
+              switch (route.name) {
+                case 'Inventory': iconName = isFocused ? 'fridge' : 'fridge-outline'; break;
+                case 'Shopping': iconName = isFocused ? 'cart' : 'cart-outline'; break;
+                case 'Insights': iconName = isFocused ? 'chart-bar' : 'chart-bar'; break;
+                case 'Notes': iconName = isFocused ? 'note-text' : 'note-text-outline'; break;
+                default: iconName = 'circle';
+              }
+
+              return (
+                <TouchableOpacity
+                  key={route.key}
+                  onPress={onPress}
+                  style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+                  activeOpacity={0.7}
+                >
+                  <Icon name={iconName} size={rs(24)} color={color} />
+                  <Text style={{ 
+                    fontSize: rs(10), 
+                    color, 
+                    fontWeight: '700',
+                    marginTop: rs(2),
+                  }}>
+                    {route.name}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        );
+      }}
+    >
+      <Tab.Screen name="Inventory" component={InventoryScreen} />
+      <Tab.Screen name="Shopping" component={ShoppingScreen} />
+      <Tab.Screen name="Insights" component={InsightsScreen} />
+      <Tab.Screen name="Notes" component={NotesScreen} />
+    </Tab.Navigator>
+  );
+};
 
 const App: React.FC = () => {
   const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>('system');
@@ -40,8 +134,7 @@ const App: React.FC = () => {
   const [isSecurityEnabled, setIsSecurityEnabled] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [showSplashScreen, setShowSplashScreen] = useState(true);
-
-
+  const [swipeEnabled, setSwipeEnabled] = useState(true);
 
   useEffect(() => {
     // Initialize app
@@ -101,6 +194,9 @@ const App: React.FC = () => {
         setIsAuthenticated(authSuccess);
       }
 
+      // Clear all notifications on startup
+      await Notifications.dismissAllNotificationsAsync();
+
       setIsLoading(false);
     } catch (error) {
       console.error('❌ Error initializing app:', error);
@@ -124,7 +220,11 @@ const App: React.FC = () => {
 
   // Show splash screen while initializing or during animation
   if (showSplashScreen) {
-    return <SplashScreen onAnimationFinish={handleSplashFinish} />;
+    return (
+      <PaperProvider theme={theme}>
+        <SplashScreen onAnimationFinish={handleSplashFinish} isDark={isDark} />
+      </PaperProvider>
+    );
   }
 
   // Show authentication screen if security is enabled but not authenticated
@@ -160,92 +260,14 @@ const App: React.FC = () => {
     );
   }
 
-  // Tab Navigator Component
-  const TabNavigator = () => {
-    return (
-      <Tab.Navigator
-        tabBarPosition="bottom"
-        swipeEnabled={true}
-        tabBar={({ state, descriptors, navigation }) => {
-          return (
-            <View style={{
-              position: 'absolute',
-              bottom: tabBarDims.bottomOffset,
-              left: tabBarDims.sideOffset,
-              right: tabBarDims.sideOffset,
-              height: tabBarDims.height,
-              backgroundColor: theme.colors.surface,
-              borderRadius: tabBarDims.borderRadius,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-around',
-              ...commonStyles.shadow,
-              elevation: 8,
-              paddingBottom: rs(4),
-            }}>
-              {state.routes.map((route, index) => {
-                const isFocused = state.index === index;
-                const color = isFocused ? theme.colors.primary : theme.colors.onSurfaceVariant;
-
-                const onPress = () => {
-                  const event = navigation.emit({
-                    type: 'tabPress',
-                    target: route.key,
-                    canPreventDefault: true,
-                  });
-
-                  if (!isFocused && !event.defaultPrevented) {
-                    navigation.navigate(route.name);
-                  }
-                };
-
-                let iconName: any;
-                switch (route.name) {
-                  case 'Inventory': iconName = isFocused ? 'fridge' : 'fridge-outline'; break;
-                  case 'Shopping': iconName = isFocused ? 'cart' : 'cart-outline'; break;
-                  case 'Insights': iconName = isFocused ? 'chart-bar' : 'chart-bar'; break;
-                  case 'Notes': iconName = isFocused ? 'note-text' : 'note-text-outline'; break;
-                  default: iconName = 'circle';
-                }
-
-                return (
-                  <TouchableOpacity
-                    key={route.key}
-                    onPress={onPress}
-                    style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
-                    activeOpacity={0.7}
-                  >
-                    <Icon name={iconName} size={rs(24)} color={color} />
-                    <Text style={{ 
-                      fontSize: rs(10), 
-                      color, 
-                      fontWeight: '700',
-                      marginTop: rs(2),
-                    }}>
-                      {route.name}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          );
-        }}
-      >
-        <Tab.Screen name="Inventory" component={InventoryScreen} />
-        <Tab.Screen name="Shopping" component={ShoppingScreen} />
-        <Tab.Screen name="Insights" component={InsightsScreen} />
-        <Tab.Screen name="Notes" component={NotesScreen} />
-      </Tab.Navigator>
-    );
-  };
-
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
+    <SwipeContext.Provider value={{ swipeEnabled, setSwipeEnabled }}>
     <PaperProvider theme={theme}>
       <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
         <StatusBar
           barStyle={isDark ? 'light-content' : 'dark-content'}
-          backgroundColor={theme.colors.surface}
+          backgroundColor={isDark ? theme.colors.surface : theme.colors.background}
         />
         <NavigationContainer
           theme={{
@@ -264,7 +286,10 @@ const App: React.FC = () => {
           <Stack.Navigator
             screenOptions={{
               headerStyle: {
-                backgroundColor: theme.colors.surface,
+                backgroundColor: theme.colors.background,
+                elevation: 0,
+                shadowOpacity: 0,
+                borderBottomWidth: 0,
               },
               headerTintColor: theme.colors.onSurface,
               headerTitleStyle: {
@@ -347,6 +372,7 @@ const App: React.FC = () => {
         </NavigationContainer>
       </View>
     </PaperProvider>
+    </SwipeContext.Provider>
     </GestureHandlerRootView>
   );
 };

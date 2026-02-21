@@ -57,7 +57,7 @@ const DoodleBackground: React.FC = () => {
     return items;
   }, []);
 
-  const doodleColor = theme.dark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)';
+  const doodleColor = theme.dark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)';
 
   return (
     <View style={[StyleSheet.absoluteFill, styles.container]} pointerEvents="none">

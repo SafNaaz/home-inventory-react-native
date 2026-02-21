@@ -51,6 +51,7 @@ import { InventoryItem, InventoryCategory, InventorySubcategory, ShoppingState }
 import { CATEGORY_CONFIG, SUBCATEGORY_CONFIG, getAllCategories, getCategoryConfig, getSubcategoryConfig } from '../constants/CategoryConfig';
 import { getStockColor, getCategoryColor, commonStyles } from '../themes/AppTheme';
 import DoodleBackground from '../components/DoodleBackground';
+import { SwipeContext } from '../../App';
 import { tabBar as tabBarDims, fontSize as fs, spacing as sp, radius as r, iconSize as is, card as cardDims, fab as fabDims, screen } from '../themes/Responsive';
 
 const { width, height } = Dimensions.get('window');
@@ -779,10 +780,17 @@ const SubcategoryInput = ({
 const InventoryScreen: React.FC = () => {
   const theme = useTheme();
   const navigationObj = useNavigation();
+  const { setSwipeEnabled } = React.useContext(SwipeContext);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const pendingUpdatesRef = useRef<Record<string, number>>({});
   const [refreshing, setRefreshing] = useState(false);
   const [navigation, setNavigation] = useState<NavigationContext>({ state: 'home' });
+
+  // Control tab swipe based on internal navigation state
+  useEffect(() => {
+    setSwipeEnabled(navigation.state === 'home');
+    return () => setSwipeEnabled(true);
+  }, [navigation.state]);
   const [showIgnoredOnly, setShowIgnoredOnly] = useState(false);
   const [showingAddDialog, setShowingAddDialog] = useState(false);
   const [newItemName, setNewItemName] = useState('');
@@ -1400,7 +1408,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
         isSearch={isSearch}
         name={item.name}
         quantity={item.quantity}
-        isIgnored={item.isIgnored}
+        isIgnored={item.isIgnored ?? false}
         categoryName={categoryName}
       />
     );

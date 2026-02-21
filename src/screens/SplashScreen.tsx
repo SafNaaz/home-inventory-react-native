@@ -1,74 +1,110 @@
 import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, Animated, Dimensions, StatusBar, Image } from 'react-native';
-import { Title, useTheme } from 'react-native-paper';
+import { View, StyleSheet, Animated, Dimensions, StatusBar, Image, Platform } from 'react-native';
+import { Title, useTheme, Text } from 'react-native-paper';
+import { rs } from '../themes/Responsive';
 
 interface SplashScreenProps {
   onAnimationFinish: () => void;
+  isDark: boolean;
 }
 
 const { width, height } = Dimensions.get('window');
 
 import DoodleBackground from '../components/DoodleBackground';
 
-const SplashScreen: React.FC<SplashScreenProps> = ({ onAnimationFinish }) => {
+const SplashScreen: React.FC<SplashScreenProps> = ({ onAnimationFinish, isDark }) => {
   const theme = useTheme();
   
-  // Animation values
-  const [blur, setBlur] = React.useState(20);
-  const animValue = useRef(new Animated.Value(0)).current;
+  // High-performance Native Animation Values
+  const opacity = useRef(new Animated.Value(0)).current;
+  const scale = useRef(new Animated.Value(0.95)).current;
+  const taglineOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Listener to handle the blur effect
-    const blurListener = animValue.addListener(({ value }) => {
-      // Blur goes from 20 to 0 as value goes from 0 to 1
-      setBlur(20 * (1 - value));
-    });
-
-    // Animation Sequence
-    Animated.sequence([
-      Animated.delay(400),
-      Animated.timing(animValue, {
+    // 1. Initial Reveal
+    Animated.parallel([
+      Animated.timing(opacity, {
         toValue: 1,
-        duration: 1200,
-        useNativeDriver: false, // Required for blurRadius calculation via state
+        duration: 800,
+        useNativeDriver: true,
       }),
-      Animated.delay(1000),
-    ]).start(() => {
-      onAnimationFinish();
-    });
+      Animated.spring(scale, {
+        toValue: 1,
+        tension: 20,
+        friction: 7,
+        useNativeDriver: true,
+      })
+    ]).start();
 
-    return () => {
-      animValue.removeListener(blurListener);
-    };
+    // 2. Subtitle Reveal
+    Animated.timing(taglineOpacity, {
+      toValue: 1,
+      duration: 1000,
+      delay: 600,
+      useNativeDriver: true,
+    }).start();
+
+    // 3. Complete Sequence
+    const timer = setTimeout(() => {
+      // Final fade out before revealing app
+      Animated.timing(opacity, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+      }).start(() => {
+        onAnimationFinish();
+      });
+    }, 2500);
+
+    return () => clearTimeout(timer);
   }, []);
 
-  const iconOpacity = animValue;
-  const iconScale = animValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.6, 1],
-  });
+  const bgColor = isDark ? '#020617' : '#F8FAFC';
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <StatusBar translucent backgroundColor="transparent" barStyle={theme.dark ? "light-content" : "dark-content"} />
+    <View style={[styles.container, { backgroundColor: bgColor }]}>
+      <StatusBar translucent backgroundColor="transparent" barStyle={isDark ? "light-content" : "dark-content"} />
       
-      {/* Doodle Background */}
       <DoodleBackground />
 
-      {/* Center Icon with Blur-to-Visible Effect */}
       <View style={styles.content}>
-        <Animated.Image 
-          source={require('../../assets/icon.png')} 
-          style={[
-            styles.icon,
-            { 
-              opacity: iconOpacity,
-              transform: [{ scale: iconScale }]
-            }
-          ]}
-          blurRadius={blur}
-          resizeMode="contain"
-        />
+        <Animated.View 
+          style={{
+            opacity: opacity,
+            transform: [{ scale: scale }],
+            flexDirection: 'row',
+            alignItems: 'center',
+          }}
+        >
+          <Text 
+            style={[
+              styles.brandText, 
+              { 
+                color: isDark ? '#FFF' : theme.colors.primary,
+              }
+            ]}
+          >
+            HiHome
+          </Text>
+          
+          <Animated.View 
+             style={{ 
+               marginLeft: rs(8),
+               transform: [{ 
+                 rotate: scale.interpolate({
+                   inputRange: [0.95, 1],
+                   outputRange: ['-10deg', '0deg']
+                 })
+               }]
+             }}
+          >
+            <Image 
+              source={require('../../assets/icon.png')} 
+              style={styles.smallIcon}
+              resizeMode="contain"
+            />
+          </Animated.View>
+        </Animated.View>
       </View>
     </View>
   );
@@ -77,16 +113,29 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onAnimationFinish }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  content: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  icon: {
-    width: 180,
-    height: 180,
-    borderRadius: 40,
+  content: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
+  },
+  brandText: {
+    fontSize: rs(54),
+    fontWeight: '900',
+    textAlign: 'center',
+    letterSpacing: -1,
+    // Using fun, rounded fonts that feel "funky" but stable
+    fontFamily: Platform.OS === 'ios' ? 'Chalkboard SE' : 'monospace',
+    textShadowColor: 'rgba(0,0,0,0.1)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 4,
+  },
+  smallIcon: {
+    width: rs(58),
+    height: rs(58),
+    borderRadius: rs(12),
   }
 });
 
