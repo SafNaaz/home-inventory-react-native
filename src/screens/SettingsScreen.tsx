@@ -270,9 +270,8 @@ const SettingsScreen: React.FC = () => {
     
     const itemsCount = inventoryManager.getTotalItems();
     const notesCount = notesManager.getTotalNotes();
-    const historyCount = settings.miscItemHistory.length;
     
-    return `${itemsCount} items, ${notesCount} notes, ${historyCount} history items`;
+    return `${itemsCount} items, ${notesCount} notes`;
   };
 
   const renderAppearanceSection = () => (
