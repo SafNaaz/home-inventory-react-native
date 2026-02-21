@@ -891,6 +891,7 @@ const InventoryScreen: React.FC = () => {
   const searchInputRef = useRef<RNTextInput>(null);
   const isSearchVisibleRef = useRef(isSearchVisible);
   const editNameRef = useRef('');
+  const homeScrollViewRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     isSearchVisibleRef.current = isSearchVisible;
@@ -1054,6 +1055,7 @@ const InventoryScreen: React.FC = () => {
              // Force restore tab bar when jumping home - handled by useEffect now
              return { state: 'home' };
           }
+          homeScrollViewRef.current?.scrollTo({ y: 0, animated: true });
           setIsReordering(false);
           return prevNav;
         });
@@ -1281,7 +1283,15 @@ const InventoryScreen: React.FC = () => {
   
 
   const renderStatsHeader = () => (
-    <View style={[styles.statsHeader, { backgroundColor: theme.colors.surfaceVariant }]}>
+    <View style={[
+      styles.statsHeader, 
+      { 
+        backgroundColor: theme.colors.surface,
+        borderWidth: 1,
+        borderColor: theme.colors.outlineVariant,
+        borderRadius: 16
+      }
+    ]}>
       <View style={styles.statItem}>
         <Text style={[styles.statLabel, { color: theme.colors.onSurfaceVariant }]}>Total Items</Text>
         <Text style={[styles.statValue, { color: theme.colors.onSurface }]}>{getTotalItems()}</Text>
@@ -1583,6 +1593,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
         </View>
         
         <ScrollView
+          ref={homeScrollViewRef}
           style={styles.scrollView}
           contentContainerStyle={{ paddingBottom: 110 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}

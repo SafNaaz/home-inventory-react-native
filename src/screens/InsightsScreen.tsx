@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   ScrollView,
@@ -8,6 +8,7 @@ import {
   LayoutAnimation,
   Platform,
   UIManager,
+  InteractionManager
 } from 'react-native';
 import {
   Text,
@@ -15,6 +16,7 @@ import {
   Surface,
   ProgressBar,
 } from 'react-native-paper';
+import { useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { inventoryManager } from '../managers/InventoryManager';
 import { settingsManager } from '../managers/SettingsManager';
@@ -271,6 +273,8 @@ const InsightsScreen: React.FC = () => {
   // Expand/collapse state for each section
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
 
+  const navigationObj = useNavigation();
+  const insightScrollViewRef = useRef<ScrollView>(null);
 
   const toggleSection = (key: string) => {
     toggleAnimation();
@@ -278,20 +282,32 @@ const InsightsScreen: React.FC = () => {
   };
 
   useEffect(() => {
-    loadInventoryData();
-    const unsubInventory = inventoryManager.addListener(() => loadInventoryData());
-    const unsubSettings = settingsManager.addListener(() => loadInventoryData());
+    loadInsightsData();
+    const unsubInventory = inventoryManager.addListener(() => loadInsightsData());
+    const unsubSettings = settingsManager.addListener(() => loadInsightsData());
     return () => { unsubInventory(); unsubSettings(); };
   }, []);
 
-  const loadInventoryData = () => {
+  // Scroll to top when tab is pressed while already focused
+  useEffect(() => {
+    const unsubscribeTabPress = (navigationObj as any).addListener('tabPress', (e: any) => {
+      InteractionManager.runAfterInteractions(() => {
+        insightScrollViewRef.current?.scrollTo({ y: 0, animated: true });
+      });
+    });
+
+    return unsubscribeTabPress;
+  }, [navigationObj]);
+
+  const loadInsightsData = () => {
     const items = inventoryManager.getVisibleInventoryItems();
     setInventoryItems(items);
   };
 
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true);
-    loadInventoryData();
+    toggleAnimation();
+    loadInsightsData();
     setRefreshing(false);
   };
 
@@ -1032,6 +1048,7 @@ const InsightsScreen: React.FC = () => {
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <DoodleBackground />
       <ScrollView
+        ref={insightScrollViewRef}
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
