@@ -314,7 +314,14 @@ const ShoppingScreen: React.FC = () => {
                 />
               ) : null
         )}
-        onPress={() => canToggle && handleToggleItem(item)}
+        onPress={() => {
+          if (canToggle) {
+             handleToggleItem(item);
+          } else if (canRemove && item.isTemporary) {
+             setNewItemName(item.name);
+             setAddItemDialogVisible(true);
+          }
+        }}
         style={[
           styles.listItem,
           item.isChecked && { 
@@ -416,6 +423,12 @@ const ShoppingScreen: React.FC = () => {
       >
         {searchLoading ? "Loading Items..." : "Search & Add from all items"}
       </Button>
+      <FAB
+        icon="tag-plus"
+        style={[styles.fab, { backgroundColor: theme.colors.primary }]}
+        color={theme.dark ? '#000' : '#fff'}
+        onPress={() => setAddItemDialogVisible(true)}
+      />
     </View>
   );
 
@@ -507,7 +520,7 @@ const ShoppingScreen: React.FC = () => {
       </View>
 
       <FAB
-        icon="plus"
+        icon="tag-plus"
         style={[styles.fab, { backgroundColor: theme.colors.primary }]}
         color={theme.dark ? '#000' : '#fff'}
         onPress={() => setAddItemDialogVisible(true)}
@@ -570,7 +583,7 @@ const ShoppingScreen: React.FC = () => {
         </Button>
       </View>
       <FAB
-        icon="plus"
+        icon="tag-plus"
         style={[styles.fab, { backgroundColor: theme.colors.primary }]}
         color={theme.dark ? '#000' : '#fff'}
         onPress={() => setAddItemDialogVisible(true)}
@@ -679,7 +692,7 @@ const ShoppingScreen: React.FC = () => {
           </View>
         </View>
       <FAB
-        icon="plus"
+        icon="tag-plus"
         style={[styles.fab, { backgroundColor: theme.colors.primary }]}
         color={theme.dark ? '#000' : '#fff'}
         onPress={() => setAddItemDialogVisible(true)}
@@ -912,7 +925,7 @@ const ShoppingScreen: React.FC = () => {
   return (
     <>
       {renderContent()}
-      {shoppingState !== ShoppingState.EMPTY && renderAddItemDialog()}
+      {renderAddItemDialog()}
       {renderConfirmDialogs()}
       <Snackbar
         visible={snackbarVisible}

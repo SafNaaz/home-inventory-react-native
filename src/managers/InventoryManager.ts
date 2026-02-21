@@ -601,7 +601,9 @@ export class InventoryManager {
   }
 
   async addTemporaryItemToShoppingList(name: string): Promise<void> {
-    if (this.shoppingState !== ShoppingState.GENERATING && this.shoppingState !== ShoppingState.SHOPPING) {
+    if (this.shoppingState === ShoppingState.EMPTY) {
+      this.shoppingState = ShoppingState.GENERATING;
+    } else if (this.shoppingState !== ShoppingState.GENERATING && this.shoppingState !== ShoppingState.SHOPPING) {
       console.error('❌ Cannot add items when not in generating or shopping state');
       return;
     }
@@ -623,7 +625,9 @@ export class InventoryManager {
   }
 
   async addInventoryItemToShoppingList(itemId: string): Promise<void> {
-    if (this.shoppingState !== ShoppingState.GENERATING && this.shoppingState !== ShoppingState.SHOPPING) {
+    if (this.shoppingState === ShoppingState.EMPTY) {
+      this.shoppingState = ShoppingState.GENERATING;
+    } else if (this.shoppingState !== ShoppingState.GENERATING && this.shoppingState !== ShoppingState.SHOPPING) {
       console.error('❌ Cannot add items when not in generating or shopping state');
       return;
     }
