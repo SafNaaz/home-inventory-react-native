@@ -22,7 +22,7 @@ import {
 } from 'react-native-paper';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
-import * as FileSystem from 'expo-file-system';
+import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as Clipboard from 'expo-clipboard';
 import * as DocumentPicker from 'expo-document-picker';
@@ -176,12 +176,12 @@ const SettingsScreen: React.FC = () => {
   const shareDataAsFile = async () => {
     try {
         const fileName = `inventory_backup_${new Date().toISOString().split('T')[0]}.json`;
-        const fileUri = FileSystem.documentDirectory + fileName;
+        const file = new File(Paths.document, fileName);
         
-        await FileSystem.writeAsStringAsync(fileUri, exportData);
+        file.write(exportData);
         
         if (await Sharing.isAvailableAsync()) {
-            await Sharing.shareAsync(fileUri);
+            await Sharing.shareAsync(file.uri);
         } else {
             setSnackbarMessage('Sharing is not available on this device');
             setSnackbarVisible(true);
@@ -209,7 +209,8 @@ const SettingsScreen: React.FC = () => {
       }
 
       const fileUri = result.assets[0].uri;
-      const fileContent = await FileSystem.readAsStringAsync(fileUri);
+      const file = new File(fileUri);
+      const fileContent = await file.text();
       
       setImportDataText(fileContent);
       // Optional: Auto-import or just fill the text box? 

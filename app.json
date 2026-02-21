@@ -33,7 +33,9 @@
       }
     },
     "plugins": [
-      "expo-dev-client"
-    ]
+      "expo-dev-client",
+      "@react-native-community/datetimepicker"
+    ],
+    "newArchEnabled": true
   }
 }
