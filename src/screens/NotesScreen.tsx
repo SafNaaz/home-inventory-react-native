@@ -391,7 +391,7 @@ const NotesScreen: React.FC = () => {
               bottom: (insets.bottom > 0 ? insets.bottom + rs(8) : tabBarDims.bottomOffset) + tabBarDims.height + rs(24)
             }
           ]}
-          color={theme.dark ? '#000' : '#fff'}
+          color={theme.colors.onPrimary}
           onPress={handleAddNote}
         />
       )}

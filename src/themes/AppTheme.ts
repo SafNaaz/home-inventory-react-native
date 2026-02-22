@@ -36,7 +36,7 @@ export const lightTheme = {
     inversePrimary: '#C7D2FE',
     // Custom colors for categories
     fridge: '#2563EB', // Blue
-    grocery: '#16A34A', // Green
+    grocery: '#475569', // Slate 600 instead of Green
     hygiene: '#64748B', // Neutral Slate
     personalCare: '#94A3B8', // Neutral Slate variant
     // Status colors
@@ -52,26 +52,26 @@ export const darkTheme = {
   ...MD3DarkTheme,
   colors: {
     ...MD3DarkTheme.colors,
-    primary: '#F8FAFC', // Near white for dark mode (Clean)
+    primary: '#CBD5E1', // Slate 200 - Softer than near-white
     primaryContainer: '#334155',
-    secondary: '#CBD5E1', 
+    secondary: '#94A3B8', 
     secondaryContainer: '#1E293B',
-    tertiary: '#94A3B8',
+    tertiary: '#64748B',
     tertiaryContainer: '#0F172A',
     surface: '#1E293B', // Slate 800
     surfaceVariant: '#0F172A', // Slate 900
     background: '#020617', // Slate 950
     error: '#F87171',
     errorContainer: '#450A0A',
-    onPrimary: '#020617', // Slate 950 (Contrast for white primary)
-    onPrimaryContainer: '#FFFFFF',
-    onSecondary: '#020617', // Contrast for light secondary
-    onSecondaryContainer: '#F1F5F9', // Contrast for dark container
-    onTertiary: '#020617',
-    onTertiaryContainer: '#F1F5F9',
-    onSurface: '#F1F5F9',
+    onPrimary: '#0F172A', // Slate 900 (High contrast for light primary)
+    onPrimaryContainer: '#D1D5DB', // Soft gray instead of white
+    onSecondary: '#020617',
+    onSecondaryContainer: '#D1D5DB',
+    onTertiary: '#F1F5F9',
+    onTertiaryContainer: '#D1D5DB',
+    onSurface: '#D1D5DB', // Gray 300 - Softer text for dark mode
     onSurfaceVariant: '#94A3B8',
-    onBackground: '#F1F5F9',
+    onBackground: '#D1D5DB', // Gray 300
     onError: '#450A0A',
     onErrorContainer: '#FECACA',
     outline: '#334155',
@@ -83,7 +83,7 @@ export const darkTheme = {
     inversePrimary: '#4F46E5',
     // Custom colors for categories
     fridge: '#60A5FA',
-    grocery: '#34D399',
+    grocery: '#94A3B8', // Softer slate instead of green
     hygiene: '#94A3B8',
     personalCare: '#CBD5E1',
     // Status colors

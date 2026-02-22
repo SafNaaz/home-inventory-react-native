@@ -58,11 +58,11 @@ const getCategoryIconColor = (category: string, isDark: boolean): string => {
   const cat = category.toLowerCase();
   if (isDark) {
     switch (cat) {
-      case 'fridge': return '#FFFFFF';
-      case 'grocery': return '#D4D4D4';
-      case 'hygiene': return '#BABABA';
-      case 'personal care': case 'personalcare': return '#A0A0A0';
-      default: return '#CCCCCC';
+      case 'fridge': return '#94A3B8'; // Softer slate/blue instead of bright white
+      case 'grocery': return '#CBD5E1'; // Neutral light slate instead of green
+      case 'hygiene': return '#94A3B8';
+      case 'personal care': case 'personalcare': return '#CBD5E1';
+      default: return '#94A3B8';
     }
   } else {
     switch (cat) {
@@ -586,7 +586,9 @@ const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, on
           backgroundColor: isSearch ? theme.colors.surfaceVariant : theme.colors.surface,
           borderRadius: 24,
           ...commonStyles.shadow,
-          elevation: (item.isIgnored || isSearch) ? 0 : 6,
+          elevation: isSearch ? (theme.dark ? 1 : 2) : 6,
+          // Remove explicit borders for hidden items to match the "make it same" request
+          // while ensuring visibility through elevation in light mode.
         }
       ]}
     >
@@ -657,8 +659,8 @@ const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, on
               onComplete={(q) => onUpdate(item, q)}
               trackColor={theme.colors.outline}
               progressColor={stockColor}
-              thumbColor="#FFFFFF"
-              thumbBorderColor="#FFFFFF"
+              thumbColor={theme.colors.surface}
+              thumbBorderColor={theme.colors.outline}
             />
           </View>
           <IconButton
