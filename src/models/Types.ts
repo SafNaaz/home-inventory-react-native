@@ -126,6 +126,8 @@ export interface AppSettings {
   healthAlertTime: Date;
   securityLockTimeout: number; // in milliseconds, 0 = immediately
   hasConfiguredNotifications: boolean; // true after first-launch notification setup
+  tourState: 'not_started' | 'in_progress' | 'completed';
+  tourStep: number;
 }
 
 export enum SecurityLockTimeout {

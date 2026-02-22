@@ -3,7 +3,7 @@ import { StorageService } from '../services/StorageService';
 import { inventoryManager } from './InventoryManager';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as Notifications from 'expo-notifications';
-import { Platform } from 'react-native';
+import { Platform, Alert, AppState, Appearance } from 'react-native';
 
 // MARK: - Settings Manager Class
 export class SettingsManager {
@@ -100,6 +100,8 @@ export class SettingsManager {
       healthAlertTime: healthDefault,
       securityLockTimeout: SecurityLockTimeout.IMMEDIATELY,
       hasConfiguredNotifications: false,
+      tourState: 'not_started',
+      tourStep: 0,
     };
   }
 
@@ -208,7 +210,27 @@ export class SettingsManager {
   }
 
   isDarkModeEnabled(): boolean {
-    return this.settings.themeMode === 'dark';
+    return this.settings.themeMode === 'system' 
+      ? Appearance.getColorScheme() === 'dark'
+      : this.settings.themeMode === 'dark';
+  }
+
+  getTourState(): 'not_started' | 'in_progress' | 'completed' {
+    return this.settings.tourState;
+  }
+
+  async setTourState(state: 'not_started' | 'in_progress' | 'completed'): Promise<void> {
+    this.settings.tourState = state;
+    await this.saveSettings();
+  }
+
+  getTourStep(): number {
+    return this.settings.tourStep;
+  }
+
+  async setTourStep(step: number): Promise<void> {
+    this.settings.tourStep = step;
+    await this.saveSettings();
   }
 
   isSecurityEnabled(): boolean {

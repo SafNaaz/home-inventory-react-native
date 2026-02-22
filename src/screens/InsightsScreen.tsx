@@ -17,14 +17,15 @@ import {
   Surface,
   ProgressBar,
 } from 'react-native-paper';
-import { useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { inventoryManager } from '../managers/InventoryManager';
 import { settingsManager } from '../managers/SettingsManager';
+import { tourManager } from '../managers/TourManager';
 import { InventoryItem, InventoryCategory } from '../models/Types';
 import { CATEGORY_CONFIG, getAllCategories } from '../constants/CategoryConfig';
 import { commonStyles } from '../themes/AppTheme';
 import DoodleBackground from '../components/DoodleBackground';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { tabBar as tabBarDims, rs, fontSize as fs, spacing as sp, radius as r, screen } from '../themes/Responsive';
 
 // Theme-based icon shades: slight variation per category type
@@ -291,6 +292,12 @@ const InsightsScreen: React.FC = () => {
     const unsubSettings = settingsManager.addListener(() => loadInsightsData());
     return () => { unsubInventory(); unsubSettings(); };
   }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      tourManager.onAction('SWITCHED_TO_INSIGHTS');
+    }, [])
+  );
 
   // Scroll to top when tab is pressed while already focused
   useEffect(() => {

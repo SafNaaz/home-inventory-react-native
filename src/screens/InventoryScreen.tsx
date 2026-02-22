@@ -48,6 +48,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { settingsManager } from '../managers/SettingsManager';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { inventoryManager } from '../managers/InventoryManager';
+import { tourManager } from '../managers/TourManager';
 import { InventoryItem, InventoryCategory, InventorySubcategory, ShoppingState } from '../models/Types';
 import { CATEGORY_CONFIG, SUBCATEGORY_CONFIG, getAllCategories, getCategoryConfig, getSubcategoryConfig } from '../constants/CategoryConfig';
 import { getStockColor, getCategoryColor, commonStyles, getDialogTheme } from '../themes/AppTheme';
@@ -706,19 +707,25 @@ const InventoryItemRow = React.memo(({ item, theme, onIncrement, onDecrement, on
     </Swipeable>
   );
 });
-const EditItemInput = ({ initialValue, onSave, onCancel }: { initialValue: string, onSave: (val: string) => void, onCancel: () => void }) => {
+const EditItemInput = ({ initialValue, onSave, onCancel, theme }: { initialValue: string, onSave: (val: string) => Promise<void>, onCancel: () => void, theme: any }) => {
   const [isValid, setIsValid] = useState(!!initialValue.trim());
+  const [errorMsg, setErrorMsg] = useState('');
   const textRef = useRef(initialValue);
 
-  // Update ref when typing, update valid state
   const handleChangeText = (text: string) => {
     textRef.current = text;
     setIsValid(!!text.trim());
+    setErrorMsg('');
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (textRef.current.trim()) {
-      onSave(textRef.current.trim());
+      try {
+        setErrorMsg('');
+        await onSave(textRef.current.trim());
+      } catch (err: any) {
+        setErrorMsg(err.message);
+      }
     }
   };
 
@@ -732,8 +739,14 @@ const EditItemInput = ({ initialValue, onSave, onCancel }: { initialValue: strin
         onSubmitEditing={handleSave}
         returnKeyType="done"
         autoFocus={true}
-        key={initialValue} // Force remount if initial value changes (e.g. reused component instance)
+        key={initialValue}
+        error={!!errorMsg}
       />
+      {!!errorMsg && (
+        <Text style={{ color: theme.colors.error, fontSize: 12, marginTop: 4, marginLeft: 4 }}>
+          {errorMsg}
+        </Text>
+      )}
       
       <Dialog.Actions style={{ paddingHorizontal: 0, marginTop: 10 }}>
         <Button onPress={onCancel}>Cancel</Button>
@@ -743,18 +756,25 @@ const EditItemInput = ({ initialValue, onSave, onCancel }: { initialValue: strin
   );
 };
 
-const AddItemInput = ({ onAdd, onCancel, subcategory }: { onAdd: (name: string) => void, onCancel: () => void, subcategory: string }) => {
+const AddItemInput = ({ onAdd, onCancel, subcategory, theme }: { onAdd: (name: string) => Promise<void>, onCancel: () => void, subcategory: string, theme: any }) => {
   const [isValid, setIsValid] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
   const textRef = useRef('');
 
   const handleChangeText = (text: string) => {
     textRef.current = text;
     setIsValid(!!text.trim());
+    setErrorMsg('');
   };
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (textRef.current.trim()) {
-      onAdd(textRef.current.trim());
+      try {
+        setErrorMsg('');
+        await onAdd(textRef.current.trim());
+      } catch (err: any) {
+        setErrorMsg(err.message);
+      }
     }
   };
 
@@ -768,7 +788,13 @@ const AddItemInput = ({ onAdd, onCancel, subcategory }: { onAdd: (name: string) 
         onSubmitEditing={handleAdd}
         returnKeyType="done"
         autoFocus={true}
+        error={!!errorMsg}
       />
+      {!!errorMsg && (
+        <Text style={{ color: theme.colors.error, fontSize: 12, marginTop: 4, marginLeft: 4 }}>
+          {errorMsg}
+        </Text>
+      )}
       
       <Dialog.Actions style={{ paddingHorizontal: 0, marginTop: 10 }}>
         <Button onPress={onCancel}>Cancel</Button>
@@ -790,23 +816,30 @@ const SubcategoryInput = ({
   initialName: string, 
   initialIcon: string, 
   availableIcons: string[], 
-  onSave: (name: string, icon: string) => void, 
+  onSave: (name: string, icon: string) => Promise<void>, 
   onCancel: () => void,
   saveLabel: string,
   theme: any
 }) => {
   const [icon, setIcon] = useState(initialIcon);
   const [isValid, setIsValid] = useState(!!initialName.trim());
+  const [errorMsg, setErrorMsg] = useState('');
   const nameRef = useRef(initialName);
 
   const handleChangeText = (text: string) => {
     nameRef.current = text;
     setIsValid(!!text.trim());
+    setErrorMsg('');
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (nameRef.current.trim()) {
-      onSave(nameRef.current.trim(), icon);
+      try {
+        setErrorMsg('');
+        await onSave(nameRef.current.trim(), icon);
+      } catch (err: any) {
+        setErrorMsg(err.message);
+      }
     }
   };
 
@@ -817,13 +850,19 @@ const SubcategoryInput = ({
         defaultValue={initialName}
         onChangeText={handleChangeText}
         mode="outlined"
-        style={{ marginBottom: 16 }}
+        style={{ marginBottom: 4 }}
         onSubmitEditing={handleSave}
         returnKeyType="done"
         key={initialName} 
         autoFocus={true}
+        error={!!errorMsg}
       />
-      <Text style={{ marginBottom: 8, color: theme.colors.onSurface }}>Select Icon:</Text>
+      {!!errorMsg && (
+        <Text style={{ color: theme.colors.error, fontSize: 12, marginBottom: 12, marginLeft: 4 }}>
+          {errorMsg}
+        </Text>
+      )}
+      <Text style={{ marginBottom: 8, marginTop: 8, color: theme.colors.onSurface }}>Select Icon:</Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
         {availableIcons.map(ic => (
           <IconButton
@@ -1034,6 +1073,12 @@ const InventoryScreen: React.FC = () => {
     
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setNavigation(newNav);
+    
+    // Tour integration
+    if (typeof newNav === 'object') {
+      if (newNav.state === 'category') tourManager.onAction('ENTERED_CATEGORY');
+      if (newNav.state === 'subcategory') tourManager.onAction('ENTERED_SUBCATEGORY');
+    }
   };
 
   // Extra safety: reset filters when navigation state changes
@@ -1041,6 +1086,16 @@ const InventoryScreen: React.FC = () => {
     setShowIgnoredOnly(false);
     setIsReordering(false);
   }, [navigation.state, navigation.category]);
+
+  // When the tour is started/restarted (e.g. from Settings), reset internal nav to home
+  useEffect(() => {
+    const unsub = tourManager.addOnStartListener(() => {
+      setNavigation({ state: 'home' });
+      setShowIgnoredOnly(false);
+      setIsReordering(false);
+    });
+    return unsub;
+  }, []);
 
   // Control tab bar visibility based on isFabVisible state
   useEffect(() => {
@@ -1145,8 +1200,7 @@ const InventoryScreen: React.FC = () => {
       setNewSubIcon('');
       setEditingSubId(null);
     } catch (err: any) {
-      setSnackbarMessage(err.message);
-      setSnackbarVisible(true);
+      throw err;
     }
   };
 
@@ -1222,12 +1276,18 @@ const InventoryScreen: React.FC = () => {
     }
   };
 
-  const handleQuantityUpdate = useCallback(async (item: InventoryItem, newQuantity: number) => {
-    pendingUpdatesRef.current[item.id] = newQuantity;
-    setInventoryItems(prev => prev.map(it => it.id === item.id ? { ...it, quantity: newQuantity } : it));
+  const handleQuantityUpdate = useCallback(async (item: InventoryItem, q: number) => {
+    // Optimistic UI First
+    setInventoryItems(prevItems => prevItems.map(it => 
+      it.id === item.id ? { ...it, quantity: q } : it
+    ));
 
+    // Tour integration
+    tourManager.onAction('STOCK_LOWERED', q);
+
+    pendingUpdatesRef.current[item.id] = q;
     try {
-      await inventoryManager.updateItemQuantity(item.id, newQuantity);
+      await inventoryManager.updateItemQuantity(item.id, q);
       delete pendingUpdatesRef.current[item.id];
     } catch (err) {
       delete pendingUpdatesRef.current[item.id];
@@ -1241,12 +1301,12 @@ const InventoryScreen: React.FC = () => {
     try {
       if (!name.trim() || !navigation.subcategory) return;
       
-      await inventoryManager.addCustomItem(name.trim(), navigation.subcategory);
+      const newItem = await inventoryManager.addCustomItem(name.trim(), navigation.subcategory);
+      tourManager.onAction('ITEM_ADDED', newItem);
       setNewItemName('');
       setShowingAddDialog(false);
     } catch (err: any) {
-      setSnackbarMessage(err.message);
-      setSnackbarVisible(true);
+      throw err;
     }
   };
 
@@ -1258,8 +1318,7 @@ const InventoryScreen: React.FC = () => {
       setEditingItem(null);
       setEditedName('');
     } catch (err: any) {
-      setSnackbarMessage(err.message);
-      setSnackbarVisible(true);
+      throw err;
     }
   };
 
@@ -1270,8 +1329,11 @@ const InventoryScreen: React.FC = () => {
     if (currentState !== ShoppingState.EMPTY) {
       setShoppingDialogState(currentState);
       setShowingShoppingDialog(true);
+      // Let the tour know the dialog appeared, so it shows a hint bubble
+      tourManager.onAction('EXISTING_CART_SHOWN');
     } else {
       await inventoryManager.startGeneratingShoppingList();
+      tourManager.onAction('MAGIC_CART_CREATED');
       setSuccessMessage('Shopping list generated successfully!');
       setShowingSuccessDialog(true);
     }
@@ -1286,6 +1348,7 @@ const InventoryScreen: React.FC = () => {
     setShowingShoppingDialog(false);
     await inventoryManager.cancelShopping();
     await inventoryManager.startGeneratingShoppingList();
+    tourManager.onAction('MAGIC_CART_CREATED'); // Also fire for tour in case user picks this manually
     setSuccessMessage('New shopping list started!');
     setShowingSuccessDialog(true);
   };
@@ -1905,7 +1968,10 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
                   mode="contained"
                   containerColor={theme.dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)'}
                   iconColor={getSubcategoryIconColor(inventoryManager.getSubcategoryConfig(navigation.subcategory as any), theme.dark)}
-                  onPress={() => setShowingAddDialog(true)}
+                  onPress={() => {
+                    tourManager.onAction('OPENED_ADD_ITEM');
+                    setShowingAddDialog(true);
+                  }}
                   style={{ margin: 4 }}
                 />
               </>
@@ -1950,7 +2016,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
     <BottomSheetDialog 
       visible={showingAddDialog} 
       onDismiss={() => setShowingAddDialog(false)}
-      title="Add New Item"
+      title="New Item"
       theme={theme}
       insets={insets}
     >
@@ -1958,6 +2024,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
           subcategory={navigation.subcategory || ''}
           onAdd={handleAddItem}
           onCancel={() => setShowingAddDialog(false)}
+          theme={theme}
        />
     </BottomSheetDialog>
   );
@@ -1966,23 +2033,23 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
 
   const renderEditItemDialog = () => {
     return (
-      <BottomSheetDialog 
-        visible={!!editingItem} 
-        onDismiss={() => setEditingItem(null)}
-        title="Edit Item"
-        theme={theme}
-        insets={insets}
-      >
-         <EditItemInput 
-            initialValue={editingItem?.name || ''} 
-            onSave={(newName) => {
-               if (editingItem) {
-                 handleEditItem(editingItem.id, newName);
-               }
-            }}
-            onCancel={() => setEditingItem(null)}
-         />
-      </BottomSheetDialog>
+      <Portal>
+        <Dialog theme={getDialogTheme(theme.dark)} visible={!!editingItem} onDismiss={() => setEditingItem(null)} style={{ borderRadius: 28, backgroundColor: theme.colors.surface }}>
+          <Dialog.Title style={{ color: theme.colors.onSurface }}>Edit Item</Dialog.Title>
+          <Dialog.Content>
+            <EditItemInput
+              initialValue={editingItem?.name || ''}
+              onSave={async (name) => {
+                if (editingItem) {
+                  await handleEditItem(editingItem.id, name);
+                }
+              }}
+              onCancel={() => setEditingItem(null)}
+              theme={theme}
+            />
+          </Dialog.Content>
+        </Dialog>
+      </Portal>
     );
   };
 

@@ -28,6 +28,10 @@ import { useColorScheme } from 'react-native';
 import { inventoryManager } from './src/managers/InventoryManager';
 import { settingsManager } from './src/managers/SettingsManager';
 import { notesManager } from './src/managers/NotesManager';
+import { tourManager } from './src/managers/TourManager';
+
+// Components
+import { TourBubble } from './src/components/TourBubble';
 
 // Themes
 import { lightTheme, darkTheme, commonStyles } from './src/themes/AppTheme';
@@ -147,6 +151,7 @@ const App: React.FC = () => {
   const [showSplashScreen, setShowSplashScreen] = useState(true);
   const [swipeEnabled, setSwipeEnabled] = useState(true);
   const [showNotifDialog, setShowNotifDialog] = useState(false);
+  const [showTourDialog, setShowTourDialog] = useState(false);
 
   useEffect(() => {
     // Initialize app
@@ -219,6 +224,8 @@ const App: React.FC = () => {
       // First-launch: show styled notification dialog
       if (settingsManager.isFirstLaunch()) {
         setShowNotifDialog(true);
+      } else {
+        await checkTourOrStart();
       }
 
       // Clear all notifications on startup
@@ -233,6 +240,13 @@ const App: React.FC = () => {
 
   const handleSplashFinish = () => {
     setShowSplashScreen(false);
+  };
+
+  const checkTourOrStart = async () => {
+    await tourManager.initialize();
+    if (settingsManager.getTourState() === 'not_started') {
+      setShowTourDialog(true);
+    }
   };
 
 
@@ -458,6 +472,7 @@ const App: React.FC = () => {
                 onPress={async () => {
                   setShowNotifDialog(false);
                   await settingsManager.setupDefaultNotifications();
+                  await checkTourOrStart();
                 }}
                 style={{ width: '100%', borderRadius: 50 }}
                 contentStyle={{ paddingVertical: 6 }}
@@ -471,6 +486,7 @@ const App: React.FC = () => {
                 onPress={async () => {
                   setShowNotifDialog(false);
                   await settingsManager.skipNotificationSetup();
+                  await checkTourOrStart();
                 }}
                 labelStyle={{ color: theme.colors.onSurfaceVariant, fontWeight: '600' }}
               >
@@ -480,6 +496,29 @@ const App: React.FC = () => {
           </Dialog>
         </Portal>
 
+        <Portal>
+          <Dialog visible={showTourDialog} dismissable={false} style={{ borderRadius: 28, backgroundColor: theme.colors.surface }}>
+            <View style={{ alignItems: 'center', paddingTop: 24, paddingBottom: 8 }}>
+              <Icon name="shoe-sneaker" size={40} color={theme.colors.primary} />
+            </View>
+            <Dialog.Title style={{ textAlign: 'center', fontWeight: '800' }}>Want a Quick Tour?</Dialog.Title>
+            <Dialog.Content>
+              <Paragraph style={{ textAlign: 'center' }}>We can show you exactly how to add items, hide them, and use the Magic Shopping Cart in 60 seconds.</Paragraph>
+            </Dialog.Content>
+            <Dialog.Actions style={{ flexDirection: 'column', gap: 8, paddingHorizontal: 20, paddingBottom: 20 }}>
+              <Button mode="contained" onPress={() => {
+                setShowTourDialog(false);
+                tourManager.startTour();
+              }} style={{ width: '100%', borderRadius: 50 }}>Start Tour</Button>
+              <Button mode="text" onPress={() => {
+                setShowTourDialog(false);
+                tourManager.quitTour(); // marks it complete so we don't ask again
+              }}>I'll figure it out</Button>
+            </Dialog.Actions>
+          </Dialog>
+        </Portal>
+
+        <TourBubble />
       </View>
     </PaperProvider>
     </SwipeContext.Provider>

@@ -43,6 +43,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 
 import { inventoryManager } from '../managers/InventoryManager';
 import { settingsManager } from '../managers/SettingsManager';
+import { tourManager } from '../managers/TourManager';
 import { ShoppingListItem, ShoppingState, InventoryItem, InventoryCategory } from '../models/Types';
 import { getCategoryConfig, getSubcategoryConfig } from '../constants/CategoryConfig';
 import { getStockColor, getCategoryColor, commonStyles, getDialogTheme } from '../themes/AppTheme';
@@ -127,6 +128,12 @@ const ShoppingScreen: React.FC = () => {
     return unsubscribe;
   }, []);
 
+  useFocusEffect(
+    useCallback(() => {
+      tourManager.onAction('SWITCHED_TO_SHOPPING');
+    }, [])
+  );
+
   const loadShoppingData = () => {
     const items = inventoryManager.getShoppingList();
     const state = inventoryManager.getShoppingState();
@@ -197,10 +204,12 @@ const ShoppingScreen: React.FC = () => {
       return;
     }
     await inventoryManager.finalizeShoppingList();
+    tourManager.onAction('FINALIZED_LIST');
   };
 
   const handleStartShopping = async () => {
     await inventoryManager.startShopping();
+    tourManager.onAction('STARTED_SHOPPING');
   };
 
   const handleCompleteAndRestore = async () => {
@@ -215,6 +224,7 @@ const ShoppingScreen: React.FC = () => {
       
       // 2. Perform the logic (will trigger state update to EMPTY)
       await inventoryManager.completeAndRestoreShopping();
+      tourManager.onAction('FINISHED_SHOPPING');
 
       // 3. Show success dialog AFTER the state has settled and View re-rendered
       setTimeout(() => {

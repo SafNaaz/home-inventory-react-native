@@ -19,7 +19,8 @@ import {
   Dialog,
 } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
-import { useNavigation, useIsFocused } from '@react-navigation/native';
+import { useNavigation, useIsFocused, useFocusEffect } from '@react-navigation/native';
+import { tourManager } from '../managers/TourManager';
 
 import { notesManager } from '../managers/NotesManager';
 import { Note } from '../models/Types';
@@ -55,6 +56,12 @@ const NotesScreen: React.FC = () => {
 
     return unsubscribe;
   }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      tourManager.onAction('SWITCHED_TO_NOTES');
+    }, [])
+  );
 
   const loadNotesData = () => {
     const allNotes = notesManager.getNotes();

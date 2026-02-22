@@ -37,8 +37,9 @@ import { AppSettings, SecurityLockTimeout } from '../models/Types';
 import { commonStyles, getDialogTheme } from '../themes/AppTheme';
 import DoodleBackground from '../components/DoodleBackground';
 import BottomSheetDialog from '../components/BottomSheetDialog';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, CommonActions } from '@react-navigation/native';
 import { tabBar as tabBarDims, rs, fontSize as fs, spacing as sp, radius as r, screen } from '../themes/Responsive';
+import { tourManager } from '../managers/TourManager';
 
 const SettingsScreen: React.FC = () => {
   const theme = useTheme();
@@ -537,6 +538,16 @@ const SettingsScreen: React.FC = () => {
           title="Features"
           description="Home Inventory tracking, shopping lists, notes, and insights.."
           left={() => <Icon name="feature-search-outline" size={24} color={theme.colors.onSurface} />}
+        />
+
+        <List.Item
+          title="App Walkthrough Tour"
+          description="Restart the interactive app tour"
+          left={() => <Icon name="shoe-sneaker" size={24} color={theme.colors.primary} />}
+          onPress={() => {
+            navigation.dispatch(CommonActions.navigate('MainTabs', { screen: 'Inventory' }));
+            setTimeout(() => tourManager.startTour(), 300);
+          }}
         />
         
         <Paragraph style={styles.aboutText}>
