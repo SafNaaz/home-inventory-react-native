@@ -18,16 +18,18 @@ import {
 import Slider from '@react-native-community/slider';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { settingsManager } from '../managers/SettingsManager';
 import { InventoryCategory } from '../models/Types';
 import { CATEGORY_CONFIG } from '../constants/CategoryConfig';
 import DoodleBackground from '../components/DoodleBackground';
 import { commonStyles } from '../themes/AppTheme';
-import { fontSize as fs, spacing as sp, radius as r, screen } from '../themes/Responsive';
+import { tabBar as tabBarDims, rs, fontSize as fs, spacing as sp, radius as r, screen } from '../themes/Responsive';
 
 const NotificationSettingsScreen: React.FC = () => {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const [isInventoryReminderEnabled, setIsInventoryReminderEnabled] = useState(false);
   const [isSecondReminderEnabled, setIsSecondReminderEnabled] = useState(false);
   const [reminderTime1, setReminderTime1] = useState(new Date());
@@ -37,6 +39,8 @@ const NotificationSettingsScreen: React.FC = () => {
   const [thresholds, setThresholds] = useState<Record<string, number>>({});
   const [isHealthAlertsEnabled, setIsHealthAlertsEnabled] = useState(true);
   const [healthAlertTime, setHealthAlertTime] = useState(new Date());
+
+  const dynamicPadding = tabBarDims.height + (insets.bottom > 0 ? insets.bottom + rs(8) : tabBarDims.bottomOffset) + rs(20);
 
   useEffect(() => {
     loadSettings();
@@ -106,7 +110,10 @@ const NotificationSettingsScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <DoodleBackground />
-      <ScrollView style={styles.scrollView}>
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={{ paddingBottom: dynamicPadding }}
+      >
         {/* Inventory Reminders Section */}
         <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
           <View style={styles.sectionHeader}>

@@ -38,7 +38,7 @@ import { commonStyles, getDialogTheme } from '../themes/AppTheme';
 import DoodleBackground from '../components/DoodleBackground';
 import BottomSheetDialog from '../components/BottomSheetDialog';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { tabBar as tabBarDims, fontSize as fs, spacing as sp, radius as r, screen } from '../themes/Responsive';
+import { tabBar as tabBarDims, rs, fontSize as fs, spacing as sp, radius as r, screen } from '../themes/Responsive';
 
 const SettingsScreen: React.FC = () => {
   const theme = useTheme();
@@ -682,11 +682,14 @@ const SettingsScreen: React.FC = () => {
     );
   }
 
+  const dynamicPadding = tabBarDims.height + (insets.bottom > 0 ? insets.bottom + rs(8) : tabBarDims.bottomOffset) + rs(20);
+
   return (
     <View style={styles.container}>
       <DoodleBackground />
       <ScrollView
         style={styles.scrollView}
+        contentContainerStyle={{ paddingBottom: dynamicPadding }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }

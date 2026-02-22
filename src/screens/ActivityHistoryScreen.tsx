@@ -4,10 +4,11 @@ import { FlatList } from 'react-native-gesture-handler';
 import { useNavigation } from '@react-navigation/native';
 import { Text, Surface, IconButton, ActivityIndicator, Divider, Button, Dialog, Portal, Paragraph } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { inventoryManager } from '../managers/InventoryManager';
 import { settingsManager } from '../managers/SettingsManager';
 import { ActivityLog, ActivityAction } from '../models/Types';
-import { rs, fontSize, spacing } from '../themes/Responsive';
+import { tabBar as tabBarDims, rs, fontSize, spacing } from '../themes/Responsive';
 import { useColorScheme } from 'react-native';
 import { lightTheme, darkTheme, commonStyles } from '../themes/AppTheme';
 import DoodleBackground from '../components/DoodleBackground';
@@ -19,11 +20,14 @@ const ActivityHistoryScreen: React.FC = () => {
   const [selectedLog, setSelectedLog] = useState<ActivityLog | null>(null);
   const [showConfirmClear, setShowConfirmClear] = useState(false);
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
 
   const systemColorScheme = useColorScheme();
   const settings = settingsManager.getSettings();
   const isDark = settings.themeMode === 'system' ? systemColorScheme === 'dark' : settings.themeMode === 'dark';
   const theme = isDark ? darkTheme : lightTheme;
+
+  const dynamicPadding = tabBarDims.height + (insets.bottom > 0 ? insets.bottom + rs(8) : tabBarDims.bottomOffset) + rs(20);
 
   useEffect(() => {
     navigation.setOptions({
@@ -100,46 +104,35 @@ const ActivityHistoryScreen: React.FC = () => {
   };
 
   const renderLogItem = ({ item }: { item: ActivityLog }) => {
-    const isUndone = item.isUndone;
-
+    const actionTitle = getActionTitle(item.action);
+    const isError = item.action === ActivityAction.REMOVE_ITEM;
+    
     return (
-      <Surface style={[styles.logCard, { backgroundColor: theme.colors.surface }, isUndone && styles.undoneCard]} elevation={1}>
-        <View style={styles.cardHeader}>
-          <View style={styles.headerText}>
-            <Text style={[styles.actionTitle, { color: theme.colors.onSurface }]}>
-              {getActionTitle(item.action)}
-            </Text>
-            <Text style={[styles.timestamp, { color: theme.colors.onSurface, opacity: 0.7, fontWeight: '700' }]}>
-              {formatTimestamp(item.timestamp)}
-            </Text>
+      <Surface style={[styles.logItem, { backgroundColor: theme.colors.surface }]} elevation={1}>
+        <View style={styles.logHeader}>
+          <View style={[styles.actionIcon, { backgroundColor: isError ? theme.colors.errorContainer : theme.colors.primaryContainer }]}>
+            <Icon 
+              name={isError ? 'delete' : 'history'} 
+              size={20} 
+              color={isError ? theme.colors.error : theme.colors.primary} 
+            />
           </View>
-          {!isUndone && (
+          <View style={styles.logHeaderText}>
+            <Text style={[styles.actionTitle, { color: theme.colors.onSurface }]}>{actionTitle}</Text>
+            <Text style={[styles.timestamp, { color: theme.colors.onSurfaceVariant }]}>{formatTimestamp(item.timestamp)}</Text>
+          </View>
+          {item.details.isUndoable !== false && (
             <IconButton
               icon="undo"
               size={20}
-              iconColor={theme.colors.secondary}
               onPress={() => handleUndoPress(item)}
+              iconColor={theme.colors.primary}
             />
-          )}
-          {isUndone && (
-             <View style={styles.undoneBadge}>
-                <Text style={styles.undoneText}>UNDONE</Text>
-             </View>
           )}
         </View>
 
-        <Divider style={styles.divider} />
-
-        <View style={styles.cardBody}>
-          <Text style={[styles.itemName, { color: theme.colors.onSurface, fontWeight: '700' }]}>
-            Item: {item.itemName}
-          </Text>
-
-          {item.details.itemSnapshot && (
-            <Text style={[styles.locationText, { color: theme.colors.primary, fontWeight: '800' }]}>
-              {inventoryManager.getSubcategoryConfig(item.details.itemSnapshot.subcategory)?.category} • {item.details.itemSnapshot.subcategory}
-            </Text>
-          )}
+        <View style={styles.logContent}>
+          <Text style={[styles.itemName, { color: theme.colors.onSurface }]}>{item.itemName}</Text>
           
           {item.action === ActivityAction.UPDATE_QUANTITY && (
             <Text style={[styles.detailText, { color: theme.colors.onSurface, fontWeight: '600' }]}>
@@ -191,7 +184,7 @@ const ActivityHistoryScreen: React.FC = () => {
         data={logs}
         renderItem={renderLogItem}
         keyExtractor={item => item.id}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { paddingBottom: dynamicPadding }]}
         initialNumToRender={10}
         maxToRenderPerBatch={10}
         windowSize={5}
@@ -248,71 +241,59 @@ const styles = StyleSheet.create({
   listContent: {
     padding: spacing.md,
   },
-  logCard: {
-    borderRadius: rs(16),
-    padding: spacing.md,
+  logItem: {
     marginBottom: spacing.md,
-    ...commonStyles.shadow,
+    borderRadius: rs(20),
+    overflow: 'hidden',
   },
-  undoneCard: {
-    opacity: 0.6,
-  },
-  cardHeader: {
+  logHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    padding: spacing.md,
+    paddingBottom: spacing.xs,
   },
-  headerText: {
+  actionIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.sm,
+  },
+  logHeaderText: {
     flex: 1,
   },
   actionTitle: {
-    fontSize: fontSize.md,
-    fontWeight: 'bold',
+    fontSize: fontSize.base,
+    fontWeight: '700',
   },
   timestamp: {
-    fontSize: fontSize.sm,
-  },
-  undoneBadge: {
-    backgroundColor: 'rgba(0,0,0,0.1)',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: rs(2),
-    borderRadius: rs(4),
-  },
-  undoneText: {
     fontSize: fontSize.xs,
-    fontWeight: 'bold',
-    color: '#888',
+    opacity: 0.7,
   },
-  divider: {
-    marginVertical: spacing.sm,
-  },
-  cardBody: {
-    paddingLeft: spacing.xs,
+  logContent: {
+    padding: spacing.md,
+    paddingTop: 0,
   },
   itemName: {
-    fontSize: fontSize.md,
-    marginBottom: rs(2),
+    fontSize: fontSize.lg,
+    fontWeight: '600',
+    marginBottom: 4,
   },
   detailText: {
     fontSize: fontSize.sm,
-    fontStyle: 'italic',
-  },
-  locationText: {
-    fontSize: fontSize.xs,
-    fontWeight: '700',
-    marginBottom: rs(4),
-    textTransform: 'uppercase',
-    opacity: 0.8,
+    opacity: 0.9,
   },
   emptyContainer: {
     flex: 1,
-    marginTop: rs(100),
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 100,
   },
   emptyText: {
+    fontSize: fontSize.lg,
     marginTop: spacing.md,
-    fontSize: fontSize.md,
-    textAlign: 'center',
+    fontWeight: '600',
   },
 });
 
