@@ -530,7 +530,7 @@ const SettingsScreen: React.FC = () => {
         
         <List.Item
           title="HiHome"
-          description="Version 10.1.1"
+          description="Version 11.0.0"
           left={() => <Icon name="information-outline" size={24} color={theme.colors.onSurface} />}
         />
         
