@@ -27,8 +27,11 @@ import DoodleBackground from '../components/DoodleBackground';
 import { commonStyles } from '../themes/AppTheme';
 import { tabBar as tabBarDims, rs, fontSize as fs, spacing as sp, radius as r, screen } from '../themes/Responsive';
 
+import { useNavigation } from '@react-navigation/native';
+
 const NotificationSettingsScreen: React.FC = () => {
   const theme = useTheme();
+  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const [isInventoryReminderEnabled, setIsInventoryReminderEnabled] = useState(false);
   const [isSecondReminderEnabled, setIsSecondReminderEnabled] = useState(false);
@@ -64,14 +67,17 @@ const NotificationSettingsScreen: React.FC = () => {
   };
 
   const handleInventoryReminderToggle = async () => {
+    setIsInventoryReminderEnabled(prev => !prev);
     await settingsManager.toggleInventoryReminder();
   };
 
   const handleSecondReminderToggle = async () => {
+    setIsSecondReminderEnabled(prev => !prev);
     await settingsManager.toggleSecondReminder();
   };
 
   const handleHealthAlertsToggle = async () => {
+    setIsHealthAlertsEnabled(prev => !prev);
     await settingsManager.toggleHealthAlerts();
   };
 
@@ -90,14 +96,17 @@ const NotificationSettingsScreen: React.FC = () => {
 
   const handleTimePickerConfirm = async (date: Date) => {
     if (timePickerType === 'time1') {
+      setReminderTime1(date);
       await settingsManager.updateReminderTime1(date);
     } else if (timePickerType === 'time2') {
+      setReminderTime2(date);
       await settingsManager.updateReminderTime2(date);
     } else {
       // Clamp to 8 AM - 10 PM
       const hour = date.getHours();
       if (hour < 8) date.setHours(8, 0, 0, 0);
       if (hour >= 22) date.setHours(21, 55, 0, 0);
+      setHealthAlertTime(date);
       await settingsManager.updateHealthAlertTime(date);
     }
     setTimePickerVisible(false);
@@ -126,37 +135,12 @@ const NotificationSettingsScreen: React.FC = () => {
           </View>
 
           <List.Section style={styles.listSection}>
-            <List.Item
-              title="Enable Inventory Reminders"
-              description="Receive notifications to check your inventory"
-              left={(props) => <List.Icon {...props} icon="bell" />}
-              right={() => (
-                <Switch
-                  value={isInventoryReminderEnabled}
-                  onValueChange={handleInventoryReminderToggle}
-                  color={theme.colors.primary}
-                />
-              )}
-            />
-            
-            <Divider />
-
-            {isInventoryReminderEnabled && (
+            {isInventoryReminderEnabled ? (
               <>
                 <List.Item
-                  title="First Reminder"
-                  description={`Daily at ${formatTime(reminderTime1)}`}
-                  left={(props) => <List.Icon {...props} icon="clock-outline" />}
-                  right={(props) => <List.Icon {...props} icon="chevron-right" />}
-                  onPress={() => handleTimePickerOpen('time1')}
-                />
-
-                <Divider />
-
-                <List.Item
-                  title="Second Reminder"
-                  description={isSecondReminderEnabled ? `Daily at ${formatTime(reminderTime2)}` : 'Disabled'}
-                  left={(props) => <List.Icon {...props} icon="clock-outline" />}
+                  title="Enable Second Reminder"
+                  description="Standard second reminder for inventory updates"
+                  left={(props) => <List.Icon {...props} icon="bell-plus" />}
                   right={() => (
                     <Switch
                       value={isSecondReminderEnabled}
@@ -179,86 +163,95 @@ const NotificationSettingsScreen: React.FC = () => {
                   </>
                 )}
               </>
+            ) : (
+              <List.Item
+                title="Reminders Disabled"
+                description="Enable Inventory Reminders in the main settings to configure multiple reminders."
+                left={(props) => <List.Icon {...props} icon="bell-off-outline" />}
+                onPress={() => navigation.goBack()}
+              />
             )}
           </List.Section>
         </View>
 
         {/* Inventory Health Section */}
-        <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.onBackground }]}>
-              Health Notifications
-            </Text>
-            <Text style={[styles.sectionDescription, { color: theme.colors.onSurfaceVariant }]}>
-              Get a daily health check notification about stale items, low stock, and items needing attention. Fires once daily between 8 AM — 10 PM.
-            </Text>
-          </View>
+        {isInventoryReminderEnabled && (
+          <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: theme.colors.onBackground }]}>
+                Health Notifications
+              </Text>
+              <Text style={[styles.sectionDescription, { color: theme.colors.onSurfaceVariant }]}>
+                Get a daily health check notification about stale items, low stock, and items needing attention. Fires once daily between 8 AM — 10 PM.
+              </Text>
+            </View>
 
-          <List.Section style={styles.listSection}>
-            <List.Item
-              title="Enable Health Notifications"
-              description="Daily inventory health report"
-              left={(props) => <List.Icon {...props} icon="heart-pulse" />}
-              right={() => (
-                <Switch
-                  value={isHealthAlertsEnabled}
-                  onValueChange={handleHealthAlertsToggle}
-                  color={theme.colors.primary}
-                />
-              )}
-            />
+            <List.Section style={styles.listSection}>
+              <List.Item
+                title="Enable Health Notifications"
+                description="Daily inventory health report"
+                left={(props) => <List.Icon {...props} icon="heart-pulse" />}
+                right={() => (
+                  <Switch
+                    value={isHealthAlertsEnabled}
+                    onValueChange={handleHealthAlertsToggle}
+                    color={theme.colors.primary}
+                  />
+                )}
+              />
 
-            <Divider />
+              <Divider />
 
-            {isHealthAlertsEnabled && (
-              <>
-                <List.Item
-                  title="Health Alert Time"
-                  description={`Daily at ${formatTime(healthAlertTime)}`}
-                  left={(props) => <List.Icon {...props} icon="clock-outline" />}
-                  right={(props) => <List.Icon {...props} icon="chevron-right" />}
-                  onPress={() => handleTimePickerOpen('health')}
-                />
+              {isHealthAlertsEnabled && (
+                <>
+                  <List.Item
+                    title="Health Alert Time"
+                    description={`Daily at ${formatTime(healthAlertTime)}`}
+                    left={(props) => <List.Icon {...props} icon="clock-outline" />}
+                    right={(props) => <List.Icon {...props} icon="chevron-right" />}
+                    onPress={() => handleTimePickerOpen('health')}
+                  />
 
-                <Divider />
+                  <Divider />
 
-                {Object.values(InventoryCategory).map((category, index, array) => {
-                  const config = CATEGORY_CONFIG[category];
-                  const days = thresholds[category] || 0;
-                  
-                  return (
-                    <React.Fragment key={category}>
-                      <View style={styles.thresholdItem}>
-                        <View style={styles.thresholdHeader}>
-                          <View style={styles.thresholdTitleRow}>
-                            <Icon name={config.icon as any} size={24} color={config.color} />
-                            <Text style={[styles.thresholdLabel, { color: theme.colors.onSurface }]}>{category}</Text>
+                  {Object.values(InventoryCategory).map((category, index, array) => {
+                    const config = CATEGORY_CONFIG[category];
+                    const days = thresholds[category] || 0;
+                    
+                    return (
+                      <React.Fragment key={category}>
+                        <View style={styles.thresholdItem}>
+                          <View style={styles.thresholdHeader}>
+                            <View style={styles.thresholdTitleRow}>
+                              <Icon name={config.icon as any} size={24} color={config.color} />
+                              <Text style={[styles.thresholdLabel, { color: theme.colors.onSurface }]}>{category}</Text>
+                            </View>
+                            <Text style={[styles.thresholdValue, { color: theme.colors.primary }]}>
+                              Every {days} {days === 1 ? 'day' : 'days'}
+                            </Text>
                           </View>
-                          <Text style={[styles.thresholdValue, { color: theme.colors.primary }]}>
-                            Every {days} {days === 1 ? 'day' : 'days'}
-                          </Text>
+                          <Slider
+                            style={styles.slider}
+                            minimumValue={1}
+                            maximumValue={30}
+                            step={1}
+                            value={days}
+                            onValueChange={(val) => setThresholds(prev => ({ ...prev, [category]: val }))}
+                            onSlidingComplete={(value: number) => settingsManager.updateActivityThreshold(category, value)}
+                            minimumTrackTintColor={theme.colors.primary}
+                            maximumTrackTintColor={theme.colors.surfaceVariant}
+                            thumbTintColor={theme.colors.primary}
+                          />
                         </View>
-                        <Slider
-                          style={styles.slider}
-                          minimumValue={1}
-                          maximumValue={30}
-                          step={1}
-                          value={days}
-                          onValueChange={(val) => setThresholds(prev => ({ ...prev, [category]: val }))}
-                          onSlidingComplete={(value: number) => settingsManager.updateActivityThreshold(category, value)}
-                          minimumTrackTintColor={theme.colors.primary}
-                          maximumTrackTintColor={theme.colors.surfaceVariant}
-                          thumbTintColor={theme.colors.primary}
-                        />
-                      </View>
-                      {index < array.length - 1 && <Divider />}
-                    </React.Fragment>
-                  );
-                })}
-              </>
-            )}
-          </List.Section>
-        </View>
+                        {index < array.length - 1 && <Divider />}
+                      </React.Fragment>
+                    );
+                  })}
+                </>
+              )}
+            </List.Section>
+          </View>
+        )}
 
         {/* Information Section */}
         <View style={styles.card}>

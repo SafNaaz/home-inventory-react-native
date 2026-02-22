@@ -241,6 +241,7 @@ export class SettingsManager {
       // Disabling security
       this.settings.isSecurityEnabled = false;
       this.settings.isAuthenticated = false;
+      this.notifyListeners();
       await this.saveSettings();
       console.log('🔓 Security disabled');
     }
@@ -276,7 +277,6 @@ export class SettingsManager {
   private initializePushNotifications(): void {
     Notifications.setNotificationHandler({
       handleNotification: async () => ({
-        shouldShowAlert: true,
         shouldPlaySound: true,
         shouldSetBadge: false,
         shouldShowBanner: true,
@@ -284,17 +284,14 @@ export class SettingsManager {
       }),
     });
 
-    // Listen for notification responses (user tapping on a notification)
-    Notifications.addNotificationResponseReceivedListener(async (response) => {
-      console.log('🔔 Notification response received, clearing all notifications');
-      await Notifications.dismissAllNotificationsAsync();
-    });
+    // Note: notification tap navigation is handled in App.tsx via navigationRef
   }
 
   async toggleInventoryReminder(): Promise<void> {
-    this.settings.isInventoryReminderEnabled = !this.settings.isInventoryReminderEnabled;
-    
-    if (this.settings.isInventoryReminderEnabled) {
+    const newValue = !this.settings.isInventoryReminderEnabled;
+    this.settings.isInventoryReminderEnabled = newValue;
+    this.notifyListeners();
+    if (newValue) {
       const hasPermission = await this.requestNotificationPermission();
       if (hasPermission) {
         await this.scheduleInventoryReminders();
@@ -302,17 +299,25 @@ export class SettingsManager {
         console.log('🔔 Inventory reminders enabled');
       } else {
         this.settings.isInventoryReminderEnabled = false;
+        this.notifyListeners();
         console.log('❌ Notification permission denied');
       }
     } else {
+      // Turn off dependent notifications
+      this.settings.isSecondReminderEnabled = false;
+      this.settings.isHealthAlertsEnabled = false;
+      this.notifyListeners();
+      
       await this.cancelInventoryReminders();
+      await this.cancelHealthNotification();
       await this.saveSettings();
-      console.log('🔕 Inventory reminders disabled');
+      console.log('🔕 Inventory reminders and dependent alerts disabled');
     }
   }
 
   async toggleSecondReminder(): Promise<void> {
     this.settings.isSecondReminderEnabled = !this.settings.isSecondReminderEnabled;
+    this.notifyListeners();
     
     if (this.settings.isInventoryReminderEnabled) {
       await this.scheduleInventoryReminders();
@@ -324,6 +329,7 @@ export class SettingsManager {
 
   async toggleHealthAlerts(): Promise<void> {
     this.settings.isHealthAlertsEnabled = !this.settings.isHealthAlertsEnabled;
+    this.notifyListeners();
     
     if (this.settings.isHealthAlertsEnabled) {
       const hasPermission = await this.requestNotificationPermission();
@@ -332,6 +338,7 @@ export class SettingsManager {
         console.log('💚 Health notifications enabled');
       } else {
         this.settings.isHealthAlertsEnabled = false;
+        this.notifyListeners();
         console.log('❌ Notification permission denied for health alerts');
       }
     } else {
@@ -344,6 +351,7 @@ export class SettingsManager {
 
   async updateHealthAlertTime(time: Date): Promise<void> {
     this.settings.healthAlertTime = time;
+    this.notifyListeners();
     
     if (this.settings.isHealthAlertsEnabled) {
       await this.scheduleHealthNotification();
@@ -355,6 +363,7 @@ export class SettingsManager {
 
   async updateReminderTime1(time: Date): Promise<void> {
     this.settings.reminderTime1 = time;
+    this.notifyListeners();
     
     if (this.settings.isInventoryReminderEnabled) {
       await this.scheduleInventoryReminders();
@@ -366,6 +375,7 @@ export class SettingsManager {
 
   async updateReminderTime2(time: Date): Promise<void> {
     this.settings.reminderTime2 = time;
+    this.notifyListeners();
     
     if (this.settings.isInventoryReminderEnabled) {
       await this.scheduleInventoryReminders();
@@ -377,30 +387,36 @@ export class SettingsManager {
 
   private async requestNotificationPermission(): Promise<boolean> {
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    console.log(`🔔 [Notifications] Current permission status: ${existingStatus}`);
     let finalStatus = existingStatus;
     
     if (existingStatus !== 'granted') {
       const { status } = await Notifications.requestPermissionsAsync();
       finalStatus = status;
+      console.log(`🔔 [Notifications] After requesting, status: ${finalStatus}`);
     }
     
     if (finalStatus !== 'granted') {
+      console.warn(`❌ [Notifications] Permission not granted! Status: ${finalStatus}`);
       return false;
     }
 
+    console.log(`✅ [Notifications] Permission granted`);
+
     if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('default', {
+      const defaultChannel = await Notifications.setNotificationChannelAsync('default', {
         name: 'Inventory Reminders',
         importance: Notifications.AndroidImportance.MAX,
         vibrationPattern: [0, 250, 250, 250],
         lightColor: '#FF231F7C',
       });
-      await Notifications.setNotificationChannelAsync('health', {
+      const healthChannel = await Notifications.setNotificationChannelAsync('health', {
         name: 'Health Alerts',
         importance: Notifications.AndroidImportance.HIGH,
         vibrationPattern: [0, 200, 100, 200],
         lightColor: '#34D399',
       });
+      console.log(`📢 [Notifications] Android channels created: default=${defaultChannel?.importance}, health=${healthChannel?.importance}`);
     }
 
     return true;
@@ -410,42 +426,68 @@ export class SettingsManager {
     // Cancel existing inventory notifications
     await this.cancelInventoryReminders();
     
+    const time1 = this.settings.reminderTime1;
+    console.log(`⏰ [Notifications] Scheduling FIRST reminder at ${time1.getHours()}:${String(time1.getMinutes()).padStart(2,'0')}`);
+    
     // Schedule first reminder
     await this.scheduleDailyReminder(
       'inv-1',
-      this.settings.reminderTime1, 
+      time1,
       'Time to check your inventory!',
       this.getInventoryReminderBody()
     );
     
     // Schedule second reminder only if enabled
     if (this.settings.isSecondReminderEnabled) {
+      const time2 = this.settings.reminderTime2;
+      console.log(`⏰ [Notifications] Scheduling SECOND reminder at ${time2.getHours()}:${String(time2.getMinutes()).padStart(2,'0')}`);
       await this.scheduleDailyReminder(
         'inv-2',
-        this.settings.reminderTime2,
+        time2,
         'Evening inventory check!',
         'Any items running low today? Update your list now.'
       );
     }
     
-    console.log(`✅ Reminders scheduled`);
+    // List all scheduled to confirm
+    const all = await Notifications.getAllScheduledNotificationsAsync();
+    console.log(`✅ [Notifications] Total scheduled notifications: ${all.length}`);
+    all.forEach(n => console.log(`  → [${n.identifier}] trigger:`, JSON.stringify(n.trigger)));
   }
 
   private async scheduleDailyReminder(identifier: string, time: Date, title: string, body: string): Promise<void> {
-    await Notifications.scheduleNotificationAsync({
-      identifier,
-      content: {
-        title,
-        body,
-        sound: true,
-      },
-      trigger: {
-        type: 'calendar',
-        hour: time.getHours(),
-        minute: time.getMinutes(),
-        repeats: true,
-      } as any,
-    });
+    const hour = time.getHours();
+    const minute = time.getMinutes();
+    console.log(`📅 [Notifications] scheduleDailyReminder id=${identifier} at ${hour}:${String(minute).padStart(2,'0')} (platform: ${Platform.OS})`);
+    try {
+      // Android requires DAILY trigger; CALENDAR is iOS-only
+      const trigger = Platform.OS === 'android'
+        ? {
+            type: Notifications.SchedulableTriggerInputTypes.DAILY as const,
+            hour,
+            minute,
+          }
+        : {
+            type: Notifications.SchedulableTriggerInputTypes.CALENDAR as const,
+            hour,
+            minute,
+            repeats: true,
+          };
+
+      await Notifications.scheduleNotificationAsync({
+        identifier,
+        content: {
+          title,
+          body,
+          sound: true,
+          ...(Platform.OS === 'android' ? { channelId: 'default' } : {}),
+        },
+        trigger,
+      });
+      console.log(`✅ [Notifications] Scheduled ${identifier} successfully`);
+    } catch (err) {
+      console.error(`❌ [Notifications] Failed to schedule ${identifier}:`, err);
+    }
   }
 
   async sendTestNotification(): Promise<void> {
@@ -543,12 +585,18 @@ export class SettingsManager {
         sound: true,
         ...(Platform.OS === 'android' ? { channelId: 'health' } : {}),
       },
-      trigger: {
-        type: 'calendar',
-        hour: time.getHours(),
-        minute: time.getMinutes(),
-        repeats: true,
-      } as any,
+      trigger: Platform.OS === 'android'
+        ? {
+            type: Notifications.SchedulableTriggerInputTypes.DAILY as const,
+            hour: time.getHours(),
+            minute: time.getMinutes(),
+          }
+        : {
+            type: Notifications.SchedulableTriggerInputTypes.CALENDAR as const,
+            hour: time.getHours(),
+            minute: time.getMinutes(),
+            repeats: true as const,
+          },
     });
 
     console.log(`💚 Health notification scheduled at ${this.formatTime(time)}`);

@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState, useMemo, useContext } from 'react';
-import { NavigationContainer, DefaultTheme as NavDefaultTheme, DarkTheme as NavDarkTheme } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme as NavDefaultTheme, DarkTheme as NavDarkTheme, createNavigationContainerRef } from '@react-navigation/native';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { createStackNavigator, CardStyleInterpolators } from '@react-navigation/stack';
@@ -46,6 +46,7 @@ export const SwipeContext = React.createContext({
 
 const Tab = createMaterialTopTabNavigator();
 const Stack = createStackNavigator();
+export const navigationRef = createNavigationContainerRef<any>();
 
 // Tab Navigator Component
 const TabNavigator = () => {
@@ -181,9 +182,19 @@ const App: React.FC = () => {
       }
     });
 
+    // Notification tap listener — clear all app notifications and navigate to Inventory
+    const notifSubscription = Notifications.addNotificationResponseReceivedListener(async () => {
+      // Dismiss all pending notifications from this app (inventory + health)
+      await Notifications.dismissAllNotificationsAsync();
+      if (navigationRef.isReady()) {
+        navigationRef.navigate('MainTabs', { screen: 'Inventory' });
+      }
+    });
+
     return () => {
       settingsUnsubscribe();
       appStateSubscription.remove();
+      notifSubscription.remove();
     };
   }, []);
 
@@ -281,6 +292,7 @@ const App: React.FC = () => {
           backgroundColor={isDark ? theme.colors.surface : theme.colors.background}
         />
         <NavigationContainer
+          ref={navigationRef}
           theme={{
             ... (isDark ? NavDarkTheme : NavDefaultTheme),
             colors: {

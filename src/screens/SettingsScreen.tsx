@@ -145,11 +145,25 @@ const SettingsScreen: React.FC = () => {
   };
 
   const handleToggleInventoryReminder = async () => {
-    await settingsManager.toggleInventoryReminder();
+    if (settings) {
+      // Optimistic update
+      const newValue = !settings.isInventoryReminderEnabled;
+      setSettings({ 
+        ...settings, 
+        isInventoryReminderEnabled: newValue,
+        isSecondReminderEnabled: newValue ? settings.isSecondReminderEnabled : false,
+        isHealthAlertsEnabled: newValue ? settings.isHealthAlertsEnabled : false
+      });
+      await settingsManager.toggleInventoryReminder();
+    }
   };
 
   const handleToggleSecondReminder = async () => {
-    await settingsManager.toggleSecondReminder();
+    if (settings) {
+      // Optimistic update
+      setSettings({ ...settings, isSecondReminderEnabled: !settings.isSecondReminderEnabled });
+      await settingsManager.toggleSecondReminder();
+    }
   };
 
   const handleTimePickerOpen = (type: 'time1' | 'time2') => {
@@ -158,10 +172,14 @@ const SettingsScreen: React.FC = () => {
   };
 
   const handleTimePickerConfirm = async (date: Date) => {
-    if (timePickerType === 'time1') {
-      await settingsManager.updateReminderTime1(date);
-    } else {
-      await settingsManager.updateReminderTime2(date);
+    if (settings) {
+      if (timePickerType === 'time1') {
+        setSettings({ ...settings, reminderTime1: date });
+        await settingsManager.updateReminderTime1(date);
+      } else {
+        setSettings({ ...settings, reminderTime2: date });
+        await settingsManager.updateReminderTime2(date);
+      }
     }
     setTimePickerVisible(false);
   };
@@ -427,31 +445,12 @@ const SettingsScreen: React.FC = () => {
         />
         
         {settings?.isInventoryReminderEnabled && (
-          <>
-            <List.Item
-              title="First Reminder"
-              description={`Daily at ${formatTime(settings.reminderTime1)}`}
-              left={() => <Icon name="clock-outline" size={24} color={theme.colors.onSurface} />}
-              onPress={() => handleTimePickerOpen('time1')}
-            />
-            
-            <List.Item
-              title="Second Reminder"
-              description={
-                settings.isSecondReminderEnabled 
-                  ? `Daily at ${formatTime(settings.reminderTime2)}`
-                  : 'Disabled'
-              }
-              left={() => <Icon name="clock-outline" size={24} color={theme.colors.onSurface} />}
-              right={() => (
-                <Switch
-                  value={settings.isSecondReminderEnabled}
-                  onValueChange={handleToggleSecondReminder}
-                />
-              )}
-              onPress={() => settings.isSecondReminderEnabled && handleTimePickerOpen('time2')}
-            />
-          </>
+          <List.Item
+            title="Reminder Time"
+            description={`Daily at ${formatTime(settings.reminderTime1)}`}
+            left={() => <Icon name="clock-outline" size={24} color={theme.colors.onSurface} />}
+            onPress={() => handleTimePickerOpen('time1')}
+          />
         )}
         
         <Divider style={styles.divider} />

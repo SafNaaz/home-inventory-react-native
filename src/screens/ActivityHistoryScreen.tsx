@@ -10,7 +10,7 @@ import { settingsManager } from '../managers/SettingsManager';
 import { ActivityLog, ActivityAction } from '../models/Types';
 import { tabBar as tabBarDims, rs, fontSize, spacing } from '../themes/Responsive';
 import { useColorScheme } from 'react-native';
-import { lightTheme, darkTheme, commonStyles } from '../themes/AppTheme';
+import { lightTheme, darkTheme, commonStyles, getDialogTheme } from '../themes/AppTheme';
 import DoodleBackground from '../components/DoodleBackground';
 
 const ActivityHistoryScreen: React.FC = () => {
@@ -121,7 +121,12 @@ const ActivityHistoryScreen: React.FC = () => {
             <Text style={[styles.actionTitle, { color: theme.colors.onSurface }]}>{actionTitle}</Text>
             <Text style={[styles.timestamp, { color: theme.colors.onSurfaceVariant }]}>{formatTimestamp(item.timestamp)}</Text>
           </View>
-          {item.details.isUndoable !== false && (
+          {item.isUndone ? (
+            <View style={[styles.undoneBadge, { backgroundColor: theme.colors.surfaceVariant }]}>
+              <Icon name="undo-variant" size={14} color={theme.colors.onSurfaceVariant} />
+              <Text style={[styles.undoneText, { color: theme.colors.onSurfaceVariant }]}>Undone</Text>
+            </View>
+          ) : (
             <IconButton
               icon="undo"
               size={20}
@@ -164,6 +169,9 @@ const ActivityHistoryScreen: React.FC = () => {
              </Text>
           )}
         </View>
+        {item.isUndone && (
+          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.03)', pointerEvents: 'none' }]} />
+        )}
       </Surface>
     );
   };
@@ -199,30 +207,30 @@ const ActivityHistoryScreen: React.FC = () => {
         }
       />
 
-      <Portal>
-        <Dialog visible={showConfirmUndo} onDismiss={() => setShowConfirmUndo(false)}>
-          <Dialog.Title>Confirm Undo</Dialog.Title>
+      <Portal theme={getDialogTheme(isDark)}>
+        <Dialog visible={showConfirmUndo} onDismiss={() => setShowConfirmUndo(false)} style={{ borderRadius: 28 }}>
+          <Dialog.Title style={{ fontWeight: '800' }}>Confirm Undo</Dialog.Title>
           <Dialog.Content>
-            <Paragraph>
+            <Paragraph style={{ color: theme.colors.onSurfaceVariant }}>
               Are you sure you want to revert this action for "{selectedLog?.itemName}"?
             </Paragraph>
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setShowConfirmUndo(false)}>Cancel</Button>
-            <Button onPress={confirmUndo} textColor={theme.colors.error}>Confirm Undo</Button>
+            <Button onPress={() => setShowConfirmUndo(false)} labelStyle={{ fontWeight: '700' }}>Cancel</Button>
+            <Button onPress={confirmUndo} textColor={theme.colors.error} labelStyle={{ fontWeight: '800' }}>Confirm Undo</Button>
           </Dialog.Actions>
         </Dialog>
 
-        <Dialog visible={showConfirmClear} onDismiss={() => setShowConfirmClear(false)}>
-          <Dialog.Title>Clear History</Dialog.Title>
+        <Dialog visible={showConfirmClear} onDismiss={() => setShowConfirmClear(false)} style={{ borderRadius: 28 }}>
+          <Dialog.Title style={{ fontWeight: '800' }}>Clear History</Dialog.Title>
           <Dialog.Content>
-            <Paragraph>
+            <Paragraph style={{ color: theme.colors.onSurfaceVariant }}>
               Are you sure you want to permanently delete all activity history? This cannot be undone.
             </Paragraph>
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setShowConfirmClear(false)}>Cancel</Button>
-            <Button onPress={handleClearHistory} textColor={theme.colors.error}>Clear All</Button>
+            <Button onPress={() => setShowConfirmClear(false)} labelStyle={{ fontWeight: '700' }}>Cancel</Button>
+            <Button onPress={handleClearHistory} textColor={theme.colors.error} labelStyle={{ fontWeight: '800' }}>Clear All</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
@@ -294,6 +302,19 @@ const styles = StyleSheet.create({
     fontSize: fontSize.lg,
     marginTop: spacing.md,
     fontWeight: '600',
+  },
+  undoneBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    gap: 4,
+  },
+  undoneText: {
+    fontSize: fontSize.xs,
+    fontWeight: '700',
+    textTransform: 'uppercase',
   },
 });
 
