@@ -1140,6 +1140,8 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: sp.base,
     paddingTop: sp.sm,
+    flexGrow: 1,
+    justifyContent: 'flex-end',
   },
 
   // Hero

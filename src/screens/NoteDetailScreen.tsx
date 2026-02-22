@@ -7,7 +7,7 @@ import { notesManager } from '../managers/NotesManager';
 import { Note } from '../models/Types';
 import DoodleBackground from '../components/DoodleBackground';
 import * as Clipboard from 'expo-clipboard';
-import { commonStyles } from '../themes/AppTheme';
+import { commonStyles, getDialogTheme } from '../themes/AppTheme';
 import { spacing as sp, radius as r } from '../themes/Responsive';
 
 // Define constants outside to avoid re-creation and dependency issues
@@ -354,6 +354,32 @@ const NoteDetailScreen: React.FC = () => {
     return unsubscribe;
   }, [navigation, noteId]);
 
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        if (deleteConfirmVisible) {
+          setDeleteConfirmVisible(false);
+          return true;
+        }
+        if (unsavedDialogVisible) {
+          setUnsavedDialogVisible(false);
+          return true;
+        }
+        if (duplicateConfirmVisible) {
+          setDuplicateConfirmVisible(false);
+          return true;
+        }
+        
+        // Original back behavior
+        handleBackViaRef();
+        return true;
+      };
+
+      const handler = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => handler.remove();
+    }, [deleteConfirmVisible, unsavedDialogVisible, duplicateConfirmVisible, handleBackViaRef])
+  );
+
   const handleUnsavedDiscard = async () => {
     setUnsavedDialogVisible(false);
     const action = pendingActionRef.current;
@@ -625,9 +651,9 @@ const NoteDetailScreen: React.FC = () => {
     <View style={styles.container}>
       <DoodleBackground />
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={flexOne}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 20}
       >
         <View style={styles.mainLayout}>
           <ScrollView
@@ -706,7 +732,7 @@ const NoteDetailScreen: React.FC = () => {
       </KeyboardAvoidingView>
 
       <Portal>
-        <Dialog visible={deleteConfirmVisible} onDismiss={() => setDeleteConfirmVisible(false)}>
+        <Dialog theme={getDialogTheme(theme.dark)} style={{ borderRadius: 28 }} visible={deleteConfirmVisible} onDismiss={() => setDeleteConfirmVisible(false)}>
           <Dialog.Title>Delete Note</Dialog.Title>
           <Dialog.Content><Text>Delete this note forever?</Text></Dialog.Content>
           <Dialog.Actions>
@@ -715,7 +741,7 @@ const NoteDetailScreen: React.FC = () => {
           </Dialog.Actions>
         </Dialog>
 
-        <Dialog visible={unsavedDialogVisible} onDismiss={() => setUnsavedDialogVisible(false)}>
+        <Dialog theme={getDialogTheme(theme.dark)} style={{ borderRadius: 28 }} visible={unsavedDialogVisible} onDismiss={() => setUnsavedDialogVisible(false)}>
           <Dialog.Title>Unsaved Changes</Dialog.Title>
           <Dialog.Content>
             <Text variant="bodyMedium">You have unsaved changes. Do you want to save them before leaving?</Text>
@@ -727,7 +753,7 @@ const NoteDetailScreen: React.FC = () => {
           </Dialog.Actions>
         </Dialog>
 
-        <Dialog visible={duplicateConfirmVisible} onDismiss={() => setDuplicateConfirmVisible(false)}>
+        <Dialog theme={getDialogTheme(theme.dark)} style={{ borderRadius: 28 }} visible={duplicateConfirmVisible} onDismiss={() => setDuplicateConfirmVisible(false)}>
           <Dialog.Title>Duplicate Note</Dialog.Title>
           <Dialog.Content>
             <Text variant="bodyMedium">Are you sure you want to duplicate this note?</Text>

@@ -50,7 +50,8 @@ import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { inventoryManager } from '../managers/InventoryManager';
 import { InventoryItem, InventoryCategory, InventorySubcategory, ShoppingState } from '../models/Types';
 import { CATEGORY_CONFIG, SUBCATEGORY_CONFIG, getAllCategories, getCategoryConfig, getSubcategoryConfig } from '../constants/CategoryConfig';
-import { getStockColor, getCategoryColor, commonStyles } from '../themes/AppTheme';
+import { getStockColor, getCategoryColor, commonStyles, getDialogTheme } from '../themes/AppTheme';
+import BottomSheetDialog from '../components/BottomSheetDialog';
 
 // Theme-based icon shades: slight variation per category type
 const getCategoryIconColor = (category: string, isDark: boolean): string => {
@@ -846,6 +847,8 @@ const SubcategoryInput = ({
 
 
 
+
+
 const InventoryScreen: React.FC = () => {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -903,48 +906,8 @@ const InventoryScreen: React.FC = () => {
 
   const fabAnimation = useRef(new Animated.Value(1)).current;
 
-  const handleScroll = useCallback((event: any) => {
-    const currentScrollY = event.nativeEvent.contentOffset.y;
-    if (currentScrollY <= 0) {
-      if (!isFabVisible) {
-        setIsFabVisible(true);
-        Animated.spring(fabAnimation, {
-          toValue: 1,
-          useNativeDriver: true,
-          tension: 40,
-          friction: 7
-        }).start();
-        // Restore tabs
-        navigationObj.getParent()?.setOptions({
-          tabBarStyle: {
-            backgroundColor: theme.colors.surface,
-            borderTopWidth: 0,
-            height: 65,
-            paddingBottom: 10,
-            paddingTop: 10,
-            position: 'absolute',
-            bottom: 20,
-            left: 20,
-            right: 20,
-            borderRadius: 32,
-            elevation: 8,
-          }
-        });
-      }
-      return;
-    }
-
-    const diff = currentScrollY - lastScrollY.current;
-    if (Math.abs(diff) < 5) return; 
-
-    if (diff > 20 && isFabVisible) {
-      setIsFabVisible(false);
-      Animated.timing(fabAnimation, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true
-      }).start();
-    } else if (diff < -20 && !isFabVisible) {
+  const showFab = useCallback(() => {
+    if (!isFabVisible) {
       setIsFabVisible(true);
       Animated.spring(fabAnimation, {
         toValue: 1,
@@ -952,10 +915,61 @@ const InventoryScreen: React.FC = () => {
         tension: 40,
         friction: 7
       }).start();
+      
+      // Restore tabs
+      navigationObj.getParent()?.setOptions({
+        tabBarStyle: {
+          backgroundColor: theme.colors.surface,
+          borderTopWidth: 0,
+          height: 65,
+          paddingBottom: 10,
+          paddingTop: 10,
+          position: 'absolute',
+          bottom: 20,
+          left: 20,
+          right: 20,
+          borderRadius: 32,
+          elevation: 8,
+        }
+      });
+    }
+  }, [isFabVisible, theme, fabAnimation, navigationObj]);
+
+  const hideFab = useCallback(() => {
+    if (isFabVisible) {
+      setIsFabVisible(false);
+      Animated.timing(fabAnimation, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true
+      }).start();
+    }
+  }, [isFabVisible, fabAnimation]);
+
+  const handleScroll = useCallback((event: any) => {
+    const currentScrollY = event.nativeEvent.contentOffset.y;
+    if (currentScrollY <= 0) {
+      showFab();
+      return;
+    }
+
+    const diff = currentScrollY - lastScrollY.current;
+    if (Math.abs(diff) < 5) return; 
+
+    if (diff > 20) {
+      hideFab();
+    } else if (diff < -20) {
+      showFab();
     }
     
     lastScrollY.current = currentScrollY;
-  }, [isFabVisible, theme, fabAnimation]);
+  }, [showFab, hideFab]);
+
+  const handleContentSizeChange = useCallback((contentWidth: number, contentHeight: number) => {
+    // If we're at home or in a category/subcategory, check if the content is smaller than the screen
+    // We can't easily get the layout height here without onLayout, but we can approximate or use a ref
+    // Better: only hide if we can actually scroll.
+  }, []);
 
   useEffect(() => {
     loadInventoryData();
@@ -1007,6 +1021,7 @@ const InventoryScreen: React.FC = () => {
     Keyboard.dismiss();
     setShowIgnoredOnly(false); // Immediate reset
     setIsReordering(false);
+    showFab(); // Ensure FAB is visible on navigation
     
     if (isSearchVisible) {
       setIsSearchVisible(false);
@@ -1482,7 +1497,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
       <InventoryItemRow
         key={item.id}
         item={item}
-        theme={theme}
+        theme={isSearch ? getDialogTheme(theme.dark) : theme}
         onIncrement={handleIncrementQuantity}
         onDecrement={handleDecrementQuantity}
         onUpdate={handleQuantityUpdate}
@@ -1605,6 +1620,10 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
           onScroll={handleScroll}
           scrollEventThrottle={16}
           removeClippedSubviews={true}
+          onContentSizeChange={(w, h) => {
+            // If content height is less than screen height (approx), ensure FAB is shown
+            if (h < height * 0.8) showFab();
+          }}
         >
           {renderStatsHeader()}
           <View style={styles.categoriesGrid}>
@@ -1726,6 +1745,9 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
             scrollEventThrottle={16}
             removeClippedSubviews={true}
             contentContainerStyle={{ paddingBottom: bottomPadding + rs(40) }}
+            onContentSizeChange={(w, h) => {
+              if (h < height * 0.8) showFab();
+            }}
           >
             <View style={styles.subcategoriesList}>
               {subcategories.map(subName => {
@@ -1895,6 +1917,9 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
             onScroll={handleScroll}
             scrollEventThrottle={16}
             removeClippedSubviews={false} // Disable clipping to prevent shadow artifacts during removal
+            onContentSizeChange={(w, h) => {
+              if (h < height * 0.8) showFab();
+            }}
           >
             {items.map(item => renderItemRow(item))}
           </ScrollView>
@@ -1904,77 +1929,51 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
   };
 
   const renderAddItemDialog = () => (
-    <Portal>
-      <Dialog 
-        visible={showingAddDialog} 
-        onDismiss={() => setShowingAddDialog(false)}
-        style={{ backgroundColor: theme.colors.elevation?.level3 || theme.colors.surface, borderRadius: 28 }}
-      >
-        <Dialog.Title>Add New Item</Dialog.Title>
-        <Dialog.Content>
-           <AddItemInput 
-              subcategory={navigation.subcategory || ''}
-              onAdd={handleAddItem}
-              onCancel={() => setShowingAddDialog(false)}
-           />
-        </Dialog.Content>
-      </Dialog>
-    </Portal>
+    <BottomSheetDialog 
+      visible={showingAddDialog} 
+      onDismiss={() => setShowingAddDialog(false)}
+      title="Add New Item"
+      theme={theme}
+      insets={insets}
+    >
+       <AddItemInput 
+          subcategory={navigation.subcategory || ''}
+          onAdd={handleAddItem}
+          onCancel={() => setShowingAddDialog(false)}
+       />
+    </BottomSheetDialog>
   );
 
 
 
   const renderEditItemDialog = () => {
-    // We use a ref and uncontrolled input to prevent cursor jumping issues during typing
-    // caused by re-renders of the parent component.
-    
-    // We need a wrapper component to hold the ref and logic, 
-    // ensuring it persists across parent re-renders but resets on new item.
-    // However, since we are inside the parent render function, we can't define a component here.
-    // We can use a key on the TextInput to force a reset when the item changes.
-    // But we need to capture the text for saving.
-    
-    // Better approach: Use a variable that persists current text if the ID matches?
-    // No, simplest is: Uncontrolled with callback updating a Ref that is stored in the Parent (InventoryScreen).
-    // Let's create a Ref in InventoryScreen scope? 
-    // Actually, `editedName` STATE causes the re-render loop.
-    // If we remove `editedName` FROM STATE and use a Ref, NO RE-RENDER happens on typing!
-    
-    // So, I will remove `editedName` state usage from `TextInput`.
-    // I will use `newItemName` style but with a Ref.
-    
-    // Wait, `InventoryScreen` has `editedName` State.
-    // I should change `editedName` to NOT be state, but just a variable/ref?
-    // But I need to know if "Save" button is disabled (empty string).
-    // So I need state for "isSaveEnabled".
-    
     return (
-      <Portal>
-        <Dialog visible={!!editingItem} onDismiss={() => setEditingItem(null)}>
-          <Dialog.Title>Edit Item</Dialog.Title>
-          <Dialog.Content>
-             {/* We use an internal component or just a key-ed TextInput to reset state */}
-             <EditItemInput 
-                initialValue={editingItem?.name || ''} 
-                onSave={(newName) => {
-                   if (editingItem) {
-                     handleEditItem(editingItem.id, newName);
-                   }
-                }}
-                onCancel={() => setEditingItem(null)}
-             />
-          </Dialog.Content>
-        </Dialog>
-      </Portal>
+      <BottomSheetDialog 
+        visible={!!editingItem} 
+        onDismiss={() => setEditingItem(null)}
+        title="Edit Item"
+        theme={theme}
+        insets={insets}
+      >
+         <EditItemInput 
+            initialValue={editingItem?.name || ''} 
+            onSave={(newName) => {
+               if (editingItem) {
+                 handleEditItem(editingItem.id, newName);
+               }
+            }}
+            onCancel={() => setEditingItem(null)}
+         />
+      </BottomSheetDialog>
     );
   };
 
   const renderDeleteConfirmDialog = () => (
     <Portal>
-      <Dialog 
+      <Dialog theme={getDialogTheme(theme.dark)} 
         visible={!!deleteConfirmItem} 
         onDismiss={() => setDeleteConfirmItem(null)}
-        style={{ backgroundColor: theme.dark ? theme.colors.elevation.level3 : '#F8FAFC', borderRadius: 28 }}
+        style={{ borderRadius: 28 }}
       >
         <Dialog.Title>Delete Item</Dialog.Title>
         <Dialog.Content>
@@ -1992,7 +1991,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
 
   const renderShoppingConfirmDialog = () => (
     <Portal>
-      <Dialog visible={showingShoppingDialog} onDismiss={() => setShowingShoppingDialog(false)}>
+      <Dialog theme={getDialogTheme(theme.dark)} style={{ borderRadius: 28 }} visible={showingShoppingDialog} onDismiss={() => setShowingShoppingDialog(false)}>
         <Dialog.Title>Start New Shopping Trip?</Dialog.Title>
         <Dialog.Content>
           <Text>{shoppingDialogState ? getShoppingStateMessage(shoppingDialogState) : ''}</Text>
@@ -2027,10 +2026,10 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
 
   const renderSuccessDialog = () => (
     <Portal>
-      <Dialog 
+      <Dialog theme={getDialogTheme(theme.dark)}
         visible={showingSuccessDialog} 
         onDismiss={() => setShowingSuccessDialog(false)}
-        style={{ backgroundColor: theme.dark ? theme.colors.elevation.level3 : '#F1F5F9', borderRadius: 28 }}
+        style={{ borderRadius: 28 }}
       >
         <Dialog.Title>Success</Dialog.Title>
         <Dialog.Content>
@@ -2061,42 +2060,30 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
 
     const onFabGestureEvent = (event: any) => {
       const { translationY } = event.nativeEvent;
-      if (translationY > 20 && isFabVisible) {
+      if (translationY > 20) {
         // Swipe Down -> Hide
-        setIsFabVisible(false);
-        Animated.timing(fabAnimation, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true
-        }).start();
-        // navigationObj.getParent()?.setOptions({ tabBarStyle: { display: 'none' } }); // Handled by useEffect
-      } else if (translationY < -20 && !isFabVisible) {
+        hideFab();
+      } else if (translationY < -20) {
         // Swipe Up -> Show
-        setIsFabVisible(true);
-        Animated.spring(fabAnimation, {
-          toValue: 1,
-          useNativeDriver: true,
-          tension: 40,
-          friction: 7
-        }).start();
+        showFab();
       }
     };
 
     return (
       <PanGestureHandler onGestureEvent={onFabGestureEvent} activeOffsetY={[-10, 10]}>
         <View 
+          pointerEvents="box-none"
           style={{ 
               position: 'absolute', 
               right: fabDims.right - 10,
               bottom: (insets.bottom > 0 ? insets.bottom + rs(8) : tabBarDims.bottomOffset) + tabBarDims.height + rs(24),
-              width: 80, // Fixed width hit area
-              height: 160, // Fixed height hit area covering both FABs positions
+              width: 80, 
+              height: isFabVisible ? 160 : 50, // Smaller hit area when hidden
               alignItems: 'center',
               justifyContent: 'flex-end',
-              paddingRight: 10, // Compensate for right offset
+              paddingRight: 10,
               paddingBottom: 10,
-              zIndex: 90, // Ensure it's above content but below dialogs
-              // backgroundColor: 'rgba(255,0,0,0.2)', // Debug color
+              zIndex: 90,
           }}
         >
           <Animated.View 
@@ -2135,34 +2122,30 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
     );
   };
   const renderSubAddDialog = () => {
-    const config = navigation.category ? getCategoryConfig(navigation.category) : null;
     return (
-      <Portal>
-        <Dialog 
-          visible={showingSubAddDialog} 
-          onDismiss={() => setShowingSubAddDialog(false)}
-          style={{ backgroundColor: theme.colors.elevation?.level3 || theme.colors.surface, borderRadius: 28 }}
-        >
-        <Dialog.Title>{editingSubId ? 'Edit Type' : 'Add New Type'}</Dialog.Title>
-        <Dialog.Content>
-          <SubcategoryInput
-            initialName={newSubName}
-            initialIcon={newSubIcon}
-            availableIcons={navigation.category ? CATEGORY_ICONS[navigation.category] : []}
-            onSave={handleAddSubcategory}
-            onCancel={() => setShowingSubAddDialog(false)}
-            saveLabel={editingSubId ? 'Save' : 'Add'}
-            theme={theme}
-          />
-        </Dialog.Content>
-      </Dialog>
-      </Portal>
+      <BottomSheetDialog 
+        visible={showingSubAddDialog} 
+        onDismiss={() => setShowingSubAddDialog(false)}
+        title={editingSubId ? 'Edit Type' : 'Add New Type'}
+        theme={theme}
+        insets={insets}
+      >
+        <SubcategoryInput
+          initialName={newSubName}
+          initialIcon={newSubIcon}
+          availableIcons={navigation.category ? CATEGORY_ICONS[navigation.category] : []}
+          onSave={handleAddSubcategory}
+          onCancel={() => setShowingSubAddDialog(false)}
+          saveLabel={editingSubId ? 'Save' : 'Add'}
+          theme={theme}
+        />
+      </BottomSheetDialog>
     );
   };
 
   const renderSubDeleteConfirmDialog = () => (
     <Portal>
-      <Dialog visible={!!subToDeleteId} onDismiss={() => setSubToDeleteId(null)}>
+      <Dialog theme={getDialogTheme(theme.dark)} visible={!!subToDeleteId} onDismiss={() => setSubToDeleteId(null)} style={{ borderRadius: 28 }}>
         <Dialog.Title>Delete Type</Dialog.Title>
         <Dialog.Content>
           <Text style={{ color: theme.colors.onSurface }}>
@@ -2188,7 +2171,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
     
     return (
       <Portal>
-        <Dialog visible={!!hidingItem} onDismiss={() => setHidingItem(null)}>
+        <Dialog theme={getDialogTheme(theme.dark)} visible={!!hidingItem} onDismiss={() => setHidingItem(null)} style={{ borderRadius: 28 }}>
           <Dialog.Title>{action} Item</Dialog.Title>
           <Dialog.Content>
             <Text style={{ color: theme.colors.onSurface }}>{message}</Text>
@@ -2223,25 +2206,29 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
 
     return (
       <Portal>
-        <Animated.View style={[StyleSheet.absoluteFill, { zIndex: 1000, opacity: searchOpacity }]}>
-          <TouchableOpacity 
-            style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]} 
-            activeOpacity={1} 
-            onPress={closeSearch}
-          />
-          <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-            <GestureHandlerRootView style={{ height: '94%' }}>
-             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-              <Animated.View style={{ 
-                flex: 1, 
-                backgroundColor: theme.colors.elevation?.level1 || theme.colors.surface, 
-                borderTopLeftRadius: 28, 
-                borderTopRightRadius: 28,
-                transform: [{ translateY: sheetTranslateY }],
-                ...commonStyles.shadow,
-                elevation: 16, // Reduced from 24 to minimize Android residue
-                overflow: 'hidden' // Important for clipping clean edges
-              }}>
+          <Animated.View style={[StyleSheet.absoluteFill, { zIndex: 1000, opacity: searchOpacity }]}>
+            <TouchableOpacity 
+              style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]} 
+              activeOpacity={1} 
+              onPress={closeSearch}
+            />
+            <KeyboardAvoidingView 
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              style={{ flex: 1, justifyContent: 'flex-end' }}
+              keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+            >
+              <GestureHandlerRootView style={{ height: '94%' }}>
+                <Animated.View style={{ 
+                  flex: 1, 
+                  backgroundColor: theme.colors.surface, 
+                  borderRadius: 28,
+                  marginBottom: insets.bottom > 0 ? insets.bottom : 8,
+                  marginHorizontal: 8,
+                  transform: [{ translateY: sheetTranslateY }],
+                  ...commonStyles.shadow,
+                  elevation: 16,
+                  overflow: 'hidden'
+                }}>
                 <PanGestureHandler
                   onGestureEvent={Animated.event([{ nativeEvent: { translationY: sheetTranslateY } }], { useNativeDriver: true })}
                   onHandlerStateChange={onHandlerStateChange}
@@ -2254,14 +2241,15 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
                     <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 8 }}>
                       <Searchbar
                         ref={searchInputRef}
-                        autoFocus={true}
-                        placeholder="Search items..."
+                        theme={getDialogTheme(theme.dark)}
+                        placeholder="Type to search..."
                         onChangeText={setSearchQuery}
                         value={searchQuery}
-                        style={[styles.searchBar, { flex: 1, backgroundColor: theme.dark ? theme.colors.elevation?.level3 : theme.colors.surfaceVariant }]}
-                        elevation={0}
+                        autoFocus
+                        style={{ flex: 1, backgroundColor: theme.dark ? theme.colors.elevation.level3 : '#f1f5f9', borderRadius: 12, elevation: 0 }}
+                        inputStyle={{ fontSize: 16 }}
                       />
-                      <IconButton icon="close-circle-outline" size={24} onPress={closeSearch} style={{ marginLeft: 4 }} />
+                      <IconButton icon="close-circle-outline" size={24} onPress={closeSearch} iconColor={theme.colors.onSurfaceVariant} style={{ marginLeft: 4 }} />
                     </View>
                   </View>
                 </PanGestureHandler>
@@ -2280,17 +2268,16 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
                       </>
                     ) : (
                       <View style={{ alignItems: 'center', marginTop: 60, opacity: 0.3 }}>
-                        <Icon name="magnify" size={64} color={theme.colors.onSurfaceVariant} />
-                        <Text style={{ marginTop: 12 }}>Search your inventory</Text>
+                         <Icon name="magnify" size={64} color={theme.colors.onSurfaceVariant} />
+                         <Text style={{ marginTop: 12, color: theme.colors.onSurfaceVariant }}>Search your inventory</Text>
                       </View>
                     )
                   )}
                 </GHScrollView>
-              </Animated.View>
-             </KeyboardAvoidingView>
-            </GestureHandlerRootView>
-          </View>
-        </Animated.View>
+                </Animated.View>
+              </GestureHandlerRootView>
+            </KeyboardAvoidingView>
+          </Animated.View>
       </Portal>
     );
   };

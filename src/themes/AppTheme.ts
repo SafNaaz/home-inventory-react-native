@@ -154,6 +154,29 @@ export const getContrastColor = (backgroundColor: string) => {
   return brightness > 128 ? '#0F172A' : '#FFFFFF';
 };
 
+export const getDialogTheme = (isDark: boolean) => {
+  const baseTheme = isDark ? darkTheme : lightTheme;
+  return {
+    ...baseTheme,
+    colors: {
+      ...baseTheme.colors,
+      elevation: isDark ? baseTheme.colors.elevation : {
+        level0: 'transparent',
+        level1: '#FFFFFF',
+        level2: '#FFFFFF',
+        level3: '#FFFFFF',
+        level4: '#FFFFFF',
+        level5: '#FFFFFF',
+      },
+      surface: isDark ? baseTheme.colors.surface : '#FFFFFF',
+    },
+  };
+};
+
+// For backward compatibility while I refactor screens
+export const whiteDialogTheme = lightTheme; 
+export const darkDialogTheme = darkTheme;
+
 // MARK: - Common Styles
 export const commonStyles = {
   shadow: {

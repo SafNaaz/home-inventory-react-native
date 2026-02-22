@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   ScrollView,
@@ -9,6 +9,10 @@ import {
   UIManager,
   ActivityIndicator,
   KeyboardAvoidingView,
+  Animated,
+  Dimensions,
+  TouchableOpacity,
+  BackHandler,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -29,19 +33,21 @@ import {
   Portal,
   Dialog,
   TextInput,
+  Searchbar,
   Snackbar,
   Divider,
   Surface,
 } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 
 import { inventoryManager } from '../managers/InventoryManager';
 import { settingsManager } from '../managers/SettingsManager';
 import { ShoppingListItem, ShoppingState, InventoryItem, InventoryCategory } from '../models/Types';
 import { getCategoryConfig, getSubcategoryConfig } from '../constants/CategoryConfig';
-import { commonStyles, getCategoryColor } from '../themes/AppTheme';
+import { getStockColor, getCategoryColor, commonStyles, getDialogTheme } from '../themes/AppTheme';
 import DoodleBackground from '../components/DoodleBackground';
+import BottomSheetDialog from '../components/BottomSheetDialog';
 import { tabBar as tabBarDims, rs, fontSize as fs, spacing as sp, radius as r, screen } from '../themes/Responsive';
 
 // Theme-based icon shades: slight variation per category type
@@ -68,9 +74,12 @@ const getCategoryIconColor = (category: string, isDark: boolean): string => {
 
 // Get icon shade for a subcategory config based on its parent category
 const getSubcategoryIconColor = (config: any, isDark: boolean): string => {
-  if (!config?.category) return isDark ? '#CCCCCC' : '#444444';
   return getCategoryIconColor(config.category, isDark);
 };
+
+const { height } = Dimensions.get('window');
+
+
 
 const ShoppingScreen: React.FC = () => {
   const theme = useTheme();
@@ -128,6 +137,49 @@ const ShoppingScreen: React.FC = () => {
     setShoppingState(state);
     setMiscSuggestions(suggestions);
   };
+  
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        if (addItemDialogVisible) {
+          setAddItemDialogVisible(false);
+          return true;
+        }
+        if (ignoredItemsDialogVisible) {
+          setIgnoredItemsDialogVisible(false);
+          return true;
+        }
+        if (searchItemsDialogVisible) {
+          setSearchItemsDialogVisible(false);
+          return true;
+        }
+        if (completeConfirmVisible) {
+          setCompleteConfirmVisible(false);
+          return true;
+        }
+        if (cancelConfirmVisible) {
+          setCancelConfirmVisible(false);
+          return true;
+        }
+        if (emptyListAlertVisible) {
+          setEmptyListAlertVisible(false);
+          return true;
+        }
+        if (invalidInputAlertVisible) {
+          setInvalidInputAlertVisible(false);
+          return true;
+        }
+        if (showSuccessDialog) {
+          setShowSuccessDialog(false);
+          return true;
+        }
+        return false;
+      };
+
+      const handler = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => handler.remove();
+    }, [addItemDialogVisible, ignoredItemsDialogVisible, searchItemsDialogVisible, completeConfirmVisible, cancelConfirmVisible, emptyListAlertVisible, invalidInputAlertVisible, showSuccessDialog])
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -740,23 +792,20 @@ const ShoppingScreen: React.FC = () => {
 };
 
   const renderAddItemDialog = () => (
-    <Portal>
-      <Dialog 
-        visible={addItemDialogVisible} 
-        onDismiss={() => setAddItemDialogVisible(false)}
-        style={{ backgroundColor: theme.colors.elevation?.level3 || theme.colors.surface, borderRadius: 28 }}
-      >
-        <Dialog.Title>Add Misc Item</Dialog.Title>
-        <Dialog.Content>
-            <AddShoppingItemInput 
-              initialValue={newItemName}
-              suggestions={miscSuggestions}
-              onAdd={handleAddMiscItem}
-              onCancel={() => setAddItemDialogVisible(false)}
-            />
-        </Dialog.Content>
-      </Dialog>
-    </Portal>
+    <BottomSheetDialog 
+      visible={addItemDialogVisible} 
+      onDismiss={() => setAddItemDialogVisible(false)}
+      title="Add Misc Item"
+      theme={theme}
+      insets={insets}
+    >
+        <AddShoppingItemInput 
+          initialValue={newItemName}
+          suggestions={miscSuggestions}
+          onAdd={handleAddMiscItem}
+          onCancel={() => setAddItemDialogVisible(false)}
+        />
+    </BottomSheetDialog>
   );
 
 const AddShoppingItemInput = ({ initialValue, onAdd, onCancel, suggestions }: { 
@@ -825,112 +874,91 @@ const AddShoppingItemInput = ({ initialValue, onAdd, onCancel, suggestions }: {
 };
 
   const renderIgnoredItemsDialog = () => (
-    <Portal>
-      <Dialog 
-        visible={ignoredItemsDialogVisible} 
-        onDismiss={() => setIgnoredItemsDialogVisible(false)} 
-        style={{ maxHeight: '80%', backgroundColor: theme.colors.elevation?.level3 || theme.colors.surface, borderRadius: 28 }}
-      >
-        <Dialog.Title>Add from Hidden Items</Dialog.Title>
-        <Dialog.Content>
-          {ignoredItems.length > 0 ? (
-             <ScrollView style={{ maxHeight: 300 }}>
-             {ignoredItems.map(item => (
-               <List.Item
-                 key={item.id}
-                 title={item.name}
-                 description={`${Math.round(item.quantity * 100)}% stock`}
-                 left={() => (
-                   <Checkbox
-                     status={selectedIgnoredIds.has(item.id) ? 'checked' : 'unchecked'}
-                     onPress={() => toggleIgnoredItemSelection(item.id)}
-                     color={theme.colors.primary}
-                     uncheckedColor={theme.colors.onSurfaceVariant}
-                   />
-                 )}
-                 onPress={() => toggleIgnoredItemSelection(item.id)}
-               />
-             ))}
-           </ScrollView>
-          ) : (
-            <Text style={{ color: theme.colors.onSurfaceVariant }}>No ignored items available to add.</Text>
-          )}
-        </Dialog.Content>
-        <Dialog.Actions>
+    <BottomSheetDialog
+      visible={ignoredItemsDialogVisible}
+      onDismiss={() => setIgnoredItemsDialogVisible(false)}
+      title="Hidden Items"
+      theme={theme}
+      insets={insets}
+      maxHeight="80%"
+    >
+      <ScrollView style={{ maxHeight: 300 }}>
+        {ignoredItems.length > 0 ? (
+           ignoredItems.map(item => (
+             <List.Item
+               key={item.id}
+               title={item.name}
+               description={`${Math.round(item.quantity * 100)}% stock`}
+               left={() => (
+                 <Checkbox
+                   status={selectedIgnoredIds.has(item.id) ? 'checked' : 'unchecked'}
+                   onPress={() => toggleIgnoredItemSelection(item.id)}
+                   color={theme.colors.primary}
+                   uncheckedColor={theme.colors.onSurfaceVariant}
+                 />
+               )}
+               onPress={() => toggleIgnoredItemSelection(item.id)}
+             />
+           ))
+        ) : (
+          <Text style={{ textAlign: 'center', marginVertical: 20, opacity: 0.6 }}>No hidden items</Text>
+        )}
+      </ScrollView>
+       <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 16 }}>
           <Button onPress={() => setIgnoredItemsDialogVisible(false)}>Cancel</Button>
-          <Button onPress={handleAddSelectedIgnoredItems} disabled={selectedIgnoredIds.size === 0}>Add Selected</Button>
-        </Dialog.Actions>
-      </Dialog>
-    </Portal>
+          <Button mode="contained" onPress={handleAddSelectedIgnoredItems} disabled={selectedIgnoredIds.size === 0} style={{ marginLeft: 8, borderRadius: 12 }}>
+            Add Selected
+          </Button>
+        </View>
+    </BottomSheetDialog>
+  );
+
+  const renderSearchInventoryDialog = () => (
+    <BottomSheetDialog
+      visible={searchItemsDialogVisible}
+      onDismiss={() => setSearchItemsDialogVisible(false)}
+      title="Search & Add Item"
+      theme={theme}
+      insets={insets}
+      maxHeight="85%"
+    >
+      <Searchbar
+        placeholder="Search items..."
+        value={itemSearchQuery}
+        onChangeText={setItemSearchQuery}
+        mode="bar"
+        style={{ marginBottom: 12, backgroundColor: theme.dark ? theme.colors.elevation?.level3 : theme.colors.surfaceVariant }}
+        elevation={0}
+      />
+      <ScrollView style={{ maxHeight: 300 }} keyboardShouldPersistTaps="handled">
+        {isSearchingItems ? (
+          <ActivityIndicator style={{ margin: 20 }} />
+        ) : (
+          filteredAllItems.map(item => (
+            <List.Item
+              key={item.id}
+              title={item.name}
+              description={item.subcategory}
+              onPress={() => handleAddAnyItem(item)}
+              left={() => <List.Icon icon="package-variant" color={theme.colors.onSurfaceVariant} />}
+              right={() => <IconButton icon="plus-circle-outline" />}
+            />
+          ))
+        )}
+        {!isSearchingItems && filteredAllItems.length === 0 && (
+          <Text style={{ textAlign: 'center', marginVertical: 32, opacity: 0.6 }}>No items found</Text>
+        )}
+      </ScrollView>
+      <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 16 }}>
+          <Button onPress={() => setSearchItemsDialogVisible(false)}>Close</Button>
+      </View>
+    </BottomSheetDialog>
   );
 
   const renderConfirmDialogs = () => (
     <Portal>
-      {renderIgnoredItemsDialog()}
-      
-      {/* Search and Add Dialog */}
-      <Portal>
-        <Dialog visible={searchItemsDialogVisible} onDismiss={() => setSearchItemsDialogVisible(false)} style={{ maxHeight: '85%', backgroundColor: theme.colors.elevation?.level3 || theme.colors.surface, borderRadius: 28 }}>
-          <Dialog.Content>
-            <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{maxHeight:'100%'}}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                <Title>Search & Add Item</Title>
-                <IconButton icon="close" size={24} onPress={() => setSearchItemsDialogVisible(false)} />
-              </View>
-              <TextInput
-                label="Search items..."
-                value={itemSearchQuery}
-                onChangeText={(text) => {
-                  setItemSearchQuery(text);
-                  if (text.trim().length > 0) {
-                    setIsSearchingItems(true);
-                  }
-                }}
-                mode="outlined"
-                style={{ marginBottom: 8 }}
-                right={<TextInput.Icon icon="magnify" />}
-                autoFocus
-              />
-              <ScrollView style={{ maxHeight: 300, flexShrink: 1 }} keyboardShouldPersistTaps="handled">
-                {isSearchingItems ? (
-                  <View style={{ padding: 20, alignItems: 'center' }}>
-                    <ActivityIndicator size="small" color={theme.colors.primary} />
-                  </View>
-                ) : filteredAllItems.length > 0 ? (
-                  filteredAllItems.map(item => (
-                    <List.Item
-                      key={item.id}
-                      title={item.name}
-                      description={`${item.subcategory} • ${Math.round(item.quantity * 100)}% stock`}
-                      onPress={() => handleAddAnyItem(item)}
-                      right={() => <IconButton icon="plus-circle-outline" />}
-                    />
-                  ))
-                ) : (
-                  <Text style={{ textAlign: 'center', marginTop: 16, color: theme.colors.onSurfaceVariant }}>
-                    No items found
-                  </Text>
-                )}
-              </ScrollView>
-            </KeyboardAvoidingView>
-          </Dialog.Content>
-          {/* Actions removed as Close is now in header */}
-        </Dialog>
-      </Portal>
-      {/* Complete Shopping Dialog */}
-      <Dialog visible={completeConfirmVisible} onDismiss={() => setCompleteConfirmVisible(false)}>
-        <Dialog.Title>Complete Shopping</Dialog.Title>
-        <Dialog.Content>
-          <Text style={{ color: theme.colors.onSurface }}>This will mark checked items as restocked and clear your shopping list. Continue?</Text>
-        </Dialog.Content>
-        <Dialog.Actions>
-          <Button onPress={() => setCompleteConfirmVisible(false)}>Cancel</Button>
-          <Button onPress={onConfirmComplete}>Complete</Button>
-        </Dialog.Actions>
-      </Dialog>
-
       {/* Cancel Shopping Dialog */}
-      <Dialog visible={cancelConfirmVisible} onDismiss={() => setCancelConfirmVisible(false)}>
+      <Dialog theme={getDialogTheme(theme.dark)} visible={cancelConfirmVisible} onDismiss={() => setCancelConfirmVisible(false)} style={{ borderRadius: 28 }}>
         <Dialog.Title>Cancel Shopping</Dialog.Title>
         <Dialog.Content>
           <Text style={{ color: theme.colors.onSurface }}>This will clear your shopping list. Are you sure?</Text>
@@ -941,8 +969,33 @@ const AddShoppingItemInput = ({ initialValue, onAdd, onCancel, suggestions }: {
         </Dialog.Actions>
       </Dialog>
 
+      {/* Complete Confirm Dialog */}
+      <Dialog theme={getDialogTheme(theme.dark)} visible={completeConfirmVisible} onDismiss={() => setCompleteConfirmVisible(false)} style={{ borderRadius: 28 }}>
+        <Dialog.Title>Complete Shopping</Dialog.Title>
+        <Dialog.Content>
+          <Text style={{ color: theme.colors.onSurface }}>Are you sure you want to finish shopping? This will update your inventory.</Text>
+        </Dialog.Content>
+        <Dialog.Actions>
+          <Button onPress={() => setCompleteConfirmVisible(false)}>Cancel</Button>
+          <Button onPress={onConfirmComplete} mode="contained">Finish</Button>
+        </Dialog.Actions>
+      </Dialog>
+
+      {/* Success Dialog */}
+      <Dialog theme={getDialogTheme(theme.dark)} visible={showSuccessDialog} onDismiss={() => setShowSuccessDialog(false)} style={{ borderRadius: 28 }}>
+        <Dialog.Title>Shopping Complete!</Dialog.Title>
+        <Dialog.Content>
+          <Text style={{ color: theme.colors.onSurface }}>
+            All purchased items have been restocked in your inventory.
+          </Text>
+        </Dialog.Content>
+        <Dialog.Actions>
+          <Button onPress={() => setShowSuccessDialog(false)}>Great!</Button>
+        </Dialog.Actions>
+      </Dialog>
+
       {/* Empty List Alert Dialog */}
-      <Dialog visible={emptyListAlertVisible} onDismiss={() => setEmptyListAlertVisible(false)}>
+      <Dialog theme={getDialogTheme(theme.dark)} visible={emptyListAlertVisible} onDismiss={() => setEmptyListAlertVisible(false)} style={{ borderRadius: 28 }}>
         <Dialog.Title>Empty List</Dialog.Title>
         <Dialog.Content>
           <Text style={{ color: theme.colors.onSurface }}>Add some items to your shopping list before finalizing.</Text>
@@ -953,26 +1006,13 @@ const AddShoppingItemInput = ({ initialValue, onAdd, onCancel, suggestions }: {
       </Dialog>
 
       {/* Invalid Input Alert Dialog */}
-      <Dialog visible={invalidInputAlertVisible} onDismiss={() => setInvalidInputAlertVisible(false)}>
+      <Dialog theme={getDialogTheme(theme.dark)} visible={invalidInputAlertVisible} onDismiss={() => setInvalidInputAlertVisible(false)} style={{ borderRadius: 28 }}>
         <Dialog.Title>Invalid Input</Dialog.Title>
         <Dialog.Content>
           <Text style={{ color: theme.colors.onSurface }}>Please enter an item name.</Text>
         </Dialog.Content>
         <Dialog.Actions>
           <Button onPress={() => setInvalidInputAlertVisible(false)}>OK</Button>
-        </Dialog.Actions>
-      </Dialog>
-
-      {/* Inventory Updated Success Dialog */}
-      <Dialog visible={showSuccessDialog} onDismiss={() => setShowSuccessDialog(false)} dismissable={false}>
-        <Dialog.Title>Shopping Complete</Dialog.Title>
-        <Dialog.Content>
-          <Text style={{ color: theme.colors.onSurface }}>
-            All purchased items have been restocked to 100% and updated in your inventory.
-          </Text>
-        </Dialog.Content>
-        <Dialog.Actions>
-          <Button onPress={() => setShowSuccessDialog(false)}>Great!</Button>
         </Dialog.Actions>
       </Dialog>
     </Portal>
@@ -999,7 +1039,9 @@ const AddShoppingItemInput = ({ initialValue, onAdd, onCancel, suggestions }: {
     <>
       {renderContent()}
       {renderAddItemDialog()}
+      {renderSearchInventoryDialog()}
       {renderConfirmDialogs()}
+      {renderIgnoredItemsDialog()}
       <Snackbar
         visible={snackbarVisible}
         onDismiss={() => setSnackbarVisible(false)}

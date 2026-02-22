@@ -1,10 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   ScrollView,
   StyleSheet,
   RefreshControl,
+  Platform,
+  BackHandler,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Card,
   Title,
@@ -31,13 +34,15 @@ import { settingsManager } from '../managers/SettingsManager';
 import { inventoryManager } from '../managers/InventoryManager';
 import { notesManager } from '../managers/NotesManager';
 import { AppSettings, SecurityLockTimeout } from '../models/Types';
-import { commonStyles } from '../themes/AppTheme';
+import { commonStyles, getDialogTheme } from '../themes/AppTheme';
 import DoodleBackground from '../components/DoodleBackground';
-import { useNavigation } from '@react-navigation/native';
+import BottomSheetDialog from '../components/BottomSheetDialog';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { tabBar as tabBarDims, fontSize as fs, spacing as sp, radius as r, screen } from '../themes/Responsive';
 
 const SettingsScreen: React.FC = () => {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -82,6 +87,41 @@ const SettingsScreen: React.FC = () => {
 
     return unsubscribe;
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        if (resetDialogVisible) {
+          setResetDialogVisible(false);
+          return true;
+        }
+        if (exportDialogVisible) {
+          setExportDialogVisible(false);
+          return true;
+        }
+        if (importDialogVisible) {
+          setImportDialogVisible(false);
+          return true;
+        }
+        if (clearAllConfirmVisible) {
+          setClearAllConfirmVisible(false);
+          return true;
+        }
+        if (errorAlertVisible) {
+          setErrorAlertVisible(false);
+          return true;
+        }
+        if (lockTimeoutDialogVisible) {
+          setLockTimeoutDialogVisible(false);
+          return true;
+        }
+        return false;
+      };
+
+      const handler = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => handler.remove();
+    }, [resetDialogVisible, exportDialogVisible, importDialogVisible, clearAllConfirmVisible, errorAlertVisible, lockTimeoutDialogVisible])
+  );
 
   const loadSettingsData = () => {
     const currentSettings = settingsManager.getSettings();
@@ -342,7 +382,7 @@ const SettingsScreen: React.FC = () => {
 
   const renderLockTimeoutDialog = () => (
     <Portal>
-      <Dialog visible={lockTimeoutDialogVisible} onDismiss={() => setLockTimeoutDialogVisible(false)}>
+      <Dialog theme={getDialogTheme(theme.dark)} style={{ borderRadius: 28 }} visible={lockTimeoutDialogVisible} onDismiss={() => setLockTimeoutDialogVisible(false)}>
         <Dialog.Title>Auto-Lock Timeout</Dialog.Title>
         <Dialog.Content>
           <List.Section>
@@ -527,7 +567,7 @@ const SettingsScreen: React.FC = () => {
 
   const renderResetDialog = () => (
     <Portal>
-      <Dialog visible={resetDialogVisible} onDismiss={() => setResetDialogVisible(false)}>
+      <Dialog theme={getDialogTheme(theme.dark)} style={{ borderRadius: 28 }} visible={resetDialogVisible} onDismiss={() => setResetDialogVisible(false)}>
         <Dialog.Title>Reset to Sample Data</Dialog.Title>
         <Dialog.Content>
           <Paragraph>
@@ -548,91 +588,89 @@ const SettingsScreen: React.FC = () => {
   );
 
   const renderExportDialog = () => (
-    <Portal>
-      <Dialog visible={exportDialogVisible} onDismiss={() => setExportDialogVisible(false)}>
-        <Dialog.Title>Export Data</Dialog.Title>
-        <Dialog.Content>
-            <Paragraph style={{marginBottom: 10}}>
-                Copy the text below to save your backup.
-            </Paragraph>
-            <Dialog.ScrollArea style={styles.exportScrollArea}>
-            <ScrollView>
-                <TextInput
-                value={exportData}
-                multiline
-                numberOfLines={10}
-                mode="outlined"
-                editable={false}
-                style={styles.exportTextInput}
-                />
-            </ScrollView>
-            </Dialog.ScrollArea>
-        </Dialog.Content>
-        <Dialog.Actions>
-          <Button onPress={() => setExportDialogVisible(false)}>Close</Button>
-          <Button 
-            onPress={async () => {
-              await Clipboard.setStringAsync(exportData);
-              setSnackbarMessage('Data copied to clipboard!');
-              setSnackbarVisible(true);
-            }}
-            style={{marginRight: 8}}
-          >
-            Copy
-          </Button>
-          <Button 
-            onPress={shareDataAsFile}
-            mode="contained"
-            icon="share-variant"
-          >
-            Share File
-          </Button>
-        </Dialog.Actions>
-      </Dialog>
-    </Portal>
+    <BottomSheetDialog
+      visible={exportDialogVisible}
+      onDismiss={() => setExportDialogVisible(false)}
+      title="Export Data"
+      theme={theme}
+      insets={insets}
+    >
+      <Paragraph style={{ marginBottom: 10 }}>
+        Copy the text below to save your backup.
+      </Paragraph>
+      <ScrollView style={{ maxHeight: 300 }}>
+        <TextInput
+          value={exportData}
+          multiline
+          numberOfLines={10}
+          mode="outlined"
+          editable={false}
+          style={styles.exportTextInput}
+        />
+      </ScrollView>
+      <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 16 }}>
+        <Button onPress={() => setExportDialogVisible(false)}>Close</Button>
+        <Button
+          onPress={async () => {
+            await Clipboard.setStringAsync(exportData);
+            setSnackbarMessage('Data copied to clipboard!');
+            setSnackbarVisible(true);
+          }}
+          style={{ marginHorizontal: 8 }}
+        >
+          Copy
+        </Button>
+        <Button
+          onPress={shareDataAsFile}
+          mode="contained"
+          icon="share-variant"
+        >
+          Share
+        </Button>
+      </View>
+    </BottomSheetDialog>
   );
 
   const renderImportDialog = () => (
-    <Portal>
-      <Dialog visible={importDialogVisible} onDismiss={() => setImportDialogVisible(false)}>
-        <Dialog.Title>Import Data</Dialog.Title>
-        <Dialog.Content>
-            <Paragraph style={{marginBottom: 10}}>
-                Paste your backup data below. This will replace all current data.
-            </Paragraph>
-            <Dialog.ScrollArea style={styles.exportScrollArea}>
-            <ScrollView>
-                <TextInput
-                value={importDataText}
-                onChangeText={setImportDataText}
-                multiline
-                numberOfLines={10}
-                placeholder="Paste JSON data here..."
-                mode="outlined"
-                style={styles.exportTextInput}
-                />
-            </ScrollView>
-            </Dialog.ScrollArea>
-        </Dialog.Content>
-        <Dialog.Actions>
-          <Button onPress={() => setImportDialogVisible(false)}>Cancel</Button>
-          <Button 
-            onPress={pickDocument}
-            icon="file-document-outline"
-            style={{marginRight: 8}}
-          >
-            File
-          </Button>
-          <Button 
-            onPress={confirmImportData}
-            mode="contained"
-            disabled={!importDataText.trim()}
-          >
-            Import
-          </Button>
-        </Dialog.Actions>
-      </Dialog>
-    </Portal>
+    <BottomSheetDialog
+      visible={importDialogVisible}
+      onDismiss={() => setImportDialogVisible(false)}
+      title="Import Data"
+      theme={theme}
+      insets={insets}
+    >
+      <Paragraph style={{ marginBottom: 10 }}>
+        Paste your backup data below. This will replace all current data.
+      </Paragraph>
+      <ScrollView style={{ maxHeight: 300 }}>
+        <TextInput
+          value={importDataText}
+          onChangeText={setImportDataText}
+          multiline
+          numberOfLines={10}
+          placeholder="Paste JSON data here..."
+          mode="outlined"
+          style={styles.exportTextInput}
+        />
+      </ScrollView>
+      <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 16 }}>
+        <Button onPress={() => setImportDialogVisible(false)}>Cancel</Button>
+        <Button
+          onPress={pickDocument}
+          icon="file-document-outline"
+          style={{ marginHorizontal: 8 }}
+        >
+          File
+        </Button>
+        <Button
+          onPress={confirmImportData}
+          mode="contained"
+          disabled={!importDataText.trim()}
+        >
+          Import
+        </Button>
+      </View>
+    </BottomSheetDialog>
   );
 
   if (!settings) {
@@ -668,7 +706,7 @@ const SettingsScreen: React.FC = () => {
 
       {/* Clear All Confirmation Dialog */}
       <Portal>
-        <Dialog visible={clearAllConfirmVisible} onDismiss={() => setClearAllConfirmVisible(false)}>
+        <Dialog theme={getDialogTheme(theme.dark)} style={{ borderRadius: 28 }} visible={clearAllConfirmVisible} onDismiss={() => setClearAllConfirmVisible(false)}>
           <Dialog.Title>Reset All Data</Dialog.Title>
           <Dialog.Content>
             <Text style={{ color: theme.colors.onSurface }}>This will permanently delete all your inventory items, shopping lists, notes, and settings. This action cannot be undone.</Text>
@@ -682,7 +720,7 @@ const SettingsScreen: React.FC = () => {
 
       {/* Error Alert Dialog */}
       <Portal>
-        <Dialog visible={errorAlertVisible} onDismiss={() => setErrorAlertVisible(false)}>
+        <Dialog theme={getDialogTheme(theme.dark)} style={{ borderRadius: 28 }} visible={errorAlertVisible} onDismiss={() => setErrorAlertVisible(false)}>
           <Dialog.Title>Error</Dialog.Title>
           <Dialog.Content>
             <Text style={{ color: theme.colors.onSurface }}>{errorMessage}</Text>
