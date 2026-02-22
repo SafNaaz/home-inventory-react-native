@@ -888,6 +888,8 @@ const InventoryScreen: React.FC = () => {
   const [newSubIcon, setNewSubIcon] = useState('');
   const [subToDeleteId, setSubToDeleteId] = useState<string | null>(null);
   const [isReordering, setIsReordering] = useState(false);
+  const [reorderSubcategories, setReorderSubcategories] = useState<string[]>([]);
+  const [reorderItems, setReorderItems] = useState<InventoryItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<InventoryItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -1711,7 +1713,12 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
             <IconButton
               icon={isReordering ? "check" : "sort-variant"}
               size={24}
-              onPress={() => setIsReordering(!isReordering)}
+              onPress={() => {
+                if (!isReordering) {
+                  setReorderSubcategories(subcategories);
+                }
+                setIsReordering(!isReordering);
+              }}
             />
             {!isReordering && (
               <IconButton
@@ -1728,8 +1735,10 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
         </View>
         {isReordering ? (
           <DraggableFlatList
-            data={subcategories}
+            data={reorderSubcategories}
             onDragEnd={({ data }) => {
+              // Immediately update local array to prevent jitter
+              setReorderSubcategories(data as string[]);
               if (navigation.category) {
                  inventoryManager.updateSubcategoryOrder(navigation.category, data as string[]);
               }
@@ -1859,7 +1868,12 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
             <IconButton
               icon={isReordering ? "check" : "sort-variant"}
               size={24}
-              onPress={() => setIsReordering(!isReordering)}
+              onPress={() => {
+                if (!isReordering) {
+                  setReorderItems(items);
+                }
+                setIsReordering(!isReordering);
+              }}
             />
             {!isReordering && (
               <>
@@ -1900,8 +1914,10 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
         </View>
         {isReordering ? (
           <DraggableFlatList
-            data={items}
+            data={reorderItems}
             onDragEnd={({ data }) => {
+              // Immediately update local array to prevent jitter
+              setReorderItems(data);
               const updates = data.map((item, index) => ({ id: item.id, order: index }));
               inventoryManager.updateItemOrder(updates);
             }}
