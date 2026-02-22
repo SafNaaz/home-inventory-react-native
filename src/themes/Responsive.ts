@@ -106,8 +106,8 @@ export const touchTarget = Math.max(44, rs(44));
 
 // Tab bar dimensions
 export const tabBar = {
-  height: isSmallScreen ? 56 : isMediumScreen ? 60 : 65,
-  bottomOffset: isSmallScreen ? 12 : isMediumScreen ? 16 : 20,
+  height: isSmallScreen ? 58 : isMediumScreen ? 62 : 68,
+  bottomOffset: isSmallScreen ? 14 : isMediumScreen ? 18 : 24,
   sideOffset: isSmallScreen ? 12 : isMediumScreen ? 16 : 20,
   borderRadius: isSmallScreen ? 24 : 32,
 };
@@ -121,7 +121,7 @@ export const card = {
 
 // FAB positioning
 export const fab = {
-  bottom: tabBar.height + tabBar.bottomOffset + (isSmallScreen ? 10 : 16),
+  bottom: tabBar.height + tabBar.bottomOffset + (isSmallScreen ? 24 : 32),
   right: isSmallScreen ? 12 : 16,
   margin: isSmallScreen ? 12 : 16,
 };

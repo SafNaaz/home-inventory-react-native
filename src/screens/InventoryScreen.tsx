@@ -20,6 +20,7 @@ import {
   Alert,
   TextInput as RNTextInput,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -80,7 +81,7 @@ const getSubcategoryIconColor = (config: any, isDark: boolean): string => {
 };
 import DoodleBackground from '../components/DoodleBackground';
 import { SwipeContext } from '../../App';
-import { tabBar as tabBarDims, fontSize as fs, spacing as sp, radius as r, iconSize as is, card as cardDims, fab as fabDims, screen } from '../themes/Responsive';
+import { tabBar as tabBarDims, rs, fontSize as fs, spacing as sp, radius as r, iconSize as is, card as cardDims, fab as fabDims, screen } from '../themes/Responsive';
 
 const { width, height } = Dimensions.get('window');
 const styles = StyleSheet.create({
@@ -847,8 +848,11 @@ const SubcategoryInput = ({
 
 const InventoryScreen: React.FC = () => {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const navigationObj = useNavigation();
   const { setSwipeEnabled } = React.useContext(SwipeContext);
+
+  const bottomPadding = tabBarDims.height + (insets.bottom > 0 ? insets.bottom + rs(8) : tabBarDims.bottomOffset) + rs(20);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const pendingUpdatesRef = useRef<Record<string, number>>({});
   const [refreshing, setRefreshing] = useState(false);
@@ -1595,7 +1599,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
         <ScrollView
           ref={homeScrollViewRef}
           style={styles.scrollView}
-          contentContainerStyle={{ paddingBottom: 110 }}
+          contentContainerStyle={{ paddingBottom: bottomPadding }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           keyboardShouldPersistTaps="handled"
           onScroll={handleScroll}
@@ -1712,7 +1716,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
             keyExtractor={(item) => item}
             renderItem={renderDraggableSubcategory}
             containerStyle={styles.container}
-            contentContainerStyle={{ paddingBottom: 110, padding: 16 }}
+            contentContainerStyle={{ paddingBottom: bottomPadding, padding: 16 }}
           />
         ) : (
           <ScrollView
@@ -1721,7 +1725,7 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
             onScroll={handleScroll}
             scrollEventThrottle={16}
             removeClippedSubviews={true}
-            contentContainerStyle={{ paddingBottom: 180 }}
+            contentContainerStyle={{ paddingBottom: bottomPadding + rs(40) }}
           >
             <View style={styles.subcategoriesList}>
               {subcategories.map(subName => {
@@ -1880,13 +1884,13 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
             keyExtractor={(item) => item.id}
             renderItem={renderDraggableItem}
             containerStyle={styles.container}
-            contentContainerStyle={{ paddingBottom: 110, padding: 16 }}
+            contentContainerStyle={{ paddingBottom: bottomPadding, padding: 16 }}
           />
         ) : (
           <ScrollView
             key="items-scroll"
             style={styles.scrollView}
-            contentContainerStyle={{ paddingBottom: 180, padding: 16 }}
+            contentContainerStyle={{ paddingBottom: bottomPadding + rs(40), padding: 16 }}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
             onScroll={handleScroll}
             scrollEventThrottle={16}
@@ -2083,8 +2087,8 @@ const SubcategoryRow = React.memo(({ subName, navigation, theme, activeCount, hi
         <View 
           style={{ 
               position: 'absolute', 
-              right: fabDims.right - 10, // Extend hit area slightly
-              bottom: fabDims.bottom - 10,
+              right: fabDims.right - 10,
+              bottom: (insets.bottom > 0 ? insets.bottom + rs(8) : tabBarDims.bottomOffset) + tabBarDims.height + rs(24),
               width: 80, // Fixed width hit area
               height: 160, // Fixed height hit area covering both FABs positions
               alignItems: 'center',

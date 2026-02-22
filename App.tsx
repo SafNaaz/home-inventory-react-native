@@ -8,6 +8,7 @@ import { GestureHandlerRootView, FlatList, ScrollView } from 'react-native-gestu
 import { Provider as PaperProvider, IconButton, Title, Paragraph, Button, Text } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { StatusBar, Alert, View, StyleSheet, AppState, TouchableOpacity, RefreshControl } from 'react-native';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { rs, tabBar as tabBarDims, fontSize, spacing, iconSize } from './src/themes/Responsive';
 
 // Screens
@@ -49,6 +50,7 @@ const Stack = createStackNavigator();
 // Tab Navigator Component
 const TabNavigator = () => {
   const { swipeEnabled } = useContext(SwipeContext);
+  const insets = useSafeAreaInsets();
   const systemColorScheme = useColorScheme();
   const settings = settingsManager.getSettings();
   const themeMode = settings.themeMode;
@@ -66,7 +68,7 @@ const TabNavigator = () => {
         return (
           <View style={{
             position: 'absolute',
-            bottom: tabBarDims.bottomOffset,
+            bottom: insets.bottom > 0 ? insets.bottom + rs(8) : tabBarDims.bottomOffset,
             left: tabBarDims.sideOffset,
             right: tabBarDims.sideOffset,
             height: tabBarDims.height,
@@ -270,6 +272,7 @@ const App: React.FC = () => {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
+    <SafeAreaProvider>
     <SwipeContext.Provider value={{ swipeEnabled, setSwipeEnabled }}>
     <PaperProvider theme={theme}>
       <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
@@ -394,6 +397,7 @@ const App: React.FC = () => {
       </View>
     </PaperProvider>
     </SwipeContext.Provider>
+    </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 };

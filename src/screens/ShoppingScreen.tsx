@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -41,7 +42,7 @@ import { ShoppingListItem, ShoppingState, InventoryItem, InventoryCategory } fro
 import { getCategoryConfig, getSubcategoryConfig } from '../constants/CategoryConfig';
 import { commonStyles, getCategoryColor } from '../themes/AppTheme';
 import DoodleBackground from '../components/DoodleBackground';
-import { tabBar as tabBarDims, fontSize as fs, spacing as sp, radius as r, screen } from '../themes/Responsive';
+import { tabBar as tabBarDims, rs, fontSize as fs, spacing as sp, radius as r, screen } from '../themes/Responsive';
 
 // Theme-based icon shades: slight variation per category type
 const getCategoryIconColor = (category: string, isDark: boolean): string => {
@@ -73,7 +74,10 @@ const getSubcategoryIconColor = (config: any, isDark: boolean): string => {
 
 const ShoppingScreen: React.FC = () => {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation();
+
+  const dynamicPadding = tabBarDims.height + (insets.bottom > 0 ? insets.bottom + rs(8) : tabBarDims.bottomOffset) + rs(24);
   const [shoppingList, setShoppingList] = useState<ShoppingListItem[]>([]);
   const [shoppingState, setShoppingState] = useState<ShoppingState>(ShoppingState.EMPTY);
   const [refreshing, setRefreshing] = useState(false);
@@ -430,7 +434,7 @@ const ShoppingScreen: React.FC = () => {
   };
 
   const renderEmptyState = () => (
-    <View style={styles.emptyState}>
+    <View style={[styles.emptyState, { paddingBottom: dynamicPadding + rs(20) }]}>
       <DoodleBackground />
       <Icon name="cart-outline" size={64} color={theme.colors.onSurfaceVariant} />
       <Text variant="headlineSmall" style={[styles.emptyTitle, { color: theme.colors.onBackground }]}>No Shopping List</Text>
@@ -479,7 +483,7 @@ const ShoppingScreen: React.FC = () => {
   );
 
   const renderGeneratingState = () => (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingBottom: dynamicPadding }]}>
       <DoodleBackground />
       <Card style={[styles.statusCard, { backgroundColor: theme.colors.surface }]} mode="elevated">
         <Card.Content style={{ paddingVertical: 8, paddingHorizontal: 12 }}>
@@ -573,7 +577,7 @@ const ShoppingScreen: React.FC = () => {
   );
 
   const renderListReadyState = () => (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingBottom: dynamicPadding }]}>
       <DoodleBackground />
       <Card style={[styles.statusCard, { backgroundColor: theme.colors.surface }]} mode="elevated">
         <Card.Content style={{ paddingVertical: 8, paddingHorizontal: 12 }}>
@@ -632,7 +636,7 @@ const ShoppingScreen: React.FC = () => {
     const uncheckedItems = getUncheckedItems();
 
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { paddingBottom: dynamicPadding }]}>
         <DoodleBackground />
         <Card style={[styles.statusCard, { backgroundColor: theme.colors.surface }]} mode="elevated">
           <Card.Content style={{ paddingVertical: 8, paddingHorizontal: 12 }}>

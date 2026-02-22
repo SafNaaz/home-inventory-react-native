@@ -24,15 +24,19 @@ import { useNavigation, useIsFocused } from '@react-navigation/native';
 import { notesManager } from '../managers/NotesManager';
 import { Note } from '../models/Types';
 import DoodleBackground from '../components/DoodleBackground';
-import { tabBar as tabBarDims, fontSize as fs, spacing as sp, radius as r, screen } from '../themes/Responsive';
+import { tabBar as tabBarDims, rs, fontSize as fs, spacing as sp, radius as r, screen } from '../themes/Responsive';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 const cardWidth = (width - 48) / 2; // 2 columns with padding
 
 const NotesScreen: React.FC = () => {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const isFocused = useIsFocused();
+  
+  const dynamicPadding = tabBarDims.height + (insets.bottom > 0 ? insets.bottom + rs(8) : tabBarDims.bottomOffset) + rs(20);
   const [notes, setNotes] = useState<Note[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
@@ -363,7 +367,7 @@ const NotesScreen: React.FC = () => {
       <DoodleBackground />
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={{ paddingBottom: 120 }}
+        contentContainerStyle={{ paddingBottom: dynamicPadding }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
@@ -380,7 +384,13 @@ const NotesScreen: React.FC = () => {
       {canAddNote && (
         <FAB
           icon="plus"
-          style={[styles.fab, { backgroundColor: theme.colors.primary }]}
+          style={[
+            styles.fab, 
+            { 
+              backgroundColor: theme.colors.primary,
+              bottom: (insets.bottom > 0 ? insets.bottom + rs(8) : tabBarDims.bottomOffset) + tabBarDims.height + rs(24)
+            }
+          ]}
           color={theme.dark ? '#000' : '#fff'}
           onPress={handleAddNote}
         />

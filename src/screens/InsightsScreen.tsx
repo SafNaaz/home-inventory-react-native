@@ -10,6 +10,7 @@ import {
   UIManager,
   InteractionManager
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Text,
   useTheme,
@@ -24,7 +25,7 @@ import { InventoryItem, InventoryCategory } from '../models/Types';
 import { CATEGORY_CONFIG, getAllCategories } from '../constants/CategoryConfig';
 import { commonStyles } from '../themes/AppTheme';
 import DoodleBackground from '../components/DoodleBackground';
-import { tabBar as tabBarDims, fontSize as fs, spacing as sp, radius as r, screen } from '../themes/Responsive';
+import { tabBar as tabBarDims, rs, fontSize as fs, spacing as sp, radius as r, screen } from '../themes/Responsive';
 
 // Theme-based icon shades: slight variation per category type
 const getCategoryIconColor = (category: string, isDark: boolean): string => {
@@ -267,7 +268,10 @@ const EmptyState: React.FC<{
 
 const InsightsScreen: React.FC = () => {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+  
+  const dynamicPadding = tabBarDims.height + (insets.bottom > 0 ? insets.bottom + rs(8) : tabBarDims.bottomOffset) + rs(20);
   const [refreshing, setRefreshing] = useState(false);
 
   // Expand/collapse state for each section
@@ -1050,7 +1054,7 @@ const InsightsScreen: React.FC = () => {
       <ScrollView
         ref={insightScrollViewRef}
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: dynamicPadding }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         {/* Hero Summary */}
