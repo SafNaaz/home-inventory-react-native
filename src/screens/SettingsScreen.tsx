@@ -490,7 +490,7 @@ const SettingsScreen: React.FC = () => {
         
         <List.Item
           title="Export Data"
-          description="Export your notes and statistics"
+          description="Export your notes and inventory statistics. Do regular backups in Cloud."
           left={() => <Icon name="export" size={24} color={theme.colors.onSurface} />}
           onPress={handleExportData}
         />
