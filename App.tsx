@@ -5,9 +5,9 @@ import { createMaterialTopTabNavigator } from '@react-navigation/material-top-ta
 import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { createStackNavigator, CardStyleInterpolators } from '@react-navigation/stack';
 import { GestureHandlerRootView, FlatList, ScrollView } from 'react-native-gesture-handler';
-import { Provider as PaperProvider, IconButton, Title, Paragraph, Button, Text } from 'react-native-paper';
+import { Provider as PaperProvider, IconButton, Title, Paragraph, Button, Text, Dialog, Portal } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
-import { StatusBar, Alert, View, StyleSheet, AppState, TouchableOpacity, RefreshControl } from 'react-native';
+import { StatusBar, View, StyleSheet, AppState, TouchableOpacity } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { rs, tabBar as tabBarDims, fontSize, spacing, iconSize } from './src/themes/Responsive';
 
@@ -146,6 +146,7 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [showSplashScreen, setShowSplashScreen] = useState(true);
   const [swipeEnabled, setSwipeEnabled] = useState(true);
+  const [showNotifDialog, setShowNotifDialog] = useState(false);
 
   useEffect(() => {
     // Initialize app
@@ -213,6 +214,11 @@ const App: React.FC = () => {
       if (settings.isSecurityEnabled && !settings.isAuthenticated) {
         const authSuccess = await settingsManager.checkAuthenticationIfNeeded();
         setIsAuthenticated(authSuccess);
+      }
+
+      // First-launch: show styled notification dialog
+      if (settingsManager.isFirstLaunch()) {
+        setShowNotifDialog(true);
       }
 
       // Clear all notifications on startup
@@ -406,6 +412,74 @@ const App: React.FC = () => {
             />
           </Stack.Navigator>
         </NavigationContainer>
+
+        {/* First-launch notification consent dialog — themed with Paper */}
+        <Portal>
+          <Dialog
+            visible={showNotifDialog}
+            dismissable={false}
+            style={{
+              borderRadius: 28,
+              backgroundColor: theme.colors.surface,
+              marginHorizontal: 24,
+            }}
+          >
+            <View style={{ alignItems: 'center', paddingTop: 28, paddingBottom: 4 }}>
+              <View style={{
+                width: 64, height: 64, borderRadius: 32,
+                backgroundColor: theme.colors.primaryContainer,
+                alignItems: 'center', justifyContent: 'center',
+                marginBottom: 16,
+              }}>
+                <Icon name="bell-badge" size={32} color={theme.colors.primary} />
+              </View>
+            </View>
+            <Dialog.Title style={{
+              textAlign: 'center',
+              fontWeight: '800',
+              fontSize: 18,
+              color: theme.colors.onSurface,
+              marginTop: 0,
+            }}>
+              Stay on Top of Your Inventory
+            </Dialog.Title>
+            <Dialog.Content>
+              <Text style={{ color: theme.colors.onSurfaceVariant, textAlign: 'center', lineHeight: 22 }}>
+                Get a daily reminder at{' '}
+                <Text style={{ fontWeight: '700', color: theme.colors.primary }}>9:00 PM</Text>
+                {' '}to check your inventory, and a health summary at{' '}
+                <Text style={{ fontWeight: '700', color: theme.colors.primary }}>9:30 PM</Text>
+                {' '}for low stock and stale items.
+              </Text>
+            </Dialog.Content>
+            <Dialog.Actions style={{ flexDirection: 'column', gap: 8, paddingHorizontal: 20, paddingBottom: 20 }}>
+              <Button
+                mode="contained"
+                onPress={async () => {
+                  setShowNotifDialog(false);
+                  await settingsManager.setupDefaultNotifications();
+                }}
+                style={{ width: '100%', borderRadius: 50 }}
+                contentStyle={{ paddingVertical: 6 }}
+                labelStyle={{ fontWeight: '800', fontSize: 15 }}
+                icon="bell-check"
+              >
+                Enable Notifications
+              </Button>
+              <Button
+                mode="text"
+                onPress={async () => {
+                  setShowNotifDialog(false);
+                  await settingsManager.skipNotificationSetup();
+                }}
+                labelStyle={{ color: theme.colors.onSurfaceVariant, fontWeight: '600' }}
+              >
+                Not Now
+              </Button>
+            </Dialog.Actions>
+          </Dialog>
+        </Portal>
+
       </View>
     </PaperProvider>
     </SwipeContext.Provider>

@@ -77,18 +77,18 @@ export class SettingsManager {
 
   private getDefaultSettings(): AppSettings {
     const now = new Date();
-    const morning = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 9, 0);
-    const evening = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 18, 0);
-    const healthTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 10, 0);
+    const reminderDefault = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 21, 0);  // 9:00 PM
+    const reminderDefault2 = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 21, 30); // 9:30 PM (fallback 2nd)
+    const healthDefault = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 21, 30);   // 9:30 PM
 
     return {
       themeMode: 'system',
       isSecurityEnabled: false,
       isAuthenticated: false,
-      isInventoryReminderEnabled: false,
+      isInventoryReminderEnabled: false, // Enabled after first-launch consent
       isSecondReminderEnabled: false,
-      reminderTime1: morning,
-      reminderTime2: evening,
+      reminderTime1: reminderDefault,
+      reminderTime2: reminderDefault2,
       miscItemHistory: [],
       activityThresholds: {
         [InventoryCategory.FRIDGE]: 3,
@@ -96,9 +96,10 @@ export class SettingsManager {
         [InventoryCategory.HYGIENE]: 15,
         [InventoryCategory.PERSONAL_CARE]: 30,
       },
-      isHealthAlertsEnabled: true,
-      healthAlertTime: healthTime,
+      isHealthAlertsEnabled: false, // Enabled after first-launch consent
+      healthAlertTime: healthDefault,
       securityLockTimeout: SecurityLockTimeout.IMMEDIATELY,
+      hasConfiguredNotifications: false,
     };
   }
 
@@ -161,6 +162,41 @@ export class SettingsManager {
   // MARK: - Settings Getters
   getSettings(): AppSettings {
     return { ...this.settings };
+  }
+
+  isFirstLaunch(): boolean {
+    return !this.settings.hasConfiguredNotifications;
+  }
+
+  /**
+   * Called on first launch after user consents.
+   * Requests permission, then enables both reminders with default times if granted.
+   * Returns true if permission was granted and notifications were enabled.
+   */
+  async setupDefaultNotifications(): Promise<boolean> {
+    const hasPermission = await this.requestNotificationPermission();
+
+    if (hasPermission) {
+      this.settings.isInventoryReminderEnabled = true;
+      this.settings.isHealthAlertsEnabled = true;
+      await this.scheduleInventoryReminders();
+      await this.scheduleHealthNotification();
+      console.log('🔔 [FirstLaunch] Default notifications enabled: reminder=21:00, health=21:30');
+    } else {
+      console.log('🔕 [FirstLaunch] User denied notifications, leaving disabled');
+    }
+
+    // Mark as configured regardless — don't ask again
+    this.settings.hasConfiguredNotifications = true;
+    await this.saveSettings();
+    return hasPermission;
+  }
+
+  /** User skipped the first-launch prompt — mark done, leave notifications off. */
+  async skipNotificationSetup(): Promise<void> {
+    this.settings.hasConfiguredNotifications = true;
+    await this.saveSettings();
+    console.log('🔕 [FirstLaunch] User skipped notifications setup');
   }
 
   getSecurityLockTimeout(): number {

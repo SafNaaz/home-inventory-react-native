@@ -125,6 +125,7 @@ export interface AppSettings {
   isHealthAlertsEnabled: boolean;
   healthAlertTime: Date;
   securityLockTimeout: number; // in milliseconds, 0 = immediately
+  hasConfiguredNotifications: boolean; // true after first-launch notification setup
 }
 
 export enum SecurityLockTimeout {
