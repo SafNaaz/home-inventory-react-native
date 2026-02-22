@@ -76,9 +76,9 @@ export const TourBubble: React.FC = () => {
   if (!guide) return null;
 
   const SCREEN_HEIGHT = Dimensions.get('window').height;
-  const shoppingSteps = ['go_shopping', 'finalize_list', 'start_shopping', 'finish_shopping'];
+  const shoppingSteps = ['finalize_list', 'start_shopping', 'finish_shopping'];
   const bottomValue =
-    guide.step === 'existing_cart' ? SCREEN_HEIGHT - 200 :
+    (guide.step === 'existing_cart' || guide.step === 'go_shopping') ? SCREEN_HEIGHT - 200 :
     guide.step === 'magic_cart' ? 200 :
     shoppingSteps.includes(guide.step) ? Math.round(SCREEN_HEIGHT / 2) - 100 : 110;
 
