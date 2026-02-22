@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, StyleSheet, Animated, PanResponder, Dimensions } from 'react-native';
+import { View, StyleSheet, Animated, PanResponder, Dimensions, Text, Alert } from 'react-native';
 import { Title, Paragraph, Button, useTheme, Surface } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { tourManager, TourGuide } from '../managers/TourManager';
@@ -79,8 +79,46 @@ export const TourBubble: React.FC = () => {
   const shoppingSteps = ['finalize_list', 'start_shopping', 'finish_shopping'];
   const bottomValue =
     (guide.step === 'existing_cart' || guide.step === 'go_shopping') ? SCREEN_HEIGHT - 200 :
-    guide.step === 'magic_cart' ? 200 :
+    guide.step === 'magic_cart' ? 280 :
     shoppingSteps.includes(guide.step) ? Math.round(SCREEN_HEIGHT / 2) - 100 : 110;
+
+  const ICON_TOKENS: Record<string, string> = {
+    '{{eye}}':        'eye-off-outline',
+    '{{search}}':     'magnify',
+    '{{wand}}':       'auto-fix',
+    '{{hidden}}':     'sleep',
+    '{{misc}}':       'tag-plus',
+    '{{swipe_left}}': 'gesture-swipe-left',
+    '{{plus}}':       'plus-circle-outline',
+  };
+
+  const renderMessage = () => {
+    const parts: { text?: string; icon?: string }[] = [];
+    const tokenRegex = /\{\{(eye|search|wand|hidden|misc|swipe_left|plus)\}\}/g;
+    let lastIndex = 0;
+    let match;
+    while ((match = tokenRegex.exec(guide.message)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push({ text: guide.message.slice(lastIndex, match.index) });
+      }
+      parts.push({ icon: ICON_TOKENS[match[0]] });
+      lastIndex = match.index + match[0].length;
+    }
+    if (lastIndex < guide.message.length) {
+      parts.push({ text: guide.message.slice(lastIndex) });
+    }
+    return (
+      <Text style={[styles.message, { color: theme.colors.onSurfaceVariant }]}>
+        {parts.map((p, i) =>
+          p.icon ? (
+            <Text key={i}> <Icon name={p.icon as any} size={15} color={theme.colors.primary} />{' '}</Text>
+          ) : (
+            <Text key={i}>{p.text}</Text>
+          )
+        )}
+      </Text>
+    );
+  };
 
   return (
     <Animated.View 
@@ -99,13 +137,24 @@ export const TourBubble: React.FC = () => {
             <Icon name="drag-horizontal-variant" size={24} color={theme.colors.primary} />
           </Animated.View>
           <Title style={[styles.title, { color: theme.colors.onSurface }]}>{guide.title}</Title>
-          <Button mode="text" compact onPress={() => tourManager.quitTour()} labelStyle={{ fontSize: 12 }}>
+          <Button mode="text" compact onPress={() => {
+            if (guide.step === 'completed') {
+              tourManager.quitTour();
+            } else {
+              Alert.alert(
+                'Skip Tour?',
+                'You can restart the tour anytime from Settings → App Walkthrough Tour.',
+                [
+                  { text: 'Keep Going', style: 'cancel' },
+                  { text: 'Skip', style: 'destructive', onPress: () => tourManager.quitTour() },
+                ]
+              );
+            }
+          }} labelStyle={{ fontSize: 12 }}>
             {guide.step === 'completed' ? 'End Tour' : 'Skip Tour'}
           </Button>
         </View>
-        <Paragraph style={[styles.message, { color: theme.colors.onSurfaceVariant }]}>
-          {guide.message}
-        </Paragraph>
+        {renderMessage()}
         <Paragraph style={{ fontSize: 10, color: theme.colors.onSurfaceVariant, opacity: 0.5, textAlign: 'right', marginTop: 4 }}>
           drag to move
         </Paragraph>

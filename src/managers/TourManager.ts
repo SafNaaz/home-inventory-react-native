@@ -26,14 +26,14 @@ export interface TourGuide {
 
 const TOUR_STEPS: TourGuide[] = [
   { step: 'welcome', title: 'Welcome to HiHome!', message: 'Let\'s take a quick 1-minute tour. First, tap on the Fridge category.' },
-  { step: 'category', title: 'Inside a Category', message: 'Great! This shows all sections in your Fridge. Tap any subcategory (like Door Bottles or Freezer).' },
-  { step: 'subcategory', title: 'Adding Items', message: 'Let\'s add a real item. Tap the + button and add "Milk".' },
+  { step: 'category', title: 'Inside a Category', message: 'Great! This shows all sections in your Fridge. Tap any subcategory to go inside.\n\n💡 Tip: swipe a section {{swipe_left}} to rename or delete it.' },
+  { step: 'subcategory', title: 'Adding Items', message: 'Now let\'s add an item — tap the {{plus}} button!\n\n💡 Tip: swipe any item {{swipe_left}} to edit or delete it.' },
   { step: 'add_item', title: 'Adding Items', message: 'Type anything (like "Milk") and hit Add.' },
   { step: 'lower_stock', title: 'Managing Stock', message: 'Look, it\'s magically 100% full! Pretend you drank some. Drag the slider or press the minus button until it turns red (Low Stock).' },
-  { step: 'magic_cart', title: 'Smart Shopping', message: 'See the eye icon? It hides items you rarely buy. The global search lets you find and add anything. Now, tap the Magic Wand 🪄' },
+  { step: 'magic_cart', title: 'Smart Shopping', message: 'The {{eye}} next to an item name hides it from shopping. The global search {{search}} floating button lets you find from all items in inventory and update quantity. Now tap the {{wand}} Magic Wand to generate your cart!' },
   { step: 'existing_cart', title: 'You Have a Cart!', message: 'An existing cart is showing. "Continue" won\'t include your test item. Tap "Start New List" to generate a fresh cart with all low-stock items.' },
   { step: 'go_shopping', title: 'Cart Generated!', message: 'You can tap on "Go There" on the alert, or the "Shopping" tab below.' },
-  { step: 'finalize_list', title: 'Review & Edit', message: 'Add from the Hidden list or type Misc items (which won\'t be stocked). Then tap "Finalize List".' },
+  { step: 'finalize_list', title: 'Review & Edit', message: 'Tap {{hidden}} to add hidden items to cart. Tap {{misc}} to add a one-off Misc item (won\'t be stocked). Then tap "Finalize List".' },
   { step: 'start_shopping', title: 'Ready to Shop', message: 'Your list is locked in. Tap "Start Shopping" to begin!' },
   { step: 'finish_shopping', title: 'Shopping in Progress', message: 'Check off your test item and tap "Complete Shopping" at the bottom.' },
   { step: 'insights_tab', title: 'Shopping Complete!', message: 'All checked items are restocked! Your test item is also deleted to keep your inventory clean. Take a peek at the "Insights" tab.' },
